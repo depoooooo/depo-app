@@ -856,12 +856,12 @@ class AppState extends ChangeNotifier {
     return null;
   }
 
-  void submitJoin({required Role type, required String storeName, required String area, String details = ''}) {
+  void submitJoin({required Role type, required String storeName, required String area, String details = '', Map<String, String> docs = const {}}) {
     if (joinBlocker() != null) return;
     final u = me!;
     joinRequests.insert(
       0,
-      JoinRequest(id: _id('j'), phone: u.phone, name: u.name, type: type, storeName: storeName, area: area, details: details),
+      JoinRequest(id: _id('j'), phone: u.phone, name: u.name, type: type, storeName: storeName, area: area, details: details, docs: Map.of(docs)),
     );
     for (final s in users.where((x) => x.role == Role.supervisor || x.role == Role.admin)) {
       notify(s.phone, 'طلب انضمام جديد: ${roleNames[type]} — ${storeName.isEmpty ? u.name : storeName}');

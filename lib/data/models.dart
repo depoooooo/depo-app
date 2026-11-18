@@ -375,6 +375,7 @@ class JoinRequest {
   String status; // pending / approved / rejected
   String note;
   int createdAt;
+  Map<String, String> docs; // اسم الورقة -> رقم الصورة
 
   JoinRequest({
     required this.id,
@@ -387,11 +388,14 @@ class JoinRequest {
     this.status = 'pending',
     this.note = '',
     int? createdAt,
-  }) : createdAt = createdAt ?? _now();
+    Map<String, String>? docs,
+  })  : createdAt = createdAt ?? _now(),
+        docs = docs ?? {};
 
   Map<String, dynamic> toJson() => {
         'id': id,
         'phone': phone,
+        'docs': docs,
         'name': name,
         'type': type.name,
         'storeName': storeName,
@@ -413,6 +417,7 @@ class JoinRequest {
         status: (j['status'] ?? 'pending') as String,
         note: (j['note'] ?? '') as String,
         createdAt: j['createdAt'] as int?,
+        docs: Map<String, String>.from((j['docs'] ?? const {}) as Map),
       );
 }
 

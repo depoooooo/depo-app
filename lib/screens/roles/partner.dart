@@ -8,30 +8,6 @@ import '../../theme.dart';
 import '../../widgets/common.dart';
 import '../orders.dart';
 
-/// يختار صورة ويرفعها، ويرجّع رقمها (أو null)
-Future<String?> pickAndUpload(BuildContext context, {String owner = ''}) async {
-  final camera = await showModalBottomSheet<bool>(
-    context: context,
-    showDragHandle: true,
-    builder: (c) => SafeArea(
-      child: Column(mainAxisSize: MainAxisSize.min, children: [
-        ListTile(leading: const Icon(Icons.photo_camera_outlined), title: const Text('صوّر هسه'), onTap: () => Navigator.pop(c, true)),
-        ListTile(leading: const Icon(Icons.photo_library_outlined), title: const Text('من المعرض'), onTap: () => Navigator.pop(c, false)),
-        const SizedBox(height: 8),
-      ]),
-    ),
-  );
-  if (camera == null) return null;
-  try {
-    final b = await Images.pick(camera: camera);
-    if (b == null) return null;
-    return await Images.put(b, owner: owner);
-  } catch (e) {
-    if (context.mounted) toast(context, 'ما انرفعت الصورة: $e');
-    return null;
-  }
-}
-
 /// واجهة المطعم والتاجر
 class PartnerHome extends StatelessWidget {
   const PartnerHome({super.key});
@@ -86,7 +62,6 @@ class _Dashboard extends StatefulWidget {
 }
 
 class _DashboardState extends State<_Dashboard> {
-  bool autoDaily = false;
 
   @override
   Widget build(BuildContext context) {
@@ -117,12 +92,11 @@ class _DashboardState extends State<_Dashboard> {
         const SizedBox(height: 12),
         if (s.type == StoreType.restaurant)
           AppCard(
-            child: SwitchListTile(
+            child: const ListTile(
               contentPadding: EdgeInsets.zero,
-              value: autoDaily,
-              onChanged: (v) => setState(() => autoDaily = v),
-              title: const Text('رواجع يومية تلقائية', style: TextStyle(fontWeight: FontWeight.w800)),
-              subtitle: const Text('تنشر وحدها كل يوم الساعة 10 بالليل وأنت تأكد الكمية بس'),
+              leading: Icon(Icons.schedule_rounded, color: DepoColors.muted),
+              title: Text('رواجع يومية تلقائية (قريباً)', style: TextStyle(fontWeight: FontWeight.w800)),
+              subtitle: Text('تنشر وحدها كل يوم بوقت تختاره وأنت تأكد الكمية بس. هسه استخدم «انشر بضغطة وحدة» فوق.'),
             ),
           ),
         const SectionTitle('الأرباح والتسويات'),

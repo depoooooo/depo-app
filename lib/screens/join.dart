@@ -19,7 +19,8 @@ class _JoinScreenState extends State<JoinScreen> {
   final kind = TextEditingController();
   final area = TextEditingController();
   final vehicle = TextEditingController();
-  final docs = <String>{};
+  final docs = <String, String>{}; // اسم الورقة -> رقم الصورة
+  String? uploading;
 
   @override
   void dispose() {
@@ -55,6 +56,7 @@ class _JoinScreenState extends State<JoinScreen> {
       storeName: type == Role.courier ? '' : storeName.text.trim(),
       area: type == Role.courier ? '' : area.text.trim(),
       details: type == Role.courier ? 'المركبة: ${vehicle.text.trim()}' : 'النوع: ${kind.text.trim()}',
+      docs: docs,
     );
     toast(context, 'وصل طلبك! المشرف يراجعه ويرتب زيارة تفتيش خلال 72 ساعة');
     Navigator.pop(context);
@@ -97,14 +99,31 @@ class _JoinScreenState extends State<JoinScreen> {
           Wrap(spacing: 8, runSpacing: 8, children: [
             for (final d in requiredDocs)
               FilterChip(
-                avatar: Icon(docs.contains(d) ? Icons.check_circle : Icons.upload_file, size: 18),
+                avatar: uploading == d
+                    ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                    : Icon(docs.containsKey(d) ? Icons.check_circle : Icons.add_a_photo_outlined, size: 18),
                 label: Text(d),
-                selected: docs.contains(d),
-                onSelected: (v) => setState(() => v ? docs.add(d) : docs.remove(d)),
+                selected: docs.containsKey(d),
+                onSelected: uploading != null
+                    ? null
+                    : (v) async {
+                        if (!v) {
+                          setState(() => docs.remove(d));
+                          return;
+                        }
+                        if (!await ensureLoggedIn(context, reason: 'سجّل أول حتى نرفع أوراقك') || !context.mounted) return;
+                        setState(() => uploading = d);
+                        final id = await pickAndUpload(context, owner: 'join:${app.currentPhone}');
+                        if (!mounted) return;
+                        setState(() {
+                          uploading = null;
+                          if (id != null) docs[d] = id;
+                        });
+                      },
               ),
           ]),
           const SizedBox(height: 4),
-          const Text('(تجريبي: اضغط على كل ورقة كأنك رفعتها. رفع الصور الحقيقي يتفعل ويه Firebase)', style: TextStyle(fontSize: 11, color: DepoColors.muted)),
+          const Text('اضغط على كل ورقة وصوّرها أو اختارها من المعرض', style: TextStyle(fontSize: 11, color: DepoColors.muted)),
           const SizedBox(height: 16),
           FilledButton(onPressed: _submit, child: const Text('أرسل الطلب')),
           const SizedBox(height: 8),

@@ -123,7 +123,7 @@ class AccountScreen extends StatelessWidget {
       context: context,
       builder: (c) => AlertDialog(
         title: const Text('ادعُ صديقك'),
-        content: Text('رمز الدعوة مالتك: $code\n\nلما صديقك يطلب أول مرة بهذا الرمز، الاثنين تاخذون نقاط.'),
+        content: Text('رمز الدعوة مالتك: $code\n\nدزّه لأصدقائك. مكافأة الدعوة (نقاط إلك وإله) تتفعل قريباً.'),
         actions: [TextButton(onPressed: () => Navigator.pop(c), child: const Text('تمام'))],
       ),
     );

@@ -65,6 +65,28 @@ class JoinRequestsTab extends StatelessWidget {
               ]),
               Text('${roleNames[r.type]} • ${r.name} • ${r.phone} • ${timeAgo(r.createdAt)}', style: const TextStyle(fontSize: 12, color: DepoColors.muted)),
               if (r.details.isNotEmpty) Text(r.details, style: const TextStyle(fontSize: 12)),
+              if (r.docs.isNotEmpty) ...[
+                const SizedBox(height: 6),
+                Wrap(spacing: 8, runSpacing: 8, children: [
+                  for (final e in r.docs.entries)
+                    InkWell(
+                      onTap: () => showDialog(
+                        context: context,
+                        builder: (c) => Dialog(
+                          child: Column(mainAxisSize: MainAxisSize.min, children: [
+                            Padding(padding: const EdgeInsets.all(12), child: Text(e.key, style: const TextStyle(fontWeight: FontWeight.w900))),
+                            AppImage(imageId: e.value, height: 380, fallback: const SizedBox(height: 120, child: Center(child: Text('الصورة ما انفتحت')))),
+                            TextButton(onPressed: () => Navigator.pop(c), child: const Text('إغلاق')),
+                          ]),
+                        ),
+                      ),
+                      child: Column(children: [
+                        AppImage(imageId: e.value, height: 64, width: 64, radius: 10, fallback: const SizedBox(width: 64, height: 64, child: Icon(Icons.image_not_supported_outlined))),
+                        SizedBox(width: 70, child: Text(e.key, maxLines: 1, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center, style: const TextStyle(fontSize: 10))),
+                      ]),
+                    ),
+                ]),
+              ],
               if (r.note.isNotEmpty) Text('السبب: ${r.note}', style: const TextStyle(fontSize: 12, color: DepoColors.danger)),
               if (r.status == 'pending') ...[
                 const SizedBox(height: 8),
