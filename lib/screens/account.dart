@@ -331,7 +331,36 @@ class SettingsScreen extends StatelessWidget {
           const SizedBox(height: 8),
           OutlinedButton.icon(
             style: OutlinedButton.styleFrom(foregroundColor: DepoColors.danger, side: const BorderSide(color: DepoColors.danger)),
-            onPressed: () => toast(context, 'حذف الحساب يتفعل ويه Firebase'),
+            onPressed: () async {
+              if (!app.loggedIn) return toast(context, 'ما مسجّل دخول');
+              if (app.me!.role != Role.customer) return toast(context, 'حسابك ${roleNames[app.me!.role]}. تواصل ويه الإدارة حتى ينحذف.');
+              final ok = await showDialog<bool>(
+                context: context,
+                builder: (c) => AlertDialog(
+                  title: const Text('تحذف حسابك نهائياً؟'),
+                  content: const Text('تنمسح معلوماتك وعناوينك ونقاطك ومتابعاتك. الطلبات القديمة تبقى بدون اسمك للحسابات.'),
+                  actions: [
+                    TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('لا')),
+                    FilledButton(
+                      style: FilledButton.styleFrom(backgroundColor: DepoColors.danger, minimumSize: const Size(0, 44)),
+                      onPressed: () => Navigator.pop(c, true),
+                      child: const Text('احذف'),
+                    ),
+                  ],
+                ),
+              );
+              if (ok != true) return;
+              final open = app.myOrders.any((o) => o.isOpen);
+              if (open) {
+                if (context.mounted) toast(context, 'عندك طلب مفتوح. انتظر يخلص بعدين احذف الحساب.');
+                return;
+              }
+              app.deleteMyAccount();
+              if (context.mounted) {
+                toast(context, 'انحذف حسابك');
+                Navigator.pop(context);
+              }
+            },
             icon: const Icon(Icons.person_remove_outlined),
             label: const Text('حذف الحساب'),
           ),

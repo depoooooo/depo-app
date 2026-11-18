@@ -280,6 +280,22 @@ class AppState extends ChangeNotifier {
     _save();
   }
 
+  /// يشيل البيانات التجريبية بس (المحلات والحسابات 0700000…) ويخلي الحقيقية — قبل الإطلاق
+  bool get hasDemoData => stores.any((s) => s.ownerPhone.startsWith('0700000'));
+  void removeDemoData() {
+    if (me?.role != Role.admin) return;
+    final demoStores = stores.where((s) => s.ownerPhone.startsWith('0700000')).map((s) => s.id).toSet();
+    offers.removeWhere((o) => demoStores.contains(o.storeId));
+    orders.removeWhere((o) => demoStores.contains(o.storeId));
+    stores.removeWhere((s) => demoStores.contains(s.id));
+    users.removeWhere((u) => u.phone.startsWith('0700000'));
+    for (final u in users) {
+      u.follows.removeWhere(demoStores.contains);
+    }
+    _log('حذف البيانات التجريبية');
+    _changed();
+  }
+
   /// يمسح كل البيانات ويرجع للبيانات التجريبية (بالسيرفر: المدير بس)
   bool get canResetDemo => !online || me?.role == Role.admin;
   Future<void> resetDemo() async {
@@ -346,8 +362,27 @@ class AppState extends ChangeNotifier {
     _changed();
   }
 
+  /// حذف حساب الزبون (مطلوب من متجر Google Play)
+  void deleteMyAccount() {
+    final u = me;
+    if (u == null || u.role != Role.customer) return;
+    for (final o in orders.where((o) => o.customerPhone == u.phone)) {
+      o.customerName = 'حساب محذوف';
+      o.address = '';
+    }
+    joinRequests.removeWhere((r) => r.phone == u.phone && r.status == 'pending');
+    users.remove(u);
+    _log('حذف حساب زبون');
+    currentPhone = null;
+    _seenTop = null;
+    cart.clear();
+    _changed();
+  }
+
   void updateName(String name) {
-    me?.name = name;
+    final t = name.trim();
+    if (t.length < 2 || t.length > 40) return;
+    me?.name = t;
     _changed();
   }
 

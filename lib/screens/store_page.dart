@@ -31,12 +31,7 @@ class StorePage extends StatelessWidget {
                 decoration: BoxDecoration(color: DepoColors.brand, borderRadius: BorderRadius.circular(20)),
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Row(children: [
-                    Container(
-                      width: 60,
-                      height: 60,
-                      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16)),
-                      child: Icon(isRest ? Icons.restaurant : Icons.storefront, color: DepoColors.dark, size: 30),
-                    ),
+                    StoreAvatar(store: s, size: 60),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -71,6 +66,11 @@ class StorePage extends StatelessWidget {
                 ]),
               ),
               const SizedBox(height: 12),
+              if (s.suspended)
+                const AppCard(
+                  color: Color(0xFFFDECED),
+                  child: Text('هذا المحل متوقف مؤقتاً، ما تكدر تطلب منه هسه.', style: TextStyle(color: DepoColors.danger, fontWeight: FontWeight.w800)),
+                ),
               if (s.usuallyPublishes.isNotEmpty)
                 AppCard(
                   child: Row(children: [

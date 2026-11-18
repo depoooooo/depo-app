@@ -40,9 +40,12 @@ class _OfferDetailScreenState extends State<OfferDetailScreen> {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => ListenableBuilder(listenable: app, builder: (context, _) => _build(context));
+
+  Widget _build(BuildContext context) {
     final o = (app.offerById(widget.offer.id) ?? widget.offer);
-    final s = app.storeById(o.storeId)!;
+    final s = app.storeById(o.storeId);
+    if (s == null) return Scaffold(appBar: AppBar(), body: const EmptyState(icon: Icons.store_outlined, text: 'هذا المحل مو متوفر'));
     final isRawaji = s.type == StoreType.restaurant;
     return Scaffold(
       appBar: AppBar(title: Text(s.fullName)),
@@ -106,8 +109,14 @@ class _OfferDetailScreenState extends State<OfferDetailScreen> {
             const SizedBox(width: 12),
             Expanded(
               child: FilledButton(
-                onPressed: o.quantityLeft > 0 && o.visible ? _add : null,
-                child: Text(o.quantityLeft > 0 ? 'أضف للسلة — ${iqd(o.price * qty)}' : 'خلصت'),
+                onPressed: o.visible && !s.suspended ? _add : null,
+                child: Text(s.suspended
+                    ? 'المحل مو متوفر هسه'
+                    : o.expired
+                        ? 'انتهى وقت العرض'
+                        : o.quantityLeft > 0 && o.visible
+                            ? 'أضف للسلة — ${iqd(o.price * qty)}'
+                            : 'خلصت'),
               ),
             ),
           ]),

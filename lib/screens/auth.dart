@@ -253,7 +253,7 @@ class _LoginScreenState extends State<LoginScreen> {
             const SizedBox(height: 4),
             const Text('حتى المحل والمندوب يعرفون منو صاحب الطلب', style: TextStyle(color: DepoColors.muted)),
             const SizedBox(height: 20),
-            TextField(controller: name, decoration: const InputDecoration(labelText: 'الاسم')),
+            TextField(controller: name, maxLength: 40, decoration: const InputDecoration(labelText: 'الاسم')),
             const SizedBox(height: 12),
             FilledButton(onPressed: _finish, child: const Text('ابدأ')),
           ],

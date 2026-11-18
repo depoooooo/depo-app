@@ -8,10 +8,20 @@ import 'common.dart';
 
 /// يضيف للسلة مباشرة (ويسأل إذا السلة من محل ثاني)
 Future<void> quickAdd(BuildContext context, Offer o) async {
-  if (o.quantityLeft <= 0) {
-    toast(context, 'خلص هذا العرض');
+  final live = app.offerById(o.id) ?? o;
+  if (!live.visible) {
+    toast(context, live.expired ? 'انتهى وقت هذا العرض' : 'خلص هذا العرض');
     return;
   }
+  if (app.storeById(live.storeId)?.suspended ?? true) {
+    toast(context, 'المحل مو متوفر هسه');
+    return;
+  }
+  if (qtyInCart(live) >= live.quantityLeft) {
+    toast(context, 'وصلت لآخر كمية متوفرة');
+    return;
+  }
+  o = live;
   if (!cart.canAdd(o)) {
     final ok = await showDialog<bool>(
       context: context,
@@ -52,7 +62,7 @@ class AddButton extends StatelessWidget {
       listenable: cart,
       builder: (context, _) {
         final q = qtyInCart(offer);
-        final soldOut = offer.quantityLeft <= 0;
+        final soldOut = !offer.visible;
         return AnimatedSwitcher(
           duration: const Duration(milliseconds: 220),
           transitionBuilder: (c, a) => ScaleTransition(scale: a, child: c),

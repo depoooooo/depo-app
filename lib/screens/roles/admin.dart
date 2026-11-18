@@ -245,6 +245,32 @@ class _SettingsTabState extends State<_SettingsTab> {
         const Text('المرحلة 3 = كل الموصل. المتابعين يوصلهم الإشعار بأول مرحلة دائماً.', style: TextStyle(fontSize: 12, color: DepoColors.muted)),
         const SizedBox(height: 16),
         FilledButton(onPressed: _save, child: const Text('حفظ الإعدادات')),
+        if (app.hasDemoData) ...[
+          const SizedBox(height: 24),
+          const SectionTitle('قبل الإطلاق'),
+          OutlinedButton.icon(
+            style: OutlinedButton.styleFrom(foregroundColor: DepoColors.danger, side: const BorderSide(color: DepoColors.danger)),
+            onPressed: () async {
+              final ok = await showDialog<bool>(
+                context: context,
+                builder: (c) => AlertDialog(
+                  title: const Text('تحذف البيانات التجريبية؟'),
+                  content: const Text('تنشال المحلات والحسابات التجريبية (أرقام 0700000…) وعروضها وطلباتها. الحسابات الحقيقية تبقى.'),
+                  actions: [
+                    TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('لا')),
+                    FilledButton(style: FilledButton.styleFrom(minimumSize: const Size(0, 44)), onPressed: () => Navigator.pop(c, true), child: const Text('احذف')),
+                  ],
+                ),
+              );
+              if (ok == true) {
+                app.removeDemoData();
+                if (context.mounted) toast(context, 'انحذفت البيانات التجريبية');
+              }
+            },
+            icon: const Icon(Icons.cleaning_services_outlined),
+            label: const Text('حذف البيانات التجريبية'),
+          ),
+        ],
       ],
     );
   }
