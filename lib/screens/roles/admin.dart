@@ -35,50 +35,105 @@ class AdminHome extends StatelessWidget {
   }
 }
 
-class _ReportsTab extends StatelessWidget {
+enum _Period { today, week, month, all }
+
+const _periodNames = {
+  _Period.today: 'اليوم',
+  _Period.week: 'هالأسبوع',
+  _Period.month: 'هالشهر',
+  _Period.all: 'الكل',
+};
+
+class _ReportsTab extends StatefulWidget {
+  @override
+  State<_ReportsTab> createState() => _ReportsTabState();
+}
+
+class _ReportsTabState extends State<_ReportsTab> {
+  _Period period = _Period.month;
+
+  /// بداية الفترة (الأسبوع يبدي من السبت)
+  int get _from {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    switch (period) {
+      case _Period.today:
+        return today.millisecondsSinceEpoch;
+      case _Period.week:
+        final back = (today.weekday - DateTime.saturday) % 7;
+        return today.subtract(Duration(days: back)).millisecondsSinceEpoch;
+      case _Period.month:
+        return DateTime(now.year, now.month).millisecondsSinceEpoch;
+      case _Period.all:
+        return 0;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final delivered = app.deliveredOrders;
+    final from = _from;
+    final inRange = app.orders.where((o) => o.createdAt >= from).toList();
+    final delivered = inRange.where((o) => o.status == OrderStatus.delivered).toList();
+    final gmv = delivered.fold(0, (s, o) => s + o.itemsTotal);
+    final comm = delivered.fold(0, (s, o) => s + o.commission);
+    final saved = delivered.fold(0, (s, o) => s + (o.originalTotal - o.itemsTotal));
     final rawaji = delivered.where((o) => app.storeById(o.storeId)?.type == StoreType.restaurant).length;
     final open = app.orders.where((o) => o.isOpen).length;
-    final customers = app.users.where((u) => u.role == Role.customer).length;
+    final cancelled = inRange.where((o) => o.status == OrderStatus.rejected || o.status == OrderStatus.cancelled).length;
+    final customers = app.users.where((u) => u.role == Role.customer).toList();
+    final newCustomers = customers.where((u) => u.createdAt >= from).length;
+    final avg = delivered.isEmpty ? 0 : (gmv / delivered.length).round();
+    final label = _periodNames[period]!;
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
+        SegmentedButton<_Period>(
+          showSelectedIcon: false,
+          segments: [for (final p in _Period.values) ButtonSegment(value: p, label: Text(_periodNames[p]!))],
+          selected: {period},
+          onSelectionChanged: (v) => setState(() => period = v.first),
+        ),
+        const SizedBox(height: 12),
         StatGrid([
-          StatTile('مجموع المبيعات (GMV)', iqd(app.gmv)),
-          StatTile('عمولات Depo', iqd(app.totalCommission)),
+          StatTile('المبيعات ($label)', iqd(gmv)),
+          StatTile('عمولات Depo', iqd(comm)),
           StatTile('طلبات مُسلّمة', '${delivered.length}'),
-          StatTile('طلبات مفتوحة', '${open}'),
+          StatTile('متوسط الطلب', iqd(avg)),
           StatTile('طلبات رواجع', '$rawaji'),
           StatTile('طلبات ماركت', '${delivered.length - rawaji}'),
-          StatTile('الزبائن', '$customers'),
-          StatTile('المحلات', '${app.stores.length}'),
+          StatTile('مرفوضة / ملغية', '$cancelled'),
+          StatTile('مفتوحة هسه', '$open'),
+          StatTile('زبائن جدد', '$newCustomers'),
+          StatTile('كل الزبائن', '${customers.length}'),
         ]),
         const SizedBox(height: 10),
         AppCard(
           color: DepoColors.successBg,
           borderColor: DepoColors.successBg,
-          child: Text('وفّرنا للزبائن ${iqd(app.savedForCustomers)} وأنقذنا ${delivered.fold(0, (s, o) => s + o.lines.fold(0, (a, l) => a + l.qty))} وجبة ومنتج',
+          child: Text('$label: وفّرنا للزبائن ${iqd(saved)} وأنقذنا ${delivered.fold(0, (s, o) => s + o.lines.fold(0, (a, l) => a + l.qty))} وجبة ومنتج',
               style: const TextStyle(color: DepoColors.success, fontWeight: FontWeight.w800)),
         ),
-        const SectionTitle('حسب المحل'),
-        for (final s in app.stores)
+        SectionTitle('حسب المحل ($label)'),
+        for (final s in [...app.stores]..sort((a, b) => _sales(b.id, delivered) - _sales(a.id, delivered)))
           AppCard(
             child: Builder(builder: (context) {
-              final os = app.ordersOfStore(s.id).where((o) => o.status == OrderStatus.delivered).toList();
+              final os = delivered.where((o) => o.storeId == s.id).toList();
               final sales = os.fold(0, (a, o) => a + o.itemsTotal);
-              final comm = os.fold(0, (a, o) => a + o.commission);
+              final c = os.fold(0, (a, o) => a + o.commission);
               return Row(children: [
                 Expanded(child: Text(s.fullName, style: const TextStyle(fontWeight: FontWeight.w800))),
-                Text('${os.length} طلب • ${iqd(sales)} • عمولة ${iqd(comm)}', style: const TextStyle(fontSize: 12)),
+                Text('${os.length} طلب • ${iqd(sales)} • عمولة ${iqd(c)}', style: const TextStyle(fontSize: 12)),
               ]);
             }),
           ),
-        const Text('التقارير التفصيلية والتصدير لـ Excel تنضاف ويه لوحة الويب.', style: TextStyle(fontSize: 12, color: DepoColors.muted)),
+        const Text('الأرقام تحسب الطلبات المُسلّمة بس. «مفتوحة هسه» ما تتأثر بالفترة.',
+            style: TextStyle(fontSize: 12, color: DepoColors.muted)),
       ],
     );
   }
+
+  int _sales(String storeId, List<Order> delivered) =>
+      delivered.where((o) => o.storeId == storeId).fold(0, (a, o) => a + o.itemsTotal);
 }
 
 class _SettingsTab extends StatefulWidget {
