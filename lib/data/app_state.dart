@@ -1,11 +1,14 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
 import 'package:flutter/foundation.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'cloud.dart';
 import 'models.dart';
 
-/// «السيرفر» المؤقت: كل البيانات تنحفظ على الجهاز لحد ما نربط Firebase.
-/// كل الدوال هنا تتبدل بعدين باستدعاءات Firebase بنفس الأسماء.
+/// حالة التطبيق: البيانات تنحفظ بـ Firebase (Firestore) وتتزامن بين كل الأجهزة.
+/// إذا ماكو اتصال بالسيرفر، تشتغل محلياً على الجهاز.
 class AppState extends ChangeNotifier {
   static const _key = 'depo_state_v1';
   final _rnd = Random();
@@ -23,36 +26,212 @@ class AppState extends ChangeNotifier {
   bool loaded = false;
 
   // ---------------- التخزين ----------------
+  /// الأقسام اللي تنحفظ بالسيرفر (كل قسم = collection بـ Firestore)
+  static const _cols = ['users', 'stores', 'offers', 'orders', 'joinRequests', 'complaints', 'meta'];
+
+  /// آخر نسخة نعرفها من كل مستند بالسيرفر (للمقارنة وكتابة الي تغيّر بس)
+  final Map<String, Map<String, String>> _synced = {for (final c in _cols) c: {}};
+  final Map<String, Map<String, int>> _ts = {for (final c in _cols) c: {}};
+  final List<StreamSubscription> _subs = [];
+  bool get online => Cloud.enabled;
+  String get cloudStatus => Cloud.status;
+
   Future<void> load() async {
     final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(_key);
-    if (raw == null) {
-      _seed();
-    } else {
+    currentPhone = prefs.getString('depo_phone');
+    courierAvailable = prefs.getBool('depo_courier_available') ?? true;
+    if (await Cloud.init()) {
       try {
-        final j = jsonDecode(raw) as Map<String, dynamic>;
-        List<Map<String, dynamic>> l(String k) =>
-            (j[k] as List? ?? const []).map((e) => Map<String, dynamic>.from(e as Map)).toList();
-        users = l('users').map(AppUser.fromJson).toList();
-        stores = l('stores').map(Store.fromJson).toList();
-        offers = l('offers').map(Offer.fromJson).toList();
-        orders = l('orders').map(Order.fromJson).toList();
-        joinRequests = l('joinRequests').map(JoinRequest.fromJson).toList();
-        complaints = l('complaints').map(Complaint.fromJson).toList();
-        audit = List<String>.from(j['audit'] ?? const []);
-        settings = AppSettings.fromJson(Map<String, dynamic>.from(j['settings'] ?? const {}));
-        currentPhone = j['currentPhone'] as String?;
-        courierAvailable = (j['courierAvailable'] ?? true) as bool;
-      } catch (_) {
-        _seed();
+        await _loadCloud();
+        loaded = true;
+        notifyListeners();
+        return;
+      } catch (e) {
+        Cloud.enabled = false;
+        Cloud.status = 'محلي — تعذر تحميل البيانات: $e';
       }
     }
+    _loadLocal(prefs);
     loaded = true;
     notifyListeners();
   }
 
+  void _loadLocal(SharedPreferences prefs) {
+    final raw = prefs.getString(_key);
+    if (raw == null) {
+      _seed();
+      return;
+    }
+    try {
+      final j = jsonDecode(raw) as Map<String, dynamic>;
+      List<Map<String, dynamic>> l(String k) =>
+          (j[k] as List? ?? const []).map((e) => Map<String, dynamic>.from(e as Map)).toList();
+      users = l('users').map(AppUser.fromJson).toList();
+      stores = l('stores').map(Store.fromJson).toList();
+      offers = l('offers').map(Offer.fromJson).toList();
+      orders = l('orders').map(Order.fromJson).toList();
+      joinRequests = l('joinRequests').map(JoinRequest.fromJson).toList();
+      complaints = l('complaints').map(Complaint.fromJson).toList();
+      audit = List<String>.from(j['audit'] ?? const []);
+      settings = AppSettings.fromJson(Map<String, dynamic>.from(j['settings'] ?? const {}));
+      currentPhone ??= j['currentPhone'] as String?;
+    } catch (_) {
+      _seed();
+    }
+  }
+
+  // ---- Firestore ----
+  Future<void> _loadCloud() async {
+    final db = Cloud.db!;
+    final first = <String, QuerySnapshot<Map<String, dynamic>>>{};
+    for (final c in _cols) {
+      first[c] = await db.collection(c).get().timeout(const Duration(seconds: 15));
+    }
+    if (first['stores']!.docs.isEmpty && first['users']!.docs.isEmpty) {
+      // أول مرة: نرفع البيانات التجريبية للسيرفر
+      _seed();
+      await _pushCloud();
+    } else {
+      for (final c in _cols) {
+        _applyDocs(c, first[c]!.docs);
+      }
+    }
+    for (final c in _cols) {
+      _subs.add(db.collection(c).snapshots().listen((qs) {
+        _applyDocs(c, qs.docs);
+        notifyListeners();
+      }, onError: (e) {
+        Cloud.status = 'انقطع الاتصال: $e';
+        notifyListeners();
+      }));
+    }
+  }
+
+  /// كل الأقسام بشكل: رقم المستند -> بياناته
+  Map<String, Map<String, dynamic>> _docsOf(String c) {
+    switch (c) {
+      case 'users':
+        return {for (final x in users) x.phone: x.toJson()};
+      case 'stores':
+        return {for (final x in stores) x.id: x.toJson()};
+      case 'offers':
+        return {for (final x in offers) x.id: x.toJson()};
+      case 'orders':
+        return {for (final x in orders) x.id: x.toJson()};
+      case 'joinRequests':
+        return {for (final x in joinRequests) x.id: x.toJson()};
+      case 'complaints':
+        return {for (final x in complaints) x.id: x.toJson()};
+      case 'meta':
+        return {
+          'settings': settings.toJson(),
+          'audit': {'items': audit},
+        };
+    }
+    return {};
+  }
+
+  /// الأقسام الي الجديد بيها ينضاف بالأول (الأحدث فوق)
+  static const _newestFirst = {'offers', 'orders', 'joinRequests', 'complaints'};
+
+  void _applyDocs(String c, List<QueryDocumentSnapshot<Map<String, dynamic>>> docs) {
+    final list = docs.toList()
+      ..sort((a, b) {
+        final ta = (a.data()['_ts'] ?? 0) as num, tb = (b.data()['_ts'] ?? 0) as num;
+        return _newestFirst.contains(c) ? tb.compareTo(ta) : ta.compareTo(tb);
+      });
+    T keep<T>(String id, Map<String, dynamic> d, T Function(Map<String, dynamic>) from, T? old) {
+      final fresh = from(_clean(d));
+      // إذا ما تغيّر نخلي نفس الكائن (حتى الشاشات المفتوحة ما تضيع)
+      if (old != null && jsonEncode((old as dynamic).toJson()) == jsonEncode((fresh as dynamic).toJson())) return old;
+      return fresh;
+    }
+
+    _synced[c]!.clear();
+    _ts[c]!.clear();
+    for (final d in list) {
+      _ts[c]![d.id] = ((d.data()['_ts'] ?? 0) as num).toInt();
+    }
+    switch (c) {
+      case 'users':
+        final old = {for (final x in users) x.phone: x};
+        users = [for (final d in list) keep(d.id, d.data(), AppUser.fromJson, old[d.id])];
+      case 'stores':
+        final old = {for (final x in stores) x.id: x};
+        stores = [for (final d in list) keep(d.id, d.data(), Store.fromJson, old[d.id])];
+      case 'offers':
+        final old = {for (final x in offers) x.id: x};
+        offers = [for (final d in list) keep(d.id, d.data(), Offer.fromJson, old[d.id])];
+      case 'orders':
+        final old = {for (final x in orders) x.id: x};
+        orders = [for (final d in list) keep(d.id, d.data(), Order.fromJson, old[d.id])];
+      case 'joinRequests':
+        final old = {for (final x in joinRequests) x.id: x};
+        joinRequests = [for (final d in list) keep(d.id, d.data(), JoinRequest.fromJson, old[d.id])];
+      case 'complaints':
+        final old = {for (final x in complaints) x.id: x};
+        complaints = [for (final d in list) keep(d.id, d.data(), Complaint.fromJson, old[d.id])];
+      case 'meta':
+        for (final d in list) {
+          if (d.id == 'settings') settings = AppSettings.fromJson(_clean(d.data()));
+          if (d.id == 'audit') audit = List<String>.from(d.data()['items'] ?? const []);
+        }
+    }
+    // نحفظ النسخة «الموحّدة» حتى ما نرجع نكتب نفس الشي
+    _docsOf(c).forEach((id, v) => _synced[c]![id] = jsonEncode(v));
+  }
+
+  Map<String, dynamic> _clean(Map<String, dynamic> d) => Map<String, dynamic>.from(d)..remove('_ts');
+
+  /// يكتب للسيرفر بس المستندات الي تغيّرت، ويحذف الي انمسحت
+  Future<void> _pushCloud() async {
+    final db = Cloud.db!;
+    var batch = db.batch();
+    var n = 0;
+    final now = DateTime.now().millisecondsSinceEpoch;
+    for (final c in _cols) {
+      final cur = _docsOf(c);
+      final ids = cur.keys.toList();
+      for (var i = 0; i < ids.length; i++) {
+        final id = ids[i];
+        final enc = jsonEncode(cur[id]);
+        if (_synced[c]![id] == enc) continue;
+        final ts = _ts[c]![id] ??= _newestFirst.contains(c) ? now - i : now + i;
+        batch.set(db.collection(c).doc(id), {...cur[id]!, '_ts': ts});
+        _synced[c]![id] = enc;
+        if (++n >= 450) {
+          await batch.commit();
+          batch = db.batch();
+          n = 0;
+        }
+      }
+      for (final id in _synced[c]!.keys.where((k) => !cur.containsKey(k)).toList()) {
+        batch.delete(db.collection(c).doc(id));
+        _synced[c]!.remove(id);
+        _ts[c]!.remove(id);
+        n++;
+      }
+    }
+    if (n > 0) await batch.commit();
+  }
+
   Future<void> _save() async {
     final prefs = await SharedPreferences.getInstance();
+    if (currentPhone == null) {
+      await prefs.remove('depo_phone');
+    } else {
+      await prefs.setString('depo_phone', currentPhone!);
+    }
+    await prefs.setBool('depo_courier_available', courierAvailable);
+    if (Cloud.enabled) {
+      try {
+        await _pushCloud();
+      } catch (e) {
+        Cloud.status = 'تعذر الحفظ بالسيرفر: $e';
+        notifyListeners();
+      }
+      return;
+    }
     await prefs.setString(
       _key,
       jsonEncode({
@@ -64,8 +243,6 @@ class AppState extends ChangeNotifier {
         'complaints': complaints.map((e) => e.toJson()).toList(),
         'audit': audit,
         'settings': settings.toJson(),
-        'currentPhone': currentPhone,
-        'courierAvailable': courierAvailable,
       }),
     );
   }
@@ -75,8 +252,10 @@ class AppState extends ChangeNotifier {
     _save();
   }
 
-  /// يمسح كل البيانات ويرجع للبيانات التجريبية
+  /// يمسح كل البيانات ويرجع للبيانات التجريبية (بالسيرفر: المدير بس)
+  bool get canResetDemo => !online || me?.role == Role.admin;
   Future<void> resetDemo() async {
+    if (!canResetDemo) return;
     users = [];
     stores = [];
     offers = [];
@@ -88,6 +267,13 @@ class AppState extends ChangeNotifier {
     currentPhone = null;
     _seed();
     _changed();
+  }
+
+  Offer? offerById(String id) {
+    for (final o in offers) {
+      if (o.id == id) return o;
+    }
+    return null;
   }
 
   String _id(String p) => '$p${DateTime.now().millisecondsSinceEpoch}${_rnd.nextInt(999)}';
@@ -258,8 +444,9 @@ class AppState extends ChangeNotifier {
       commission: commissionFor(s, items),
     );
     for (final l in cart.lines) {
-      l.offer.quantityLeft = max(0, l.offer.quantityLeft - l.qty);
-      l.offer.orderedThisWeek += l.qty;
+      final of = offerById(l.offer.id) ?? l.offer;
+      of.quantityLeft = max(0, of.quantityLeft - l.qty);
+      of.orderedThisWeek += l.qty;
     }
     orders.insert(0, o);
     notify(s.ownerPhone, 'طلب جديد #${o.id} — ${iqd(o.itemsTotal)}');

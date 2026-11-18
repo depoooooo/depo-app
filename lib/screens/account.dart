@@ -295,17 +295,25 @@ class SettingsScreen extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          AppCard(
+            child: Row(children: [
+              Icon(app.online ? Icons.cloud_done_outlined : Icons.cloud_off_outlined,
+                  color: app.online ? DepoColors.success : DepoColors.danger),
+              const SizedBox(width: 10),
+              Expanded(child: Text('السيرفر: ${app.cloudStatus}')),
+            ]),
+          ),
           const AppCard(child: Text('اللغة: العربية (الإنكليزية بمرحلة لاحقة)')),
           const AppCard(child: Text('نطاق إشعارات الرواجع: تلقائي (المتابَعين والقريبين أول شي)')),
           const AppCard(child: Text('شروط الاستخدام وسياسة الخصوصية — تنضاف قبل الإطلاق')),
           const SizedBox(height: 12),
-          OutlinedButton.icon(
+          if (app.canResetDemo) OutlinedButton.icon(
             onPressed: () async {
               final ok = await showDialog<bool>(
                 context: context,
                 builder: (c) => AlertDialog(
                   title: const Text('مسح البيانات التجريبية؟'),
-                  content: const Text('يرجع التطبيق مثل أول مرة وتنمسح كل الحسابات والطلبات على هذا الجهاز.'),
+                  content: Text(app.online ? 'تنمسح كل الحسابات والطلبات بالسيرفر لكل الأجهزة، وترجع البيانات التجريبية.' : 'يرجع التطبيق مثل أول مرة وتنمسح كل الحسابات والطلبات على هذا الجهاز.'),
                   actions: [
                     TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('لا')),
                     FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('امسح')),

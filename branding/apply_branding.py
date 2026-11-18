@@ -16,6 +16,14 @@ if os.path.exists(man):
     s = re.sub(r'android:label="[^"]*"', 'android:label="Depo"', s, count=1)
     open(man, "w", encoding="utf-8").write(s)
 
+# Firebase يحتاج أندرويد 7 فما فوق (minSdk 24)
+for g in ("android/app/build.gradle.kts", "android/app/build.gradle"):
+    gp = os.path.join(ROOT, g)
+    if os.path.exists(gp):
+        s = open(gp, encoding="utf-8").read()
+        s = re.sub(r"minSdk(Version)?\s*=?\s*flutter\.minSdkVersion", "minSdk = 24", s)
+        open(gp, "w", encoding="utf-8").write(s)
+
 # الويب
 web = os.path.join(ROOT, "web")
 if os.path.isdir(web):

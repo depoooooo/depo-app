@@ -17,7 +17,7 @@ class _OfferDetailScreenState extends State<OfferDetailScreen> {
   int qty = 1;
 
   Future<void> _add() async {
-    final o = widget.offer;
+    final o = (app.offerById(widget.offer.id) ?? widget.offer);
     if (!cart.canAdd(o)) {
       final ok = await showDialog<bool>(
         context: context,
@@ -41,7 +41,7 @@ class _OfferDetailScreenState extends State<OfferDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final o = widget.offer;
+    final o = (app.offerById(widget.offer.id) ?? widget.offer);
     final s = app.storeById(o.storeId)!;
     final isRawaji = s.type == StoreType.restaurant;
     return Scaffold(
