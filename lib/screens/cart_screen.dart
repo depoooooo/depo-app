@@ -1,50 +1,37 @@
 import 'package:flutter/material.dart';
-import '../data/mock_data.dart';
+import '../data/app_state.dart';
 import '../data/models.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
 import 'checkout_screen.dart';
 
 class CartScreen extends StatelessWidget {
-  const CartScreen({super.key});
+  /// embedded = داخل الشريط السفلي (بدون زر رجوع)
+  final bool embedded;
+  const CartScreen({super.key, this.embedded = false});
 
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
       listenable: cart,
       builder: (context, _) {
+        final appBar = AppBar(title: const Text('السلة'), automaticallyImplyLeading: !embedded);
         if (cart.isEmpty) {
           return Scaffold(
-            appBar: AppBar(title: const Text('السلة')),
-            body: const Center(child: Text('السلة فارغة')),
+            appBar: appBar,
+            body: const EmptyState(icon: Icons.shopping_bag_outlined, text: 'السلة فارغة. تصفّح الرواجع والماركت وضيف اللي يعجبك.'),
           );
         }
-        final store = storeById(cart.storeId!);
+        final store = app.storeById(cart.storeId!);
+        final remaining = app.settings.freeDeliveryThreshold - cart.total;
         return Scaffold(
-          appBar: AppBar(title: const Text('السلة')),
+          appBar: appBar,
           body: ListView(
             padding: const EdgeInsets.all(16),
             children: [
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: DepoColors.line),
-                ),
-                child: Text('${store.fullName} — السلة من محل واحد',
-                    style: const TextStyle(fontWeight: FontWeight.w800)),
-              ),
-              const SizedBox(height: 10),
+              AppCard(child: Text('${store?.fullName ?? ''} — السلة من محل واحد', style: const TextStyle(fontWeight: FontWeight.w800))),
               for (final line in cart.lines)
-                Container(
-                  margin: const EdgeInsets.only(bottom: 10),
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: DepoColors.line),
-                  ),
+                AppCard(
                   child: Row(children: [
                     SizedBox(width: 60, child: ImagePlaceholder(height: 60, box: line.offer.surpriseBox, radius: 12)),
                     const SizedBox(width: 10),
@@ -54,11 +41,7 @@ class CartScreen extends StatelessWidget {
                         PriceTag(price: line.offer.price, original: line.offer.originalPrice, size: 15),
                       ]),
                     ),
-                    IconButton(
-                      tooltip: 'أقل',
-                      onPressed: () => cart.setQty(line, line.qty - 1),
-                      icon: const Icon(Icons.remove_circle_outline),
-                    ),
+                    IconButton(tooltip: 'أقل', onPressed: () => cart.setQty(line, line.qty - 1), icon: const Icon(Icons.remove_circle_outline)),
                     Text('${line.qty}', style: const TextStyle(fontWeight: FontWeight.w900)),
                     IconButton(
                       tooltip: 'أكثر',
@@ -67,12 +50,15 @@ class CartScreen extends StatelessWidget {
                     ),
                   ]),
                 ),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(color: DepoColors.successBg, borderRadius: BorderRadius.circular(14)),
-                child: Text('وفّرت ${iqd(cart.saved)} بهذا الطلب',
-                    style: const TextStyle(color: DepoColors.success, fontWeight: FontWeight.w800)),
+              AppCard(
+                color: DepoColors.successBg,
+                borderColor: DepoColors.successBg,
+                child: Text('وفّرت ${iqd(cart.saved)} بهذا الطلب', style: const TextStyle(color: DepoColors.success, fontWeight: FontWeight.w800)),
               ),
+              if (remaining > 0)
+                Text('أضف ${iqd(remaining)} بعد ويصير التوصيل مجاني تلقائياً',
+                    style: const TextStyle(fontSize: 12, color: DepoColors.success, fontWeight: FontWeight.w700)),
+              TextButton.icon(onPressed: cart.clear, icon: const Icon(Icons.delete_outline), label: const Text('فرّغ السلة')),
             ],
           ),
           bottomNavigationBar: SafeArea(
@@ -85,8 +71,7 @@ class CartScreen extends StatelessWidget {
                 ]),
                 const SizedBox(height: 10),
                 FilledButton(
-                  onPressed: () => Navigator.of(context)
-                      .push(MaterialPageRoute(builder: (_) => const CheckoutScreen())),
+                  onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const CheckoutScreen())),
                   child: const Text('إكمال الطلب'),
                 ),
               ]),

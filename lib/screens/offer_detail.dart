@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../data/mock_data.dart';
+import '../data/app_state.dart';
 import '../data/models.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
@@ -35,13 +35,14 @@ class _OfferDetailScreenState extends State<OfferDetailScreen> {
     }
     cart.add(o, qty: qty);
     if (!mounted) return;
+    toast(context, 'انضاف للسلة');
     Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const CartScreen()));
   }
 
   @override
   Widget build(BuildContext context) {
     final o = widget.offer;
-    final s = storeById(o.storeId);
+    final s = app.storeById(o.storeId)!;
     final isRawaji = s.type == StoreType.restaurant;
     return Scaffold(
       appBar: AppBar(title: Text(s.fullName)),
@@ -105,8 +106,8 @@ class _OfferDetailScreenState extends State<OfferDetailScreen> {
             const SizedBox(width: 12),
             Expanded(
               child: FilledButton(
-                onPressed: _add,
-                child: Text('أضف للسلة — ${iqd(o.price * qty)}'),
+                onPressed: o.quantityLeft > 0 && o.visible ? _add : null,
+                child: Text(o.quantityLeft > 0 ? 'أضف للسلة — ${iqd(o.price * qty)}' : 'خلصت'),
               ),
             ),
           ]),

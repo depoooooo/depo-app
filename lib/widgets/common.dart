@@ -105,3 +105,104 @@ class SectionTitle extends StatelessWidget {
     ]);
   }
 }
+
+class AppCard extends StatelessWidget {
+  final Widget child;
+  final EdgeInsetsGeometry padding;
+  final VoidCallback? onTap;
+  final Color? color;
+  final Color? borderColor;
+  const AppCard({super.key, required this.child, this.padding = const EdgeInsets.all(12), this.onTap, this.color, this.borderColor});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Material(
+        color: color ?? Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: BorderSide(color: borderColor ?? DepoColors.line, width: 1.2),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(onTap: onTap, child: Padding(padding: padding, child: child)),
+      ),
+    );
+  }
+}
+
+class EmptyState extends StatelessWidget {
+  final IconData icon;
+  final String text;
+  const EmptyState({super.key, required this.icon, required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 48, horizontal: 24),
+      child: Column(children: [
+        Icon(icon, size: 48, color: DepoColors.brand),
+        const SizedBox(height: 10),
+        Text(text, textAlign: TextAlign.center, style: const TextStyle(color: DepoColors.muted, height: 1.6)),
+      ]),
+    );
+  }
+}
+
+class StatTile extends StatelessWidget {
+  final String label;
+  final String value;
+  const StatTile(this.label, this.value, {super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: DepoColors.line),
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(label, style: const TextStyle(fontSize: 12, color: DepoColors.muted)),
+        const SizedBox(height: 2),
+        Text(value, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
+      ]),
+    );
+  }
+}
+
+/// شبكة إحصائيات بعمودين
+class StatGrid extends StatelessWidget {
+  final List<StatTile> tiles;
+  const StatGrid(this.tiles, {super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return GridView.count(
+      crossAxisCount: 2,
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      mainAxisSpacing: 10,
+      crossAxisSpacing: 10,
+      childAspectRatio: 2.2,
+      children: tiles,
+    );
+  }
+}
+
+void toast(BuildContext context, String text) {
+  ScaffoldMessenger.of(context)
+    ..hideCurrentSnackBar()
+    ..showSnackBar(SnackBar(content: Text(text, style: const TextStyle(fontFamily: 'Tajawal'))));
+}
+
+int? parseInt(String s) {
+  const ar = '٠١٢٣٤٥٦٧٨٩';
+  final b = StringBuffer();
+  for (final ch in s.split('')) {
+    final i = ar.indexOf(ch);
+    b.write(i >= 0 ? '$i' : ch);
+  }
+  return int.tryParse(b.toString().replaceAll(',', '').replaceAll('٬', '').trim());
+}

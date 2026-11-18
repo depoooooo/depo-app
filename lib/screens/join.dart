@@ -1,0 +1,111 @@
+import 'package:flutter/material.dart';
+import '../data/app_state.dart';
+import '../data/models.dart';
+import '../theme.dart';
+import '../widgets/common.dart';
+import 'auth.dart';
+
+/// طلب الانضمام كمطعم أو تاجر أو مندوب — المشرف يراجعه ويوافق
+class JoinScreen extends StatefulWidget {
+  const JoinScreen({super.key});
+
+  @override
+  State<JoinScreen> createState() => _JoinScreenState();
+}
+
+class _JoinScreenState extends State<JoinScreen> {
+  Role type = Role.restaurant;
+  final storeName = TextEditingController();
+  final kind = TextEditingController();
+  final area = TextEditingController();
+  final vehicle = TextEditingController();
+  final docs = <String>{};
+
+  @override
+  void dispose() {
+    storeName.dispose();
+    kind.dispose();
+    area.dispose();
+    vehicle.dispose();
+    super.dispose();
+  }
+
+  List<String> get requiredDocs => type == Role.courier
+      ? ['صورة الهوية', 'صورة شخصية', 'إجازة السوق']
+      : ['الإجازة الصحية', 'السجل التجاري', 'صور المحل'];
+
+  Future<void> _submit() async {
+    if (!await ensureLoggedIn(context, reason: 'سجّل أول حتى نربط الطلب برقمك')) return;
+    if (!mounted) return;
+    if (type != Role.courier && (storeName.text.trim().isEmpty || area.text.trim().isEmpty)) {
+      toast(context, 'اكتب اسم المحل والحي');
+      return;
+    }
+    if (docs.length < requiredDocs.length) {
+      toast(context, 'ارفع كل الأوراق المطلوبة');
+      return;
+    }
+    app.submitJoin(
+      type: type,
+      storeName: type == Role.courier ? '' : storeName.text.trim(),
+      area: type == Role.courier ? '' : area.text.trim(),
+      details: type == Role.courier ? 'المركبة: ${vehicle.text.trim()}' : 'النوع: ${kind.text.trim()}',
+    );
+    toast(context, 'وصل طلبك! المشرف يراجعه ويرتب زيارة تفتيش خلال 72 ساعة');
+    Navigator.pop(context);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    Widget tile(Role r, IconData icon) => Expanded(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            child: AppCard(
+              onTap: () => setState(() {
+                type = r;
+                docs.clear();
+              }),
+              color: type == r ? DepoColors.soft : Colors.white,
+              borderColor: type == r ? DepoColors.dark : DepoColors.line,
+              child: Column(children: [Icon(icon, color: DepoColors.dark, size: 30), Text(roleNames[r]!, style: const TextStyle(fontWeight: FontWeight.w800))]),
+            ),
+          ),
+        );
+    return Scaffold(
+      appBar: AppBar(title: const Text('انضم إلى Depo')),
+      body: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          Row(children: [tile(Role.restaurant, Icons.restaurant), tile(Role.merchant, Icons.storefront), tile(Role.courier, Icons.delivery_dining)]),
+          const SizedBox(height: 8),
+          if (type != Role.courier) ...[
+            TextField(controller: storeName, decoration: InputDecoration(labelText: type == Role.restaurant ? 'اسم المطعم' : 'اسم المتجر')),
+            const SizedBox(height: 10),
+            TextField(controller: kind, decoration: InputDecoration(labelText: type == Role.restaurant ? 'نوع المطعم (مشاوي، فرن، حلويات...)' : 'نوع المتجر (سوق، جملة، موزع...)')),
+            const SizedBox(height: 10),
+            TextField(controller: area, decoration: const InputDecoration(labelText: 'الحي', hintText: 'مثلاً: الزهور، النور، المجموعة الثقافية')),
+          ] else
+            TextField(controller: vehicle, decoration: const InputDecoration(labelText: 'نوع المركبة ورقمها')),
+          const SizedBox(height: 14),
+          const Text('الأوراق والصور', style: TextStyle(fontWeight: FontWeight.w900)),
+          const SizedBox(height: 8),
+          Wrap(spacing: 8, runSpacing: 8, children: [
+            for (final d in requiredDocs)
+              FilterChip(
+                avatar: Icon(docs.contains(d) ? Icons.check_circle : Icons.upload_file, size: 18),
+                label: Text(d),
+                selected: docs.contains(d),
+                onSelected: (v) => setState(() => v ? docs.add(d) : docs.remove(d)),
+              ),
+          ]),
+          const SizedBox(height: 4),
+          const Text('(تجريبي: اضغط على كل ورقة كأنك رفعتها. رفع الصور الحقيقي يتفعل ويه Firebase)', style: TextStyle(fontSize: 11, color: DepoColors.muted)),
+          const SizedBox(height: 16),
+          FilledButton(onPressed: _submit, child: const Text('أرسل الطلب')),
+          const SizedBox(height: 8),
+          const Text('المشرف يراجع طلبك ويرتب زيارة تفتيش خلال 72 ساعة', textAlign: TextAlign.center, style: TextStyle(fontSize: 12, color: DepoColors.muted)),
+        ],
+      ),
+    );
+  }
+}

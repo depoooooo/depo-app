@@ -1,13 +1,10 @@
 import 'package:flutter/material.dart';
+import '../data/app_state.dart';
 import '../data/models.dart';
 import '../theme.dart';
-import 'login_screen.dart';
-
-enum Fulfilment { delivery, pickup }
-
-/// رسوم التوصيل وحد التوصيل المجاني — تنضبط من المدير لاحقاً
-const deliveryFee = 2000;
-const freeDeliveryThreshold = 10000;
+import '../widgets/common.dart';
+import 'auth.dart';
+import 'orders.dart';
 
 class CheckoutScreen extends StatefulWidget {
   const CheckoutScreen({super.key});
@@ -17,16 +14,38 @@ class CheckoutScreen extends StatefulWidget {
 }
 
 class _CheckoutScreenState extends State<CheckoutScreen> {
-  Fulfilment mode = Fulfilment.delivery;
+  bool pickup = false;
+  String? address;
+  bool placing = false;
 
   int get fee {
-    if (mode == Fulfilment.pickup) return 0;
-    return cart.total >= freeDeliveryThreshold ? 0 : deliveryFee;
+    if (pickup) return 0;
+    return cart.total >= app.settings.freeDeliveryThreshold ? 0 : app.settings.deliveryFee;
+  }
+
+  Future<void> _confirm() async {
+    if (cart.isEmpty) return;
+    final ok = await ensureLoggedIn(context, reason: 'دخّل رقم تلفونك حتى نأكد طلبك');
+    if (!ok || !mounted) return;
+    final addr = address ?? (app.me!.addresses.isNotEmpty ? app.me!.addresses.first : '');
+    if (!pickup && addr.isEmpty) {
+      toast(context, 'ضيف عنوان التوصيل');
+      return;
+    }
+    setState(() => placing = true);
+    final order = app.placeOrder(pickup: pickup, address: addr);
+    if (!mounted) return;
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => OrderDetailScreen(orderId: order.id)),
+      (r) => r.isFirst,
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final remainingForFree = freeDeliveryThreshold - cart.total;
+    final deliveryFee = app.settings.deliveryFee;
+    final remaining = app.settings.freeDeliveryThreshold - cart.total;
+    final addresses = app.me?.addresses ?? const ['حي الزهور — الجانب الأيسر'];
     return Scaffold(
       appBar: AppBar(title: const Text('إكمال الطلب')),
       body: ListView(
@@ -35,43 +54,44 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           const Text('طريقة الاستلام', style: TextStyle(fontWeight: FontWeight.w900)),
           const SizedBox(height: 6),
           _Option(
-            selected: mode == Fulfilment.delivery,
+            selected: !pickup,
             icon: Icons.delivery_dining,
             title: 'توصيل',
             subtitle: 'مندوب Depo — 20 إلى 40 دقيقة • ${iqd(deliveryFee)}',
-            onTap: () => setState(() => mode = Fulfilment.delivery),
+            onTap: () => setState(() => pickup = false),
           ),
           _Option(
-            selected: mode == Fulfilment.pickup,
+            selected: pickup,
             icon: Icons.storefront_outlined,
             title: 'أستلم بنفسي ووفّر ${iqd(deliveryFee)}',
             subtitle: 'تروح للمحل وتاخذ طلبك بدون رسم توصيل',
-            onTap: () => setState(() => mode = Fulfilment.pickup),
+            onTap: () => setState(() => pickup = true),
           ),
-          const SizedBox(height: 10),
+          if (!pickup) ...[
+            const SizedBox(height: 6),
+            const Text('العنوان', style: TextStyle(fontWeight: FontWeight.w900)),
+            const SizedBox(height: 6),
+            for (final a in addresses)
+              _Option(
+                selected: (address ?? addresses.first) == a,
+                icon: Icons.location_on_outlined,
+                title: a,
+                subtitle: '',
+                onTap: () => setState(() => address = a),
+              ),
+          ],
+          const SizedBox(height: 6),
           const Text('الدفع', style: TextStyle(fontWeight: FontWeight.w900)),
           const SizedBox(height: 6),
-          const _Option(
-            selected: true,
-            icon: Icons.payments_outlined,
-            title: 'نقداً عند الاستلام',
-            subtitle: 'الدفع الإلكتروني راح يتوفر قريباً',
-          ),
-          const SizedBox(height: 10),
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: DepoColors.line),
-            ),
+          const _Option(selected: true, icon: Icons.payments_outlined, title: 'نقداً عند الاستلام', subtitle: 'الدفع الإلكتروني راح يتوفر قريباً'),
+          AppCard(
             child: Column(children: [
               _Line('الطلب', iqd(cart.total)),
               _Line('التوصيل', fee == 0 ? 'مجاني' : iqd(fee)),
-              if (mode == Fulfilment.delivery && remainingForFree > 0)
+              if (!pickup && remaining > 0)
                 Align(
                   alignment: AlignmentDirectional.centerStart,
-                  child: Text('أضف ${iqd(remainingForFree)} بعد ويصير التوصيل مجاني تلقائياً',
+                  child: Text('أضف ${iqd(remaining)} بعد ويصير التوصيل مجاني تلقائياً',
                       style: const TextStyle(fontSize: 12, color: DepoColors.success, fontWeight: FontWeight.w700)),
                 ),
               const Divider(),
@@ -84,15 +104,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(mainAxisSize: MainAxisSize.min, children: [
-            FilledButton(
-              onPressed: () => Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => LoginScreen(totalToPay: cart.total + fee)),
-              ),
-              child: const Text('تأكيد الطلب'),
-            ),
+            FilledButton(onPressed: placing || cart.isEmpty ? null : _confirm, child: const Text('تأكيد الطلب')),
             const SizedBox(height: 6),
-            const Text('إذا ما مسجّل، نطلب رقمك بهاي الخطوة بس',
-                style: TextStyle(fontSize: 12, color: DepoColors.muted)),
+            Text(app.loggedIn ? 'الطلب يوصل للمحل فوراً' : 'إذا ما مسجّل، نطلب رقمك بهاي الخطوة بس',
+                style: const TextStyle(fontSize: 12, color: DepoColors.muted)),
           ]),
         ),
       ),
@@ -110,34 +125,21 @@ class _Option extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Material(
-        color: Colors.white,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(14),
-          side: BorderSide(color: selected ? DepoColors.dark : DepoColors.line, width: 1.5),
+    return AppCard(
+      onTap: onTap,
+      borderColor: selected ? DepoColors.dark : DepoColors.line,
+      child: Row(children: [
+        Icon(selected ? Icons.radio_button_checked : Icons.radio_button_off, color: DepoColors.dark),
+        const SizedBox(width: 8),
+        Icon(icon, color: DepoColors.dark),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(title, style: const TextStyle(fontWeight: FontWeight.w800)),
+            if (subtitle.isNotEmpty) Text(subtitle, style: const TextStyle(fontSize: 12, color: DepoColors.muted)),
+          ]),
         ),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(14),
-          onTap: onTap,
-          child: Padding(
-            padding: const EdgeInsets.all(12),
-            child: Row(children: [
-              Icon(selected ? Icons.radio_button_checked : Icons.radio_button_off, color: DepoColors.dark),
-              const SizedBox(width: 8),
-              Icon(icon, color: DepoColors.dark),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(title, style: const TextStyle(fontWeight: FontWeight.w800)),
-                  Text(subtitle, style: const TextStyle(fontSize: 12, color: DepoColors.muted)),
-                ]),
-              ),
-            ]),
-          ),
-        ),
-      ),
+      ]),
     );
   }
 }
