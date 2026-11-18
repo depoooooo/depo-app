@@ -20,7 +20,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   int get fee {
     if (pickup) return 0;
-    return cart.total >= app.settings.freeDeliveryThreshold ? 0 : app.settings.deliveryFee;
+    return app.deliveryFeeFor(cart.total);
   }
 
   Future<void> _confirm() async {

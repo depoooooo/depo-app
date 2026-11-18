@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../data/app_state.dart';
 import '../data/models.dart';
 import '../theme.dart';
@@ -23,9 +24,39 @@ class _SearchScreenState extends State<SearchScreen> {
   bool sortByDiscount = false;
 
   static const trending = ['صمون', 'كبة', 'فروج', 'كنافة', 'لبن', 'معجنات'];
+  List<String> recent = [];
+
+  @override
+  void initState() {
+    super.initState();
+    SharedPreferences.getInstance().then((p) {
+      if (mounted) setState(() => recent = p.getStringList('depo_recent_search') ?? []);
+    });
+  }
+
+  /// يحفظ الكلمة بـ «آخر شي دوّرت عليه»
+  Future<void> _remember([String? word]) async {
+    final t = (word ?? q.text).trim();
+    if (t.length < 2) return;
+    recent = [t, ...recent.where((x) => x != t)].take(8).toList();
+    final p = await SharedPreferences.getInstance();
+    await p.setStringList('depo_recent_search', recent);
+  }
+
+  Future<void> _clearRecent() async {
+    setState(() => recent = []);
+    final p = await SharedPreferences.getInstance();
+    await p.remove('depo_recent_search');
+  }
+
+  void _use(String t) {
+    setState(() => q.text = t);
+    _remember(t);
+  }
 
   @override
   void dispose() {
+    _remember();
     q.dispose();
     super.dispose();
   }
@@ -70,6 +101,7 @@ class _SearchScreenState extends State<SearchScreen> {
           autofocus: true,
           decoration: const InputDecoration(hintText: 'دوّر على مطعم أو وجبة أو منتج', isDense: true, prefixIcon: Icon(Icons.search)),
           onChanged: (_) => setState(() {}),
+          onSubmitted: (_) => _remember(),
         ),
       ),
       body: ListView(
@@ -81,11 +113,27 @@ class _SearchScreenState extends State<SearchScreen> {
           ]),
           const SizedBox(height: 12),
           if (!searching) ...[
+            if (recent.isNotEmpty) ...[
+              Row(children: [
+                const Expanded(child: Text('آخر شي دوّرت عليه', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900))),
+                TextButton(onPressed: _clearRecent, child: const Text('مسح')),
+              ]),
+              Wrap(spacing: 8, runSpacing: 8, children: [
+                for (final t in recent)
+                  ActionChip(
+                    avatar: const Icon(Icons.history_rounded, size: 18),
+                    label: Text(t),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                    onPressed: () => _use(t),
+                  ),
+              ]),
+              const SizedBox(height: 16),
+            ],
             const Text('الأكثر بحثاً حولك', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900)),
             const SizedBox(height: 8),
             Wrap(spacing: 8, runSpacing: 8, children: [
               for (final t in trending)
-                ActionChip(avatar: const Icon(Icons.search, size: 16), label: Text(t), onPressed: () => setState(() => q.text = t)),
+                ActionChip(avatar: const Icon(Icons.search, size: 16), label: Text(t), onPressed: () => _use(t)),
             ]),
             const SizedBox(height: 16),
             const Text('المجموعات', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900)),

@@ -448,6 +448,10 @@ class AppSettings {
   int stage2Km;
   int stage2Minutes;
   int stage3Minutes;
+  bool firstOrderFree; // توصيل مجاني لأول طلب
+  String promoText; // الشريط الصغير فوق الرئيسية ('' = مطفي)
+  String campaignName; // اسم الحملة
+  int campaignMinDiscount; // أقل خصم حتى يدخل المطعم بالحملة
 
   AppSettings({
     this.restaurantCommission = 15,
@@ -460,6 +464,10 @@ class AppSettings {
     this.stage2Km = 6,
     this.stage2Minutes = 5,
     this.stage3Minutes = 10,
+    this.firstOrderFree = true,
+    this.promoText = 'توصيل مجاني لأول طلب',
+    this.campaignName = 'رخيييييص',
+    this.campaignMinDiscount = 60,
   });
 
   Map<String, dynamic> toJson() => {
@@ -473,6 +481,10 @@ class AppSettings {
         'stage2Km': stage2Km,
         'stage2Minutes': stage2Minutes,
         'stage3Minutes': stage3Minutes,
+        'firstOrderFree': firstOrderFree,
+        'promoText': promoText,
+        'campaignName': campaignName,
+        'campaignMinDiscount': campaignMinDiscount,
       };
 
   factory AppSettings.fromJson(Map<String, dynamic> j) {
@@ -489,6 +501,10 @@ class AppSettings {
       stage2Km: g('stage2Km', d.stage2Km),
       stage2Minutes: g('stage2Minutes', d.stage2Minutes),
       stage3Minutes: g('stage3Minutes', d.stage3Minutes),
+      firstOrderFree: (j['firstOrderFree'] ?? d.firstOrderFree) as bool,
+      promoText: (j['promoText'] ?? d.promoText) as String,
+      campaignName: (j['campaignName'] ?? d.campaignName) as String,
+      campaignMinDiscount: g('campaignMinDiscount', d.campaignMinDiscount),
     );
   }
 }

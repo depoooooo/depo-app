@@ -43,6 +43,7 @@ class AppState extends ChangeNotifier {
     if (await Cloud.init()) {
       try {
         await _loadCloud();
+        await loadSeen();
         loaded = true;
         notifyListeners();
         return;
@@ -52,6 +53,7 @@ class AppState extends ChangeNotifier {
       }
     }
     _loadLocal(prefs);
+    await loadSeen();
     loaded = true;
     notifyListeners();
   }
@@ -302,6 +304,8 @@ class AppState extends ChangeNotifier {
       u.name = name;
     }
     currentPhone = phone;
+    _seenTop = null;
+    loadSeen();
     _changed();
   }
 
@@ -463,12 +467,46 @@ class AppState extends ChangeNotifier {
     _changed();
   }
 
+  // ---------------- التوصيل والعروض ----------------
+  /// أول طلب للزبون (أو زائر بعده ما طلب)
+  bool get eligibleFirstOrder =>
+      settings.firstOrderFree &&
+      !orders.any((o) => o.customerPhone == currentPhone && o.status != OrderStatus.cancelled && o.status != OrderStatus.rejected);
+
+  int deliveryFeeFor(int itemsTotal) =>
+      itemsTotal >= settings.freeDeliveryThreshold || eligibleFirstOrder ? 0 : settings.deliveryFee;
+
+  // ---------------- الإشعارات المقروءة ----------------
+  String? _seenTop;
+  int get unreadCount {
+    final l = me?.notifications ?? const <String>[];
+    if (l.isEmpty) return 0;
+    final i = _seenTop == null ? -1 : l.indexOf(_seenTop!);
+    return i < 0 ? l.length : i;
+  }
+
+  Future<void> loadSeen() async {
+    if (currentPhone == null) return;
+    final prefs = await SharedPreferences.getInstance();
+    _seenTop = prefs.getString('depo_seen_$currentPhone');
+    notifyListeners();
+  }
+
+  Future<void> markNotificationsRead() async {
+    final l = me?.notifications ?? const <String>[];
+    if (l.isEmpty || currentPhone == null) return;
+    _seenTop = l.first;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('depo_seen_$currentPhone', l.first);
+    notifyListeners();
+  }
+
   // ---------------- الطلبات ----------------
   Order placeOrder({required bool pickup, required String address}) {
     final u = me!;
     final s = storeById(cart.storeId!)!;
     final items = cart.total;
-    final fee = pickup || items >= settings.freeDeliveryThreshold ? 0 : settings.deliveryFee;
+    final fee = pickup ? 0 : deliveryFeeFor(items);
     final o = Order(
       id: (1000 + _rnd.nextInt(9000)).toString(),
       customerPhone: u.phone,

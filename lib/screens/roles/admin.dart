@@ -143,6 +143,9 @@ class _SettingsTab extends StatefulWidget {
 
 class _SettingsTabState extends State<_SettingsTab> {
   late final Map<String, TextEditingController> c;
+  late final TextEditingController promo;
+  late final TextEditingController campaign;
+  bool firstFree = true;
 
   @override
   void initState() {
@@ -159,7 +162,11 @@ class _SettingsTabState extends State<_SettingsTab> {
       'stage2Km': TextEditingController(text: '${s.stage2Km}'),
       'stage2Minutes': TextEditingController(text: '${s.stage2Minutes}'),
       'stage3Minutes': TextEditingController(text: '${s.stage3Minutes}'),
+      'campaignMinDiscount': TextEditingController(text: '${s.campaignMinDiscount}'),
     };
+    promo = TextEditingController(text: s.promoText);
+    campaign = TextEditingController(text: s.campaignName);
+    firstFree = s.firstOrderFree;
   }
 
   @override
@@ -167,6 +174,8 @@ class _SettingsTabState extends State<_SettingsTab> {
     for (final x in c.values) {
       x.dispose();
     }
+    promo.dispose();
+    campaign.dispose();
     super.dispose();
   }
 
@@ -188,6 +197,10 @@ class _SettingsTabState extends State<_SettingsTab> {
     s.stage2Km = v('stage2Km', s.stage2Km);
     s.stage2Minutes = v('stage2Minutes', s.stage2Minutes);
     s.stage3Minutes = v('stage3Minutes', s.stage3Minutes);
+    s.campaignMinDiscount = v('campaignMinDiscount', s.campaignMinDiscount);
+    s.promoText = promo.text.trim();
+    s.campaignName = campaign.text.trim().isEmpty ? s.campaignName : campaign.text.trim();
+    s.firstOrderFree = firstFree;
     app.saveSettings();
     toast(context, 'انحفظت الإعدادات وتسري على الطلبات الجديدة');
   }
@@ -202,6 +215,30 @@ class _SettingsTabState extends State<_SettingsTab> {
         Row(children: [Expanded(child: f('merchantCommission', 'عمولة التجار %')), const SizedBox(width: 10), Expanded(child: f('freeDays', 'الشهر المجاني (يوم)'))]),
         const SectionTitle('التوصيل'),
         Row(children: [Expanded(child: f('deliveryFee', 'رسم التوصيل')), const SizedBox(width: 10), Expanded(child: f('freeDeliveryThreshold', 'توصيل مجاني فوق'))]),
+        const SectionTitle('العروض والحملات'),
+        AppCard(
+          padding: EdgeInsets.zero,
+          child: SwitchListTile(
+            value: firstFree,
+            onChanged: (v) => setState(() => firstFree = v),
+            title: const Text('توصيل مجاني لأول طلب', style: TextStyle(fontWeight: FontWeight.w800)),
+            subtitle: const Text('لكل زبون جديد'),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: TextField(controller: promo, decoration: const InputDecoration(labelText: 'نص الشريط البرتقالي فوق (فارغ = مطفي)')),
+        ),
+        Row(children: [
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: TextField(controller: campaign, decoration: const InputDecoration(labelText: 'اسم الحملة')),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(child: f('campaignMinDiscount', 'أقل خصم للحملة %')),
+        ]),
         const SectionTitle('مراحل إشعار الرواجع'),
         Row(children: [Expanded(child: f('stage1Km', 'المرحلة 1: كم')), const SizedBox(width: 10), Expanded(child: f('stage2Km', 'المرحلة 2: كم'))]),
         Row(children: [Expanded(child: f('stage2Minutes', 'المرحلة 2 بعد (دقيقة)')), const SizedBox(width: 10), Expanded(child: f('stage3Minutes', 'المرحلة 3 بعد (دقيقة)'))]),

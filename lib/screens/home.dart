@@ -1,10 +1,12 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../data/app_state.dart';
+import '../data/categories.dart';
 import '../data/models.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
 import '../widgets/offer_cards.dart';
+import 'account.dart';
 import 'auth.dart';
 import 'following.dart';
 import 'join.dart';
@@ -68,7 +70,21 @@ class _Header extends StatelessWidget {
               ]),
             ]),
           ),
-          Image.asset('assets/logo/depo-ar-white.png', height: 32, semanticLabel: 'ديبو'),
+          Image.asset('assets/logo/depo-ar-white.png', height: 30, semanticLabel: 'ديبو'),
+          const SizedBox(width: 6),
+          IconButton(
+            tooltip: 'الإشعارات',
+            onPressed: () async {
+              if (await ensureLoggedIn(context, reason: 'سجّل حتى توصلك إشعارات مطاعمك وطلباتك') && context.mounted) {
+                Navigator.of(context).push(MaterialPageRoute(builder: (_) => const NotificationsScreen()));
+              }
+            },
+            icon: Badge(
+              isLabelVisible: app.unreadCount > 0,
+              label: Text('${app.unreadCount}'),
+              child: const Icon(Icons.notifications_none_rounded, size: 28, color: DepoColors.ink),
+            ),
+          ),
         ]),
         const SizedBox(height: 12),
         Material(
@@ -116,8 +132,56 @@ class _Header extends StatelessWidget {
 }
 
 // ======================= رواجع المطاعم =======================
-class _RawajiTab extends StatelessWidget {
+enum _Filter { none, discount, near, boxes, rated, fresh }
+
+const _filterNames = {
+  _Filter.discount: 'أعلى خصم',
+  _Filter.near: 'قريب عليّ',
+  _Filter.boxes: 'صناديق مفاجأة',
+  _Filter.rated: 'الأعلى تقييم',
+  _Filter.fresh: 'نزل هسه',
+};
+
+const _filterIcons = {
+  _Filter.discount: Icons.percent_rounded,
+  _Filter.near: Icons.near_me_rounded,
+  _Filter.boxes: Icons.card_giftcard_rounded,
+  _Filter.rated: Icons.star_rounded,
+  _Filter.fresh: Icons.bolt_rounded,
+};
+
+class _RawajiTab extends StatefulWidget {
   const _RawajiTab();
+
+  @override
+  State<_RawajiTab> createState() => _RawajiTabState();
+}
+
+class _RawajiTabState extends State<_RawajiTab> {
+  FoodCat? cat;
+  _Filter filter = _Filter.none;
+
+  List<Offer> _filtered(List<Offer> offers) {
+    var l = offers;
+    if (cat != null) l = l.where((o) => inCat(cat!, o, app.storeById(o.storeId))).toList();
+    final now = DateTime.now().millisecondsSinceEpoch;
+    switch (filter) {
+      case _Filter.discount:
+        l = [...l]..sort((a, b) => b.discountPercent - a.discountPercent);
+      case _Filter.near:
+        l = l.where((o) => (app.storeById(o.storeId)?.distanceKm ?? 99) <= app.settings.stage1Km).toList()
+          ..sort((a, b) => app.storeById(a.storeId)!.distanceKm.compareTo(app.storeById(b.storeId)!.distanceKm));
+      case _Filter.boxes:
+        l = l.where((o) => o.surpriseBox).toList();
+      case _Filter.rated:
+        l = [...l]..sort((a, b) => app.storeById(b.storeId)!.rating.compareTo(app.storeById(a.storeId)!.rating));
+      case _Filter.fresh:
+        l = l.where((o) => now - o.createdAt < 60 * 60 * 1000).toList();
+      case _Filter.none:
+        break;
+    }
+    return l;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -131,59 +195,215 @@ class _RawajiTab extends StatelessWidget {
     final offers = app.offers.where((o) => o.visible && ids.contains(o.storeId) && o.quantityLeft > 0).toList()
       ..sort((a, b) => a.quantityLeft - b.quantityLeft);
     final boxes = offers.where((o) => o.surpriseBox).toList();
+    final st = app.settings;
+    final campaign = restaurants.where((s) => app.offersOf(s.id).any((o) => o.discountPercent >= st.campaignMinDiscount)).toList();
+    final filtering = cat != null || filter != _Filter.none;
 
     return ListView(
-      padding: const EdgeInsets.only(top: 14, bottom: 24),
+      padding: const EdgeInsets.only(top: 12, bottom: 24),
       children: [
-        _Banners(slides: [
-          _Slide(
-            color: DepoColors.ink,
-            title: 'رخيييييص 🔥',
-            titleColor: DepoColors.accent,
-            text: 'رواجع المطاعم تبدي من 1,000 دينار',
+        if (st.promoText.isNotEmpty && app.eligibleFirstOrder) _PromoStrip(text: st.promoText),
+        // شتشتهي اليوم؟
+        _Section(title: 'شتشتهي اليوم؟'),
+        SizedBox(
+          height: 100,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            itemCount: foodCats.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 12),
+            itemBuilder: (context, i) {
+              final c = foodCats[i];
+              final on = cat == c;
+              return InkWell(
+                borderRadius: BorderRadius.circular(20),
+                onTap: () => setState(() => cat = on ? null : c),
+                child: SizedBox(
+                  width: 70,
+                  child: Column(children: [
+                    AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      width: 66,
+                      height: 66,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: on ? DepoColors.brand : Colors.white,
+                        border: Border.all(color: on ? DepoColors.dark : const Color(0xFFE8F4F6), width: on ? 2.5 : 1),
+                        boxShadow: const [BoxShadow(color: Color(0x1606363C), blurRadius: 6, offset: Offset(0, 2))],
+                      ),
+                      alignment: Alignment.center,
+                      child: Text(c.emoji, style: const TextStyle(fontSize: 32)),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(c.name, maxLines: 1, overflow: TextOverflow.ellipsis,
+                        style: TextStyle(fontSize: 12, fontWeight: on ? FontWeight.w900 : FontWeight.w700)),
+                  ]),
+                ),
+              );
+            },
           ),
-          _Slide(
-            color: DepoColors.dark,
-            title: 'استلم بنفسك',
-            text: 'ووفّر ${iqd(app.settings.deliveryFee)} رسم التوصيل',
-            icon: Icons.storefront_rounded,
+        ),
+        // أزرار الفلترة
+        SizedBox(
+          height: 46,
+          child: ListView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            children: [
+              for (final f in _filterNames.keys)
+                Padding(
+                  padding: const EdgeInsetsDirectional.only(end: 8),
+                  child: FilterChip(
+                    showCheckmark: false,
+                    avatar: Icon(_filterIcons[f], size: 18, color: filter == f ? Colors.white : DepoColors.dark),
+                    label: Text(_filterNames[f]!),
+                    labelStyle: TextStyle(fontWeight: FontWeight.w800, color: filter == f ? Colors.white : DepoColors.ink),
+                    selected: filter == f,
+                    selectedColor: DepoColors.dark,
+                    backgroundColor: Colors.white,
+                    side: BorderSide(color: filter == f ? DepoColors.dark : const Color(0xFFDCEFF2)),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                    onSelected: (v) => setState(() => filter = v ? f : _Filter.none),
+                  ),
+                ),
+            ],
           ),
-          if (!app.loggedIn)
+        ),
+        if (filtering) ..._results(offers) else ...[
+          const SizedBox(height: 6),
+          _Banners(slides: [
             _Slide(
-              color: DepoColors.accent,
-              title: 'سجّل واكسب نقاط',
-              titleColor: DepoColors.ink,
-              textColor: DepoColors.ink,
-              text: 'كل 1,000 دينار = نقطة، بدّلها بصناديق مجانية',
-              icon: Icons.stars_rounded,
-              onTap: () => ensureLoggedIn(context, reason: 'سجّل حتى تجمع نقاط وتتابع مطاعمك'),
+              color: DepoColors.ink,
+              title: '${st.campaignName} 🔥',
+              titleColor: DepoColors.accent,
+              text: 'رواجع المطاعم تبدي من 1,000 دينار',
             ),
-          _Slide(
-            color: const Color(0xFF2B5F66),
-            title: 'عندك مطعم أو محل؟',
-            text: 'انضم لديبو — أول شهر مجاني للمطاعم',
-            icon: Icons.handshake_rounded,
-            onTap: () => app.loggedIn
-                ? Navigator.of(context).push(MaterialPageRoute(builder: (_) => const JoinScreen()))
-                : ensureLoggedIn(context, reason: 'سجّل أول حتى تقدّم طلب انضمام'),
+            _Slide(
+              color: DepoColors.dark,
+              title: 'استلم بنفسك',
+              text: 'ووفّر ${iqd(st.deliveryFee)} رسم التوصيل',
+              icon: Icons.storefront_rounded,
+            ),
+            if (!app.loggedIn)
+              _Slide(
+                color: DepoColors.accent,
+                title: 'سجّل واكسب نقاط',
+                titleColor: DepoColors.ink,
+                textColor: DepoColors.ink,
+                text: 'كل 1,000 دينار = نقطة، بدّلها بصناديق مجانية',
+                icon: Icons.stars_rounded,
+                onTap: () => ensureLoggedIn(context, reason: 'سجّل حتى تجمع نقاط وتتابع مطاعمك'),
+              ),
+            _Slide(
+              color: const Color(0xFF2B5F66),
+              title: 'عندك مطعم أو محل؟',
+              text: 'انضم لديبو — أول شهر مجاني للمطاعم',
+              icon: Icons.handshake_rounded,
+              onTap: () => app.loggedIn
+                  ? Navigator.of(context).push(MaterialPageRoute(builder: (_) => const JoinScreen()))
+                  : ensureLoggedIn(context, reason: 'سجّل أول حتى تقدّم طلب انضمام'),
+            ),
+          ]),
+          const _MyStores(),
+          _Section(title: 'رواجع قريبة عليك هسه', subtitle: 'توصل خلال 20–40 دقيقة'),
+          if (offers.isEmpty)
+            const EmptyState(icon: Icons.restaurant_outlined, text: 'ماكو رواجع هسه. تابع مطاعمك المفضلة حتى يوصلك إشعار أول ما ينشرون.')
+          else
+            OfferStrip(offers: offers),
+          if (campaign.isNotEmpty) _Campaign(name: st.campaignName, minDiscount: st.campaignMinDiscount, stores: campaign),
+          if (boxes.isNotEmpty) ...[
+            _Section(title: 'صناديق المفاجأة 🎁', subtitle: 'قيمتها 3 أضعاف سعرها'),
+            OfferStrip(offers: boxes),
+          ],
+          _Section(title: 'المطاعم'),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Column(children: [for (final s in restaurants) StoreTile(store: s)]),
+          ),
+        ],
+      ],
+    );
+  }
+
+  List<Widget> _results(List<Offer> offers) {
+    final res = _filtered(offers);
+    final title = [if (cat != null) '${cat!.emoji} ${cat!.name}', if (filter != _Filter.none) _filterNames[filter]!].join(' • ');
+    return [
+      Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 8, 4),
+        child: Row(children: [
+          Expanded(child: Text('$title (${res.length})', style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w900))),
+          TextButton.icon(
+            onPressed: () => setState(() {
+              cat = null;
+              filter = _Filter.none;
+            }),
+            icon: const Icon(Icons.close_rounded, size: 18),
+            label: const Text('مسح', style: TextStyle(fontWeight: FontWeight.w800)),
           ),
         ]),
-        const _MyStores(),
-        _Section(title: 'رواجع قريبة عليك هسه', subtitle: 'توصل خلال 20–40 دقيقة'),
-        if (offers.isEmpty)
-          const EmptyState(icon: Icons.restaurant_outlined, text: 'ماكو رواجع هسه. تابع مطاعمك المفضلة حتى يوصلك إشعار أول ما ينشرون.')
-        else
-          OfferStrip(offers: offers),
-        if (boxes.isNotEmpty) ...[
-          _Section(title: 'صناديق المفاجأة 🎁', subtitle: 'قيمتها 3 أضعاف سعرها'),
-          OfferStrip(offers: boxes),
-        ],
-        _Section(title: 'المطاعم'),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Column(children: [for (final s in restaurants) StoreTile(store: s)]),
+      ),
+      if (res.isEmpty)
+        const EmptyState(icon: Icons.search_off_rounded, text: 'ماكو شي بهذا الاختيار هسه. جرّب نوع ثاني أو ارجع بعد شوية.')
+      else
+        Padding(padding: const EdgeInsets.symmetric(horizontal: 16), child: ProductGrid(products: res)),
+    ];
+  }
+}
+
+/// الشريط البرتقالي الصغير (عرض لمدة محدودة)
+class _PromoStrip extends StatelessWidget {
+  final String text;
+  const _PromoStrip({required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 4),
+      decoration: BoxDecoration(color: const Color(0xFFFFF1E0), borderRadius: BorderRadius.circular(14)),
+      clipBehavior: Clip.antiAlias,
+      child: Row(children: [
+        const SizedBox(width: 12),
+        const Text('🛵', style: TextStyle(fontSize: 20)),
+        const SizedBox(width: 8),
+        Expanded(child: Text(text, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13))),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          color: const Color(0xFFF26B1D),
+          child: const Text('لمدة محدودة', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 12)),
         ),
-      ],
+      ]),
+    );
+  }
+}
+
+/// قسم الحملة (مثل «رخيييييص»)
+class _Campaign extends StatelessWidget {
+  final String name;
+  final int minDiscount;
+  final List<Store> stores;
+  const _Campaign({required this.name, required this.minDiscount, required this.stores});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(top: 18),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 6),
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xFFE2F7F9), DepoColors.bg]),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Row(children: [
+          const Text('🔥', style: TextStyle(fontSize: 24)),
+          const SizedBox(width: 6),
+          Text(name, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: DepoColors.dark)),
+          const Spacer(),
+          Badge2('خصم $minDiscount% وأكثر'),
+        ]),
+        const SizedBox(height: 10),
+        for (final s in stores) StoreTile(store: s),
+      ]),
     );
   }
 }

@@ -265,46 +265,90 @@ class ProductCard extends StatelessWidget {
   }
 }
 
-/// سطر المحل المختصر
+/// كارت المحل: صورة كبيرة على اليمين وفوقها الخصم، والمعلومات يسار
 class StoreTile extends StatelessWidget {
   final Store store;
   const StoreTile({super.key, required this.store});
 
   @override
   Widget build(BuildContext context) {
-    final n = app.offersOf(store.id).length;
-    return AppCard(
-      onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => StorePage(storeId: store.id))),
-      child: Row(children: [
-        StoreAvatar(store: store, size: 54),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Row(children: [
-              Flexible(
-                child: Text(store.name, overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900)),
+    final list = app.offersOf(store.id);
+    final maxDisc = list.isEmpty ? 0 : list.map((o) => o.discountPercent).reduce((a, b) => a > b ? a : b);
+    final withImg = list.where((o) => o.imageId.isNotEmpty).toList();
+    final cover = store.imageId.isNotEmpty
+        ? AppImage(imageId: store.imageId, height: 112, width: 120, fallback: _ph())
+        : withImg.isNotEmpty
+            ? SizedBox(width: 120, child: OfferImage(offer: withImg.first, height: 112))
+            : list.isNotEmpty
+                ? SizedBox(width: 120, child: OfferImage(offer: list.first, height: 112))
+                : _ph();
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Material(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        elevation: 0.8,
+        shadowColor: const Color(0x2206363C),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => StorePage(storeId: store.id))),
+          child: SizedBox(
+            height: 112,
+            child: Row(children: [
+              Stack(children: [
+                cover,
+                if (maxDisc > 0)
+                  Positioned(
+                    top: 8,
+                    right: 8,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(color: const Color(0xFFE5484D), borderRadius: BorderRadius.circular(10)),
+                      child: Text('خصم $maxDisc%', style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w900)),
+                    ),
+                  ),
+              ]),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.center, children: [
+                    Row(children: [
+                      Flexible(
+                        child: Text(store.name, maxLines: 1, overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900)),
+                      ),
+                      if (store.sponsored) ...[
+                        const SizedBox(width: 6),
+                        const Badge2('مُموّل', bg: DepoColors.soft, fg: DepoColors.muted),
+                      ],
+                    ]),
+                    Text('${store.area} • ${store.distanceKm} كم', style: const TextStyle(fontSize: 12, color: DepoColors.muted)),
+                    const SizedBox(height: 6),
+                    Row(children: [
+                      const Icon(Icons.star_rounded, size: 17, color: DepoColors.brand),
+                      Text(' ${store.rating.toStringAsFixed(1)}', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w900)),
+                      const SizedBox(width: 10),
+                      const Icon(Icons.schedule_rounded, size: 15, color: DepoColors.muted),
+                      Text(' ${store.eta}', style: const TextStyle(fontSize: 12, color: DepoColors.muted)),
+                    ]),
+                    const SizedBox(height: 4),
+                    Text(list.isEmpty ? 'ماكو عروض هسه' : '${list.length} عروض متوفرة هسه',
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: list.isEmpty ? DepoColors.muted : DepoColors.success)),
+                  ]),
+                ),
               ),
-              if (store.sponsored) ...[
-                const SizedBox(width: 6),
-                const Badge2('مُموّل', bg: DepoColors.soft, fg: DepoColors.muted),
-              ],
             ]),
-            const SizedBox(height: 2),
-            Text('${store.area} • ${store.distanceKm} كم • ${store.eta}',
-                style: const TextStyle(fontSize: 12, color: DepoColors.muted)),
-            const SizedBox(height: 4),
-            Row(children: [
-              const Icon(Icons.star_rounded, size: 16, color: DepoColors.accent),
-              Text(' ${store.rating.toStringAsFixed(1)}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800)),
-              const Spacer(),
-              if (n > 0) Badge2('$n عروض', bg: DepoColors.successBg, fg: DepoColors.success),
-            ]),
-          ]),
+          ),
         ),
-      ]),
+      ),
     );
   }
+
+  Widget _ph() => ImagePlaceholder(height: 112, radius: 0, seed: store.name).let((w) => SizedBox(width: 120, child: w));
+}
+
+extension _Let<T> on T {
+  R let<R>(R Function(T) f) => f(this);
 }
 
 class StoreAvatar extends StatelessWidget {
