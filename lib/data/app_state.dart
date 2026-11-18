@@ -550,6 +550,7 @@ class AppState extends ChangeNotifier {
   }
 
   void setOfferHidden(Offer o, bool hidden) {
+    if (!can(Perm.quality)) return;
     o.hidden = hidden;
     _log('${hidden ? 'إخفاء' : 'إظهار'} عرض «${o.title}»');
     _changed();
@@ -796,6 +797,7 @@ class AppState extends ChangeNotifier {
 
   /// المشرف استلم النقد من المندوب
   void settleCourier(String phone) {
+    if (!canAny([Perm.operations, Perm.finance])) return;
     final amount = cashOf(phone);
     for (final o in orders.where((o) => o.courierPhone == phone && o.status == OrderStatus.delivered)) {
       o.cashSettled = true;
@@ -869,10 +871,10 @@ class AppState extends ChangeNotifier {
     _changed();
   }
 
-  void approveJoin(JoinRequest r) {
+  void approveJoin(JoinRequest r, {bool viaInspection = false}) {
     final u = userByPhone(r.phone);
     if (u == null || r.status != 'pending') return;
-    if (!canSetRole(r.type)) return;
+    if (!canDecideJoin(r, viaInspection: viaInspection)) return;
     r.status = 'approved';
     u.role = r.type;
     final existing = u.storeId == null ? null : storeById(u.storeId!);
@@ -897,6 +899,7 @@ class AppState extends ChangeNotifier {
   }
 
   void rejectJoin(JoinRequest r, String note) {
+    if (r.status != 'pending' || !canDecideJoin(r, viaInspection: true)) return;
     r.status = 'rejected';
     r.note = note;
     notify(r.phone, 'طلب الانضمام ما انقبل${note.isEmpty ? '' : ': $note'}');
@@ -905,12 +908,56 @@ class AppState extends ChangeNotifier {
   }
 
   // ---------------- الإدارة ----------------
+  /// هل الحساب الحالي عنده صلاحية هذا القسم؟ (المدير: كلشي)
+  bool can(Perm p) {
+    final m = me;
+    if (m == null || m.suspended) return false;
+    if (m.role == Role.admin) return true;
+    return m.role == Role.supervisor && m.perms.contains(p.name);
+  }
+
+  bool canAny(List<Perm> ps) => ps.any(can);
+
+  Set<Perm> permsOf(AppUser u) => {for (final p in Perm.values) if (u.perms.contains(p.name)) p};
+
+  /// المدير بس يحدد أقسام المشرف
+  void setPerms(AppUser u, Set<Perm> ps) {
+    if (me?.role != Role.admin || u.role != Role.supervisor) return;
+    u.perms = [for (final p in Perm.values) if (ps.contains(p)) p.name];
+    _log('أقسام المشرف ${u.phone}: ${ps.isEmpty ? 'بدون' : ps.map((p) => permNames[p]).join('، ')}');
+    notify(u.phone, 'تحدّثت أقسامك: ${ps.isEmpty ? 'بدون' : ps.map((p) => permNames[p]).join('، ')}');
+    _changed();
+  }
+
+  /// منو يكدر يقرر بطلب الانضمام: المندوبين = العمليات، المحلات = الشراكات (والجودة عن طريق التفتيش)
+  bool canDecideJoin(JoinRequest r, {bool viaInspection = false}) {
+    if (r.type == Role.courier) return can(Perm.operations);
+    return can(Perm.partnerships) || (viaInspection && can(Perm.quality));
+  }
+
+  bool canSeeJoin(JoinRequest r) => r.type == Role.courier ? can(Perm.operations) : canAny([Perm.partnerships, Perm.quality]);
+
+  void setStoreSponsored(Store s, bool v) {
+    if (!can(Perm.sales)) return;
+    s.sponsored = v;
+    _log('${v ? 'تمويل' : 'إلغاء تمويل'} ظهور ${s.name}');
+    _changed();
+  }
+
+  /// إلغاء طلب من الدعم أو العمليات
+  void staffCancel(Order o, String reason) {
+    if (!canAny([Perm.operations, Perm.support])) return;
+    if (setStatus(o, OrderStatus.cancelled, reason: reason)) _log('إلغاء الطلب #${o.id}: $reason');
+  }
+
   /// المشرف ما يكدر يرفع مشرف ثاني — المدير بس
+  /// المدير: أي دور. المشرف: التقنية (زبون/مندوب)، العمليات (مندوب/زبون). رفع المحلات من طلبات الانضمام بس.
   bool canSetRole(Role target) {
     final r = me?.role;
     if (r == Role.admin) return true;
-    if (r == Role.supervisor) return target != Role.supervisor && target != Role.admin;
-    return false;
+    if (r != Role.supervisor) return false;
+    if (target != Role.customer && target != Role.courier) return false;
+    return canAny([Perm.tech, Perm.operations]);
   }
 
   /// منو يكدر يدير هذا الحساب: المدير يدير الكل (إلا نفسه)، والمشرف يدير اللي تحت المشرف بس
@@ -925,19 +972,23 @@ class AppState extends ChangeNotifier {
   void setRole(AppUser u, Role role) {
     if (!canSetRole(role) || !canManage(u)) return;
     u.role = role;
+    if (role != Role.supervisor) u.perms = [];
     _log('تغيير دور ${u.phone} إلى ${roleNames[role]}');
     notify(u.phone, 'صار حسابك: ${roleNames[role]}');
     _changed();
   }
 
+  bool get canSuspendUsers => canAny([Perm.tech, Perm.support]);
+
   void setUserSuspended(AppUser u, bool v) {
-    if (!canManage(u)) return;
+    if (!canManage(u) || !canSuspendUsers) return;
     u.suspended = v;
     _log('${v ? 'إيقاف' : 'تفعيل'} الحساب ${u.phone}');
     _changed();
   }
 
   void setStoreSuspended(Store s, bool v) {
+    if (!canAny([Perm.quality, Perm.partnerships])) return;
     s.suspended = v;
     _log('${v ? 'إيقاف' : 'تفعيل'} المحل ${s.name}');
     _changed();
@@ -955,12 +1006,26 @@ class AppState extends ChangeNotifier {
   }
 
   void closeComplaint(Complaint c) {
+    if (!canAny([Perm.support, Perm.quality])) return;
     c.status = 'closed';
     _log('إغلاق شكوى على الطلب #${c.orderId}');
     _changed();
   }
 
+  /// إعدادات التسويق (الشريط، أول طلب، الحملة) — قسم التسويق
+  void saveMarketing({required bool firstOrderFree, required String promoText, required String campaignName, required int campaignMinDiscount}) {
+    if (!can(Perm.marketing)) return;
+    settings
+      ..firstOrderFree = firstOrderFree
+      ..promoText = promoText
+      ..campaignName = campaignName.isEmpty ? settings.campaignName : campaignName
+      ..campaignMinDiscount = campaignMinDiscount.clamp(10, 95);
+    _log('تعديل إعدادات التسويق');
+    _changed();
+  }
+
   void saveSettings() {
+    if (me?.role != Role.admin) return;
     _log('تعديل الإعدادات (العمولات/التوصيل/الإشعارات)');
     _changed();
   }

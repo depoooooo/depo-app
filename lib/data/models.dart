@@ -12,6 +12,31 @@ const roleNames = {
   Role.admin: 'مدير عام',
 };
 
+/// أقسام الشركة — كل مشرف ينطي أقسام وتنفتحله صلاحياتها بس (الإدارة = المدير العام)
+enum Perm { operations, support, quality, partnerships, sales, marketing, finance, tech }
+
+const permNames = {
+  Perm.operations: 'العمليات',
+  Perm.support: 'الدعم',
+  Perm.quality: 'الجودة وسلامة الأكل',
+  Perm.partnerships: 'الشراكات',
+  Perm.sales: 'المبيعات',
+  Perm.marketing: 'التسويق',
+  Perm.finance: 'المالية',
+  Perm.tech: 'التقنية',
+};
+
+const permDesc = {
+  Perm.operations: 'متابعة الطلبات وإلغاؤها، تنسيق المندوبين وطلبات انضمامهم، تسوية نقدهم',
+  Perm.support: 'دعم الزبائن والمطاعم والتجار والمندوبين: الشكاوى، متابعة الطلبات، إيقاف حساب مسيء',
+  Perm.quality: 'تفتيش المحلات قبل وبعد الانضمام، سحب العروض، إيقاف المحلات، الشكاوى الصحية',
+  Perm.partnerships: 'طلبات انضمام المطاعم والتجار: قبول ورفض، ومتابعة المحلات',
+  Perm.sales: 'أداء المحلات ومبيعاتها، الإعلانات الممولة (الظهور المميز)',
+  Perm.marketing: 'الشريط الترويجي، التوصيل المجاني لأول طلب، الحملات (مثل رخيييييص)',
+  Perm.finance: 'التقارير والعمولات، استلام النقد من المندوبين',
+  Perm.tech: 'الحسابات والأدوار (زبون/مندوب)، إيقاف الحسابات، سجل العمليات',
+};
+
 /// نوع المحل: مطعم (رواجع) أو تاجر (الماركت)
 enum StoreType { restaurant, merchant }
 
@@ -52,6 +77,7 @@ class AppUser {
   List<String> notifications;
   int createdAt;
   String pinHash; // رمز سري للحسابات الخاصة (مطعم/تاجر/مندوب/مشرف/مدير)
+  List<String> perms; // أقسام المشرف
 
   AppUser({
     required this.phone,
@@ -65,7 +91,9 @@ class AppUser {
     List<String>? notifications,
     int? createdAt,
     this.pinHash = '',
-  })  : addresses = addresses ?? [],
+    List<String>? perms,
+  })  : perms = perms ?? [],
+        addresses = addresses ?? [],
         follows = follows ?? [],
         notifications = notifications ?? [],
         createdAt = createdAt ?? _now();
@@ -82,6 +110,7 @@ class AppUser {
         'notifications': notifications,
         'createdAt': createdAt,
         'pinHash': pinHash,
+        'perms': perms,
       };
 
   factory AppUser.fromJson(Map<String, dynamic> j) => AppUser(
@@ -96,6 +125,7 @@ class AppUser {
         notifications: List<String>.from(j['notifications'] ?? const []),
         createdAt: j['createdAt'] as int?,
         pinHash: (j['pinHash'] ?? '') as String,
+        perms: List<String>.from(j['perms'] ?? const []),
       );
 }
 

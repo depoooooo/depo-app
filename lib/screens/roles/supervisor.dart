@@ -3,6 +3,7 @@ import '../../data/app_state.dart';
 import '../../data/models.dart';
 import '../../theme.dart';
 import '../../widgets/common.dart';
+import 'admin.dart';
 
 AppBar roleAppBar(String title, {PreferredSizeWidget? bottom}) => AppBar(
       backgroundColor: DepoColors.ink,
@@ -22,21 +23,102 @@ TabBar roleTabs(List<String> labels) => TabBar(
       tabs: [for (final l in labels) Tab(text: l)],
     );
 
-/// واجهة المشرف
+/// واجهة المشرف: التبويبات حسب أقسامه بس
 class SupervisorHome extends StatelessWidget {
   const SupervisorHome({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final pending = app.joinRequests.where((r) => r.status == 'pending').length;
+    final me = app.me!;
+    final pending = app.joinRequests.where((r) => r.status == 'pending' && app.canSeeJoin(r)).length;
     final openC = app.complaints.where((c) => c.status == 'open').length;
+    final tabs = <(String, Widget)>[
+      if (app.canAny([Perm.partnerships, Perm.quality, Perm.operations])) ('طلبات الانضمام ($pending)', JoinRequestsTab()),
+      if (app.canAny([Perm.operations, Perm.support, Perm.finance])) ('الطلبات', OrdersMonitorTab()),
+      if (app.canAny([Perm.support, Perm.quality])) ('الشكاوى ($openC)', ComplaintsTab()),
+      if (app.canAny([Perm.tech, Perm.support, Perm.operations])) ('المستخدمين', UsersTab()),
+      if (app.canAny([Perm.quality, Perm.partnerships, Perm.sales])) ('العروض والمحلات', OffersStoresTab()),
+      if (app.can(Perm.marketing)) ('التسويق', MarketingTab()),
+      if (app.canAny([Perm.finance, Perm.sales])) ('التقارير', ReportsTab()),
+      if (app.can(Perm.tech)) ('سجل العمليات', AuditTab()),
+    ]; // ignore: prefer_const_constructors
+    if (tabs.isEmpty) {
+      return Scaffold(
+        appBar: roleAppBar('واجهة المشرف'),
+        body: const EmptyState(icon: Icons.lock_outline_rounded, text: 'بعد ما انحددت أقسامك. تواصل ويه المدير العام حتى يفتحلك الصلاحيات.'),
+      );
+    }
     return DefaultTabController(
-      length: 5,
+      length: tabs.length,
       child: Scaffold(
-        appBar: roleAppBar('واجهة المشرف', bottom: roleTabs(['طلبات الانضمام ($pending)', 'الطلبات', 'الشكاوى ($openC)', 'المستخدمين', 'العروض والمحلات'])),
-        // ignore: prefer_const_constructors
-        body: TabBarView(children: [JoinRequestsTab(), OrdersMonitorTab(), ComplaintsTab(), UsersTab(), OffersStoresTab()]),
+        appBar: roleAppBar(
+          'المشرف: ${app.permsOf(me).map((p) => permNames[p]).join(' • ')}',
+          bottom: roleTabs([for (final t in tabs) t.$1]),
+        ),
+        body: TabBarView(children: [for (final t in tabs) t.$2]),
       ),
+    );
+  }
+}
+
+/// إعدادات التسويق (قسم التسويق)
+class MarketingTab extends StatefulWidget {
+  const MarketingTab({super.key});
+
+  @override
+  State<MarketingTab> createState() => _MarketingTabState();
+}
+
+class _MarketingTabState extends State<MarketingTab> {
+  late final promo = TextEditingController(text: app.settings.promoText);
+  late final campaign = TextEditingController(text: app.settings.campaignName);
+  late final minDisc = TextEditingController(text: '${app.settings.campaignMinDiscount}');
+  late bool firstFree = app.settings.firstOrderFree;
+
+  @override
+  void dispose() {
+    promo.dispose();
+    campaign.dispose();
+    minDisc.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        const SectionTitle('العروض والحملات'),
+        AppCard(
+          padding: EdgeInsets.zero,
+          child: SwitchListTile(
+            value: firstFree,
+            onChanged: (v) => setState(() => firstFree = v),
+            title: const Text('توصيل مجاني لأول طلب', style: TextStyle(fontWeight: FontWeight.w800)),
+            subtitle: const Text('لكل زبون جديد'),
+          ),
+        ),
+        TextField(controller: promo, decoration: const InputDecoration(labelText: 'نص الشريط البرتقالي فوق (فارغ = مطفي)')),
+        const SizedBox(height: 10),
+        Row(children: [
+          Expanded(child: TextField(controller: campaign, decoration: const InputDecoration(labelText: 'اسم الحملة'))),
+          const SizedBox(width: 10),
+          Expanded(child: TextField(controller: minDisc, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'أقل خصم للحملة %'))),
+        ]),
+        const SizedBox(height: 16),
+        FilledButton(
+          onPressed: () {
+            app.saveMarketing(
+              firstOrderFree: firstFree,
+              promoText: promo.text.trim(),
+              campaignName: campaign.text.trim(),
+              campaignMinDiscount: parseInt(minDisc.text) ?? app.settings.campaignMinDiscount,
+            );
+            toast(context, 'انحفظت إعدادات التسويق');
+          },
+          child: const Text('حفظ'),
+        ),
+      ],
     );
   }
 }
@@ -46,7 +128,7 @@ class JoinRequestsTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final list = app.joinRequests;
+    final list = app.joinRequests.where(app.canSeeJoin).toList();
     if (list.isEmpty) return const EmptyState(icon: Icons.how_to_reg_outlined, text: 'ماكو طلبات انضمام');
     return ListView(
       padding: const EdgeInsets.all(16),
@@ -91,20 +173,25 @@ class JoinRequestsTab extends StatelessWidget {
               if (r.status == 'pending') ...[
                 const SizedBox(height: 8),
                 Row(children: [
-                  Expanded(
-                    child: FilledButton.icon(
-                      onPressed: () {
-                        app.approveJoin(r);
-                        toast(context, 'تمت الموافقة وتحوّلت واجهة الحساب');
-                      },
-                      icon: const Icon(Icons.check),
-                      label: const Text('موافقة'),
+                  if (app.canDecideJoin(r)) ...[
+                    Expanded(
+                      child: FilledButton.icon(
+                        onPressed: () {
+                          app.approveJoin(r);
+                          toast(context, 'تمت الموافقة وتحوّلت واجهة الحساب');
+                        },
+                        icon: const Icon(Icons.check),
+                        label: const Text('موافقة'),
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(child: OutlinedButton(onPressed: () => _inspection(context, r), child: const Text('تفتيش'))),
-                  const SizedBox(width: 8),
-                  Expanded(child: OutlinedButton(onPressed: () => _reject(context, r), child: const Text('رفض'))),
+                    const SizedBox(width: 8),
+                  ],
+                  if (r.type != Role.courier && app.can(Perm.quality)) ...[
+                    Expanded(child: OutlinedButton(onPressed: () => _inspection(context, r), child: const Text('تفتيش'))),
+                    const SizedBox(width: 8),
+                  ],
+                  if (app.canDecideJoin(r, viaInspection: true))
+                    Expanded(child: OutlinedButton(onPressed: () => _reject(context, r), child: const Text('رفض'))),
                 ]),
               ],
             ]),
@@ -137,7 +224,7 @@ class JoinRequestsTab extends StatelessWidget {
             FilledButton(
               onPressed: checked.length == items.length
                   ? () {
-                      app.approveJoin(r);
+                      app.approveJoin(r, viaInspection: true);
                       Navigator.pop(c);
                       toast(context, 'نجح التفتيش وانقبل الطلب');
                     }
@@ -184,7 +271,7 @@ class OrdersMonitorTab extends StatelessWidget {
       children: [
         StatGrid([StatTile('طلبات مفتوحة', '${open.length}'), StatTile('متأخرة (+40 د)', '${late.length}')]),
         const SizedBox(height: 10),
-        if (app.couriersCash.isNotEmpty) ...[
+        if (app.couriersCash.isNotEmpty && app.canAny([Perm.operations, Perm.finance])) ...[
           const SectionTitle('النقد عند المندوبين'),
           for (final e in app.couriersCash.entries)
             AppCard(
@@ -231,7 +318,7 @@ class OrdersMonitorTab extends StatelessWidget {
               ]),
               Text('${app.storeById(o.storeId)?.fullName ?? ''} ← ${o.customerName} (${o.customerPhone})', style: const TextStyle(fontSize: 12)),
               Text('${iqd(o.total)} • عمولة ${iqd(o.commission)} • ${o.pickup ? 'استلام ذاتي' : 'توصيل'}', style: const TextStyle(fontSize: 12, color: DepoColors.muted)),
-              if (o.isOpen)
+              if (o.isOpen && app.canAny([Perm.operations, Perm.support]))
                 Align(
                   alignment: AlignmentDirectional.centerEnd,
                   child: TextButton(
@@ -246,7 +333,7 @@ class OrdersMonitorTab extends StatelessWidget {
                           ],
                         ),
                       );
-                      if (ok == true) app.setStatus(o, OrderStatus.cancelled, reason: 'ألغاه الدعم');
+                      if (ok == true) app.staffCancel(o, 'ألغاه الدعم');
                     },
                     child: const Text('إلغاء الطلب'),
                   ),
@@ -283,7 +370,7 @@ class ComplaintsTab extends StatelessWidget {
               if (c.status == 'open')
                 Row(children: [
                   TextButton(onPressed: () => app.closeComplaint(c), child: const Text('تمت المعالجة')),
-                  if (c.health)
+                  if (c.health && app.can(Perm.quality))
                     TextButton(
                       onPressed: () {
                         final o = app.orderById(c.orderId);
@@ -333,7 +420,7 @@ class _UsersTabState extends State<UsersTab> {
                   Text('${u.phone} • ${roleNames[u.role]}${u.suspended ? ' • موقوف' : ''}', style: const TextStyle(fontSize: 12, color: DepoColors.muted)),
                 ]),
               ),
-              if (app.canManage(u))
+              if (app.canManage(u) && (app.canSuspendUsers || [Role.customer, Role.courier, Role.supervisor, Role.admin].any((r) => app.canSetRole(r) && r != u.role)))
                 PopupMenuButton<String>(
                   tooltip: 'إجراءات',
                   onSelected: (v) {
@@ -345,14 +432,14 @@ class _UsersTabState extends State<UsersTab> {
                     }
                   },
                   itemBuilder: (c) => [
-                    PopupMenuItem(value: 'suspend', child: Text(u.suspended ? 'تفعيل الحساب' : 'إيقاف الحساب')),
+                    if (app.canSuspendUsers) PopupMenuItem(value: 'suspend', child: Text(u.suspended ? 'تفعيل الحساب' : 'إيقاف الحساب')),
                     for (final r in [Role.customer, Role.courier, Role.supervisor, Role.admin])
                       if (app.canSetRole(r) && r != u.role) PopupMenuItem(value: r.name, child: Text('اجعله ${roleNames[r]}')),
                   ],
                 ),
             ]),
           ),
-        const Text('ترقية المطاعم والتجار تصير من «طلبات الانضمام» حتى ينربط المحل بالحساب. والمشرف ما يكدر يرفع مشرف ثاني.',
+        const Text('ترقية المطاعم والتجار تصير من «طلبات الانضمام». المشرف يكدر يخلي الحساب مندوب أو زبون بس، والمدير العام وحده يرفع المشرفين ويحدد أقسامهم.',
             style: TextStyle(fontSize: 12, color: DepoColors.muted)),
       ],
     );
@@ -378,7 +465,14 @@ class OffersStoresTab extends StatelessWidget {
                       style: const TextStyle(fontSize: 12, color: DepoColors.muted)),
                 ]),
               ),
-              TextButton(onPressed: () => app.setStoreSuspended(s, !s.suspended), child: Text(s.suspended ? 'تفعيل' : 'إيقاف')),
+              if (app.can(Perm.sales))
+                IconButton(
+                  tooltip: s.sponsored ? 'إلغاء الظهور المميز' : 'ظهور مميز (ممول)',
+                  onPressed: () => app.setStoreSponsored(s, !s.sponsored),
+                  icon: Icon(s.sponsored ? Icons.star_rounded : Icons.star_outline_rounded, color: DepoColors.accent),
+                ),
+              if (app.canAny([Perm.quality, Perm.partnerships]))
+                TextButton(onPressed: () => app.setStoreSuspended(s, !s.suspended), child: Text(s.suspended ? 'تفعيل' : 'إيقاف')),
             ]),
           ),
         const SizedBox(height: 8),
@@ -393,7 +487,8 @@ class OffersStoresTab extends StatelessWidget {
                       style: const TextStyle(fontSize: 12, color: DepoColors.muted)),
                 ]),
               ),
-              TextButton(onPressed: () => app.setOfferHidden(o, !o.hidden), child: Text(o.hidden ? 'إظهار' : 'إخفاء')),
+              if (app.can(Perm.quality))
+                TextButton(onPressed: () => app.setOfferHidden(o, !o.hidden), child: Text(o.hidden ? 'إظهار' : 'إخفاء')),
             ]),
           ),
       ],

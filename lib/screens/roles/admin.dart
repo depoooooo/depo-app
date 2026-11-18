@@ -20,7 +20,7 @@ class AdminHome extends StatelessWidget {
             bottom: roleTabs(['التقارير', 'الإعدادات', 'المشرفين', 'طلبات الانضمام ($pending)', 'الطلبات', 'الشكاوى ($openC)', 'المستخدمين', 'العروض والمحلات', 'سجل العمليات'])),
         // ignore: prefer_const_constructors
         body: TabBarView(children: [
-          _ReportsTab(),
+          ReportsTab(),
           _SettingsTab(),
           _SupervisorsTab(),
           JoinRequestsTab(),
@@ -28,7 +28,7 @@ class AdminHome extends StatelessWidget {
           ComplaintsTab(),
           UsersTab(),
           OffersStoresTab(),
-          _AuditTab(),
+          AuditTab(),
         ]),
       ),
     );
@@ -44,12 +44,13 @@ const _periodNames = {
   _Period.all: 'الكل',
 };
 
-class _ReportsTab extends StatefulWidget {
+class ReportsTab extends StatefulWidget {
+  const ReportsTab({super.key});
   @override
-  State<_ReportsTab> createState() => _ReportsTabState();
+  State<ReportsTab> createState() => _ReportsTabState();
 }
 
-class _ReportsTabState extends State<_ReportsTab> {
+class _ReportsTabState extends State<ReportsTab> {
   _Period period = _Period.month;
 
   /// بداية الفترة (الأسبوع يبدي من السبت)
@@ -285,14 +286,24 @@ class _SupervisorsTab extends StatelessWidget {
       children: [
         FilledButton.icon(onPressed: () => _add(context), icon: const Icon(Icons.person_add_alt), label: const Text('أضف مشرف برقم التلفون')),
         const SizedBox(height: 6),
-        const Text('الشخص لازم يكون مسجّل بالتطبيق أول. المدير العام بس يرفع المشرفين.', style: TextStyle(fontSize: 12, color: DepoColors.muted)),
+        const Text('الشخص لازم يكون مسجّل بالتطبيق أول. كل مشرف تحدد أقسامه، وما يشوف غير صلاحياتها.',
+            style: TextStyle(fontSize: 12, color: DepoColors.muted)),
         const SizedBox(height: 10),
         if (sups.isEmpty) const EmptyState(icon: Icons.supervisor_account_outlined, text: 'ماكو مشرفين بعد'),
         for (final u in sups)
           AppCard(
-            child: Row(children: [
-              Expanded(child: Text('${u.name.isEmpty ? u.phone : u.name} — ${u.phone}', style: const TextStyle(fontWeight: FontWeight.w800))),
-              TextButton(onPressed: () => app.setRole(u, Role.customer), child: const Text('شيل الصلاحية')),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(children: [
+                Expanded(child: Text('${u.name.isEmpty ? u.phone : u.name} — ${u.phone}', style: const TextStyle(fontWeight: FontWeight.w800))),
+                IconButton(tooltip: 'الأقسام', onPressed: () => editPerms(context, u), icon: const Icon(Icons.tune_rounded)),
+                TextButton(onPressed: () => app.setRole(u, Role.customer), child: const Text('شيل الإشراف')),
+              ]),
+              if (u.perms.isEmpty)
+                const Text('بدون أقسام — ما يشوف شي لحد ما تحدد أقسامه', style: TextStyle(fontSize: 12, color: DepoColors.danger, fontWeight: FontWeight.w700))
+              else
+                Wrap(spacing: 6, runSpacing: 6, children: [
+                  for (final p in app.permsOf(u)) Badge2(permNames[p]!, bg: DepoColors.soft, fg: DepoColors.dark),
+                ]),
             ]),
           ),
       ],
@@ -309,17 +320,20 @@ class _SupervisorsTab extends StatelessWidget {
         actions: [
           TextButton(onPressed: () => Navigator.pop(c), child: const Text('إلغاء')),
           FilledButton(
+            style: FilledButton.styleFrom(minimumSize: const Size(0, 44)),
             onPressed: () {
               final u = app.userByPhone(ctl.text.trim());
               if (u == null) {
                 toast(context, 'هذا الرقم مو مسجّل بالتطبيق');
+              } else if (u.phone == app.currentPhone) {
+                toast(context, 'هذا رقمك أنت');
               } else {
                 app.setRole(u, Role.supervisor);
                 Navigator.pop(c);
-                toast(context, 'صار مشرف');
+                editPerms(context, u);
               }
             },
-            child: const Text('رفع'),
+            child: const Text('التالي: الأقسام'),
           ),
         ],
       ),
@@ -327,7 +341,42 @@ class _SupervisorsTab extends StatelessWidget {
   }
 }
 
-class _AuditTab extends StatelessWidget {
+/// نافذة تحديد أقسام المشرف
+Future<void> editPerms(BuildContext context, AppUser u) async {
+  final sel = app.permsOf(u);
+  final ok = await showDialog<bool>(
+    context: context,
+    builder: (c) => StatefulBuilder(
+      builder: (c, set) => AlertDialog(
+        title: Text('أقسام ${u.name.isEmpty ? u.phone : u.name}'),
+        content: SizedBox(
+          width: 420,
+          child: ListView(shrinkWrap: true, children: [
+            for (final p in Perm.values)
+              CheckboxListTile(
+                contentPadding: EdgeInsets.zero,
+                value: sel.contains(p),
+                onChanged: (v) => set(() => v == true ? sel.add(p) : sel.remove(p)),
+                title: Text(permNames[p]!, style: const TextStyle(fontWeight: FontWeight.w800)),
+                subtitle: Text(permDesc[p]!, style: const TextStyle(fontSize: 12)),
+              ),
+          ]),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('إلغاء')),
+          FilledButton(style: FilledButton.styleFrom(minimumSize: const Size(0, 44)), onPressed: () => Navigator.pop(c, true), child: const Text('حفظ')),
+        ],
+      ),
+    ),
+  );
+  if (ok == true) {
+    app.setPerms(u, sel);
+    if (context.mounted) toast(context, 'انحفظت الأقسام');
+  }
+}
+
+class AuditTab extends StatelessWidget {
+  const AuditTab({super.key});
   @override
   Widget build(BuildContext context) {
     if (app.audit.isEmpty) return const EmptyState(icon: Icons.history, text: 'ماكو عمليات مسجلة بعد');
