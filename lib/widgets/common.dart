@@ -44,28 +44,46 @@ class Badge2 extends StatelessWidget {
   }
 }
 
-/// مكان الصورة لحد ما تجي صور حقيقية
+/// مكان الصورة لحد ما تجي صور حقيقية: لون وأيقونة حسب نوع الأكل
 class ImagePlaceholder extends StatelessWidget {
   final double height;
   final bool box;
   final double radius;
-  const ImagePlaceholder({super.key, this.height = 110, this.box = false, this.radius = 14});
+  final String seed;
+  const ImagePlaceholder({super.key, this.height = 110, this.box = false, this.radius = 14, this.seed = ''});
+
+  static const _palettes = [
+    [Color(0xFFFFE8CC), Color(0xFFFFD199)], // برتقالي
+    [Color(0xFFDFF7F9), Color(0xFFB5EBF1)], // فيروزي
+    [Color(0xFFFFE3E3), Color(0xFFFFC2C2)], // وردي
+    [Color(0xFFE8F5E1), Color(0xFFC8E8B5)], // أخضر
+    [Color(0xFFFFF3C4), Color(0xFFFFE38A)], // أصفر
+    [Color(0xFFEDE7FB), Color(0xFFD4C8F5)], // بنفسجي
+  ];
+
+  IconData get _icon {
+    final t = seed;
+    if (box) return Icons.inventory_2_rounded;
+    if (t.contains('صمون') || t.contains('خبز') || t.contains('معجنات') || t.contains('بسكت')) return Icons.bakery_dining_rounded;
+    if (t.contains('كنافة') || t.contains('حلو') || t.contains('كيك')) return Icons.cake_rounded;
+    if (t.contains('فروج') || t.contains('دجاج') || t.contains('مشاوي') || t.contains('كبة')) return Icons.kebab_dining_rounded;
+    if (t.contains('لبن') || t.contains('حليب')) return Icons.local_drink_rounded;
+    if (t.contains('غسيل') || t.contains('منظف')) return Icons.local_laundry_service_rounded;
+    return Icons.restaurant_rounded;
+  }
 
   @override
   Widget build(BuildContext context) {
+    final p = _palettes[seed.isEmpty ? 1 : seed.codeUnits.fold<int>(0, (a, b) => a + b) % _palettes.length];
     return Container(
       height: height,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(radius),
-        gradient: const LinearGradient(colors: [DepoColors.soft, Color(0xFFC9F1F6)]),
+        gradient: LinearGradient(begin: Alignment.topRight, end: Alignment.bottomLeft, colors: p),
       ),
       alignment: Alignment.center,
-      child: Icon(
-        box ? Icons.inventory_2_outlined : Icons.restaurant_outlined,
-        color: DepoColors.dark,
-        size: 32,
-        semanticLabel: box ? 'صورة الصندوق' : 'صورة الوجبة',
-      ),
+      child: Icon(_icon, color: DepoColors.ink.withValues(alpha: 0.55), size: height * 0.38,
+          semanticLabel: box ? 'صورة الصندوق' : 'صورة الوجبة'),
     );
   }
 }
@@ -120,9 +138,11 @@ class AppCard extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 10),
       child: Material(
         color: color ?? Colors.white,
+        elevation: 0.6,
+        shadowColor: const Color(0x2206363C),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
-          side: BorderSide(color: borderColor ?? DepoColors.line, width: 1.2),
+          side: BorderSide(color: borderColor ?? const Color(0xFFE8F4F6), width: 1),
         ),
         clipBehavior: Clip.antiAlias,
         child: InkWell(onTap: onTap, child: Padding(padding: padding, child: child)),

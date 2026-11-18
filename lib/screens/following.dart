@@ -15,7 +15,7 @@ class FollowingScreen extends StatelessWidget {
     final me = app.me;
     final list = me == null ? <Store>[] : me.follows.map(app.storeById).whereType<Store>().toList();
     return Scaffold(
-      appBar: AppBar(title: const Text('أتابعها'), automaticallyImplyLeading: false),
+      appBar: AppBar(title: const Text('محلاتي')),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [

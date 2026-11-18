@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../data/app_state.dart';
 import '../data/models.dart';
 import '../theme.dart';
+import 'following.dart';
 import '../widgets/common.dart';
 import 'auth.dart';
 import 'join.dart';
@@ -99,6 +100,7 @@ class AccountScreen extends StatelessWidget {
                 Icon(Icons.chevron_left),
               ]),
             ),
+          _MenuItem(Icons.favorite_border, 'محلاتي (${u.follows.length})', () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const FollowingScreen()))),
           _MenuItem(Icons.notifications_none, 'الإشعارات (${u.notifications.length})', () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const NotificationsScreen()))),
           _MenuItem(Icons.location_on_outlined, 'عناويني', () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const AddressesScreen()))),
           _MenuItem(Icons.card_giftcard, 'دعوة صديق', () => _invite(context)),

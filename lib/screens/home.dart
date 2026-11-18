@@ -1,12 +1,17 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../data/app_state.dart';
 import '../data/models.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
+import '../widgets/offer_cards.dart';
 import 'auth.dart';
-import 'offer_detail.dart';
+import 'following.dart';
+import 'join.dart';
 import 'search.dart';
 import 'store_page.dart';
+
+export '../widgets/offer_cards.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -30,7 +35,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       listenable: app,
       builder: (context, _) => NestedScrollView(
         headerSliverBuilder: (context, _) => [SliverToBoxAdapter(child: _Header(tabs: _tabs))],
-        body: TabBarView(controller: _tabs, children: const [_RawajiTab(), _MarketTab()]),
+        body: TabBarView(controller: _tabs, children: [_RawajiTab(), _MarketTab()]), // ignore: prefer_const_constructors
       ),
     );
   }
@@ -42,61 +47,67 @@ class _Header extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final address = app.me?.addresses.isNotEmpty == true ? app.me!.addresses.first : 'حي الزهور — الموصل';
+    final address = app.me?.addresses.isNotEmpty == true ? app.me!.addresses.first : 'الموصل';
     return Container(
-      padding: EdgeInsets.fromLTRB(16, MediaQuery.of(context).padding.top + 12, 16, 14),
+      padding: EdgeInsets.fromLTRB(16, MediaQuery.of(context).padding.top + 10, 16, 14),
       decoration: const BoxDecoration(
-        color: DepoColors.brand,
-        borderRadius: BorderRadius.vertical(bottom: Radius.circular(24)),
+        gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xFF5AD6E3), DepoColors.brand]),
+        borderRadius: BorderRadius.vertical(bottom: Radius.circular(28)),
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         Row(children: [
           Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              const Text('التوصيل إلى', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: DepoColors.ink)),
               Row(children: [
-                const Icon(Icons.location_on_outlined, size: 18, color: DepoColors.ink),
-                const SizedBox(width: 4),
-                Flexible(child: Text(address, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w800))),
+                Flexible(
+                  child: Text(address, overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900)),
+                ),
+                const Icon(Icons.keyboard_arrow_down_rounded, size: 20),
               ]),
-              const SizedBox(height: 4),
-              const Text('رواجع حارّة خلال 20–40 دقيقة', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800)),
             ]),
           ),
-          Image.asset('assets/logo/depo-ar-white.png', height: 34, semanticLabel: 'ديبو'),
+          Image.asset('assets/logo/depo-ar-white.png', height: 32, semanticLabel: 'ديبو'),
         ]),
         const SizedBox(height: 12),
         Material(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(16),
+          elevation: 2,
+          shadowColor: const Color(0x3306363C),
           child: InkWell(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(16),
             onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const SearchScreen())),
             child: const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 12, vertical: 13),
+              padding: EdgeInsets.symmetric(horizontal: 14, vertical: 14),
               child: Row(children: [
-                Icon(Icons.search, color: DepoColors.muted),
+                Icon(Icons.search_rounded, color: DepoColors.dark),
                 SizedBox(width: 8),
-                Text('شتشتهي اليوم؟ خبز حار؟', style: TextStyle(color: DepoColors.muted)),
+                Text('دوّر على أكلة أو محل...', style: TextStyle(color: DepoColors.muted)),
               ]),
             ),
           ),
         ),
         const SizedBox(height: 12),
         Container(
-          decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.5), borderRadius: BorderRadius.circular(14)),
+          height: 46,
+          decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.35), borderRadius: BorderRadius.circular(16)),
           padding: const EdgeInsets.all(4),
           child: TabBar(
             controller: tabs,
-            indicator: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(11)),
+            indicator: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: const [BoxShadow(color: Color(0x2206363C), blurRadius: 6, offset: Offset(0, 2))],
+            ),
             indicatorSize: TabBarIndicatorSize.tab,
             dividerColor: Colors.transparent,
             labelColor: DepoColors.ink,
             unselectedLabelColor: DepoColors.ink,
-            labelStyle: const TextStyle(fontFamily: 'Tajawal', fontWeight: FontWeight.w800, fontSize: 15),
-            tabs: const [
-              Tab(icon: Icon(Icons.restaurant_outlined, size: 18), text: 'رواجع المطاعم', iconMargin: EdgeInsets.zero),
-              Tab(icon: Icon(Icons.shopping_basket_outlined, size: 18), text: 'الماركت', iconMargin: EdgeInsets.zero),
-            ],
+            labelStyle: const TextStyle(fontFamily: 'Tajawal', fontWeight: FontWeight.w900, fontSize: 15),
+            unselectedLabelStyle: const TextStyle(fontFamily: 'Tajawal', fontWeight: FontWeight.w700, fontSize: 14),
+            tabs: const [Tab(text: '🍽️  رواجع المطاعم'), Tab(text: '🛒  الماركت')],
           ),
         ),
       ]),
@@ -104,248 +115,308 @@ class _Header extends StatelessWidget {
   }
 }
 
+// ======================= رواجع المطاعم =======================
 class _RawajiTab extends StatelessWidget {
   const _RawajiTab();
 
   @override
   Widget build(BuildContext context) {
-    final restaurants = app.storesOfType(StoreType.restaurant).where((s) => app.offersOf(s.id).isNotEmpty).toList()
-      ..sort((a, b) => (b.sponsored ? 1 : 0) - (a.sponsored ? 1 : 0));
+    final restaurants = app.storesOfType(StoreType.restaurant)
+      ..sort((a, b) {
+        final sp = (b.sponsored ? 1 : 0) - (a.sponsored ? 1 : 0);
+        if (sp != 0) return sp;
+        return app.offersOf(b.id).length - app.offersOf(a.id).length;
+      });
+    final ids = restaurants.map((s) => s.id).toSet();
+    final offers = app.offers.where((o) => o.visible && ids.contains(o.storeId) && o.quantityLeft > 0).toList()
+      ..sort((a, b) => a.quantityLeft - b.quantityLeft);
+    final boxes = offers.where((o) => o.surpriseBox).toList();
+
     return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+      padding: const EdgeInsets.only(top: 14, bottom: 24),
       children: [
-        if (!app.loggedIn) const _GuestBanner(),
-        const _CampaignBanner(),
-        const SizedBox(height: 4),
-        const SectionTitle('رواجع قريبة عليك هسه'),
-        if (restaurants.isEmpty)
-          const EmptyState(icon: Icons.restaurant_outlined, text: 'ماكو رواجع هسه. تابع مطاعمك المفضلة حتى يوصلك إشعار أول ما ينشرون.'),
-        for (final s in restaurants) StoreRow(store: s),
-        const _PickupBanner(),
+        _Banners(slides: [
+          _Slide(
+            color: DepoColors.ink,
+            title: 'رخيييييص 🔥',
+            titleColor: DepoColors.accent,
+            text: 'رواجع المطاعم تبدي من 1,000 دينار',
+          ),
+          _Slide(
+            color: DepoColors.dark,
+            title: 'استلم بنفسك',
+            text: 'ووفّر ${iqd(app.settings.deliveryFee)} رسم التوصيل',
+            icon: Icons.storefront_rounded,
+          ),
+          if (!app.loggedIn)
+            _Slide(
+              color: DepoColors.accent,
+              title: 'سجّل واكسب نقاط',
+              titleColor: DepoColors.ink,
+              textColor: DepoColors.ink,
+              text: 'كل 1,000 دينار = نقطة، بدّلها بصناديق مجانية',
+              icon: Icons.stars_rounded,
+              onTap: () => ensureLoggedIn(context, reason: 'سجّل حتى تجمع نقاط وتتابع مطاعمك'),
+            ),
+          _Slide(
+            color: const Color(0xFF2B5F66),
+            title: 'عندك مطعم أو محل؟',
+            text: 'انضم لديبو — أول شهر مجاني للمطاعم',
+            icon: Icons.handshake_rounded,
+            onTap: () => app.loggedIn
+                ? Navigator.of(context).push(MaterialPageRoute(builder: (_) => const JoinScreen()))
+                : ensureLoggedIn(context, reason: 'سجّل أول حتى تقدّم طلب انضمام'),
+          ),
+        ]),
+        const _MyStores(),
+        _Section(title: 'رواجع قريبة عليك هسه', subtitle: 'توصل خلال 20–40 دقيقة'),
+        if (offers.isEmpty)
+          const EmptyState(icon: Icons.restaurant_outlined, text: 'ماكو رواجع هسه. تابع مطاعمك المفضلة حتى يوصلك إشعار أول ما ينشرون.')
+        else
+          OfferStrip(offers: offers),
+        if (boxes.isNotEmpty) ...[
+          _Section(title: 'صناديق المفاجأة 🎁', subtitle: 'قيمتها 3 أضعاف سعرها'),
+          OfferStrip(offers: boxes),
+        ],
+        _Section(title: 'المطاعم'),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Column(children: [for (final s in restaurants) StoreTile(store: s)]),
+        ),
       ],
     );
   }
 }
 
-class _GuestBanner extends StatelessWidget {
-  const _GuestBanner();
+class _Section extends StatelessWidget {
+  final String title;
+  final String subtitle;
+  final VoidCallback? onAll;
+  const _Section({required this.title, this.subtitle = '', this.onAll});
 
   @override
   Widget build(BuildContext context) {
-    return AppCard(
-      borderColor: const Color(0xFF9BD9E1),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 18, 8, 8),
       child: Row(children: [
-        const Icon(Icons.star_rounded, color: DepoColors.accent),
-        const SizedBox(width: 8),
-        const Expanded(
-          child: Text('سجّل واكسب نقاط تبدّلها بصناديق مجانية', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
-        ),
-        TextButton(onPressed: () => ensureLoggedIn(context, reason: 'سجّل حتى تجمع نقاط وتتابع مطاعمك'), child: const Text('تسجيل')),
-      ]),
-    );
-  }
-}
-
-class _CampaignBanner extends StatelessWidget {
-  const _CampaignBanner();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(color: DepoColors.ink, borderRadius: BorderRadius.circular(18)),
-      child: const Row(children: [
-        Icon(Icons.local_fire_department, color: DepoColors.accent, size: 30),
-        SizedBox(width: 10),
         Expanded(
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('رخيييييص', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: DepoColors.accent)),
-            Text('حملة الشهر: رواجع تبدي من 1,000 دينار', style: TextStyle(fontSize: 12, color: Colors.white)),
+            Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
+            if (subtitle.isNotEmpty) Text(subtitle, style: const TextStyle(fontSize: 12, color: DepoColors.muted)),
           ]),
         ),
+        if (onAll != null) TextButton(onPressed: onAll, child: const Text('الكل', style: TextStyle(fontWeight: FontWeight.w800))),
       ]),
     );
   }
 }
 
-class _PickupBanner extends StatelessWidget {
-  const _PickupBanner();
+/// المحلات اللي أتابعها: دوائر صغيرة فوق
+class _MyStores extends StatelessWidget {
+  const _MyStores();
 
   @override
   Widget build(BuildContext context) {
-    return AppCard(
-      borderColor: DepoColors.dark,
-      child: Row(children: [
-        const Icon(Icons.storefront_outlined, color: DepoColors.dark, size: 28),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('استلم بنفسك ووفّر ${iqd(app.settings.deliveryFee)}', style: const TextStyle(fontWeight: FontWeight.w900)),
-            const Text('تروح للمطعم وتاخذ طلبك بدون رسم توصيل', style: TextStyle(fontSize: 12, color: DepoColors.muted)),
-          ]),
-        ),
-      ]),
-    );
-  }
-}
-
-/// كرت المطعم ويه عروضه بشريط أفقي
-class StoreRow extends StatelessWidget {
-  final Store store;
-  const StoreRow({super.key, required this.store});
-
-  @override
-  Widget build(BuildContext context) {
-    final list = app.offersOf(store.id);
-    return AppCard(
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        InkWell(
-          onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => StorePage(storeId: store.id))),
-          child: Row(children: [
-            Container(
-              width: 48,
-              height: 48,
-              decoration: BoxDecoration(color: DepoColors.soft, borderRadius: BorderRadius.circular(14)),
-              child: Icon(store.type == StoreType.restaurant ? Icons.restaurant : Icons.storefront, color: DepoColors.dark),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(store.fullName, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900)),
-                Text('★ ${store.rating.toStringAsFixed(1)} (${store.ratingCount}) • ${store.distanceKm} كم • ${store.eta}',
-                    style: const TextStyle(fontSize: 11, color: DepoColors.muted)),
-              ]),
-            ),
-            if (store.sponsored) const Badge2('مُموّل', bg: DepoColors.soft, fg: DepoColors.muted),
-            const Icon(Icons.chevron_left, color: DepoColors.muted),
-          ]),
-        ),
-        const SizedBox(height: 10),
-        SizedBox(
-          height: 186,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            itemCount: list.length,
-            separatorBuilder: (_, __) => const SizedBox(width: 10),
-            itemBuilder: (context, i) => MiniOffer(offer: list[i]),
-          ),
-        ),
-      ]),
-    );
-  }
-}
-
-class MiniOffer extends StatelessWidget {
-  final Offer offer;
-  const MiniOffer({super.key, required this.offer});
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      borderRadius: BorderRadius.circular(12),
-      onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => OfferDetailScreen(offer: offer))),
-      child: SizedBox(
-        width: 132,
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Stack(children: [
-            ImagePlaceholder(height: 92, box: offer.surpriseBox, radius: 12),
-            Positioned(
-              top: 6,
-              right: 6,
-              child: Badge2(offer.surpriseBox ? 'صندوق مفاجأة' : 'خصم ${offer.discountPercent}%',
-                  bg: offer.surpriseBox ? DepoColors.brand : DepoColors.accent),
-            ),
-          ]),
-          const SizedBox(height: 4),
-          Text(offer.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800)),
-          PriceTag(price: offer.price, original: offer.originalPrice, size: 14),
-          Text(offer.quantityLeft <= 2 ? 'باقي ${offer.quantityLeft} بس' : 'باقي ${offer.quantityLeft}',
-              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: DepoColors.danger)),
-        ]),
+    final me = app.me;
+    final list = me == null ? <Store>[] : me.follows.map(app.storeById).whereType<Store>().toList();
+    if (list.isEmpty) return const SizedBox.shrink();
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      _Section(
+        title: 'محلاتي',
+        onAll: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const FollowingScreen())),
       ),
-    );
+      SizedBox(
+        height: 92,
+        child: ListView.separated(
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          itemCount: list.length,
+          separatorBuilder: (_, __) => const SizedBox(width: 14),
+          itemBuilder: (context, i) {
+            final s = list[i];
+            final hasOffers = app.offersOf(s.id).isNotEmpty;
+            return InkWell(
+              borderRadius: BorderRadius.circular(16),
+              onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => StorePage(storeId: s.id))),
+              child: SizedBox(
+                width: 66,
+                child: Column(children: [
+                  Stack(clipBehavior: Clip.none, children: [
+                    Container(
+                      padding: const EdgeInsets.all(2.5),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(color: hasOffers ? DepoColors.accent : DepoColors.line, width: 2.5),
+                      ),
+                      child: ClipOval(child: StoreAvatar(store: s, size: 54)),
+                    ),
+                    if (hasOffers)
+                      const Positioned(bottom: -2, left: -2, child: Badge2('جديد', bg: DepoColors.accent)),
+                  ]),
+                  const SizedBox(height: 4),
+                  Text(s.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700)),
+                ]),
+              ),
+            );
+          },
+        ),
+      ),
+    ]);
   }
 }
 
+// ======================= البنرات المتحركة =======================
+class _Slide {
+  final Color color;
+  final String title;
+  final String text;
+  final Color titleColor;
+  final Color textColor;
+  final IconData icon;
+  final VoidCallback? onTap;
+  const _Slide({
+    required this.color,
+    required this.title,
+    required this.text,
+    this.titleColor = Colors.white,
+    this.textColor = Colors.white,
+    this.icon = Icons.local_fire_department_rounded,
+    this.onTap,
+  });
+}
+
+class _Banners extends StatefulWidget {
+  final List<_Slide> slides;
+  const _Banners({required this.slides});
+
+  @override
+  State<_Banners> createState() => _BannersState();
+}
+
+class _BannersState extends State<_Banners> {
+  final _page = PageController(viewportFraction: 0.92);
+  int _i = 0;
+  Timer? _t;
+
+  @override
+  void initState() {
+    super.initState();
+    _t = Timer.periodic(const Duration(seconds: 4), (_) {
+      if (!_page.hasClients || widget.slides.isEmpty) return;
+      _page.animateToPage((_i + 1) % widget.slides.length,
+          duration: const Duration(milliseconds: 450), curve: Curves.easeOutCubic);
+    });
+  }
+
+  @override
+  void dispose() {
+    _t?.cancel();
+    _page.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final n = widget.slides.length;
+    return Column(children: [
+      SizedBox(
+        height: 112,
+        child: PageView.builder(
+          controller: _page,
+          itemCount: n,
+          onPageChanged: (i) => setState(() => _i = i),
+          itemBuilder: (context, i) {
+            final s = widget.slides[i];
+            return Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: Material(
+                color: s.color,
+                borderRadius: BorderRadius.circular(20),
+                clipBehavior: Clip.antiAlias,
+                child: InkWell(
+                  onTap: s.onTap,
+                  child: Stack(children: [
+                    Positioned(
+                      left: -18,
+                      bottom: -22,
+                      child: Icon(s.icon, size: 120, color: Colors.white.withValues(alpha: 0.12)),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
+                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.center, children: [
+                        Text(s.title, style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: s.titleColor)),
+                        const SizedBox(height: 4),
+                        Text(s.text, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: s.textColor)),
+                      ]),
+                    ),
+                  ]),
+                ),
+              ),
+            );
+          },
+        ),
+      ),
+      const SizedBox(height: 8),
+      Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+        for (var k = 0; k < n; k++)
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 250),
+            margin: const EdgeInsets.symmetric(horizontal: 3),
+            width: k == _i ? 18 : 6,
+            height: 6,
+            decoration: BoxDecoration(
+              color: k == _i ? DepoColors.dark : DepoColors.line,
+              borderRadius: BorderRadius.circular(3),
+            ),
+          ),
+      ]),
+    ]);
+  }
+}
+
+// ======================= الماركت =======================
 class _MarketTab extends StatelessWidget {
   const _MarketTab();
 
   @override
   Widget build(BuildContext context) {
-    final merchantIds = app.storesOfType(StoreType.merchant).map((s) => s.id).toSet();
-    final products = app.offers.where((o) => o.visible && merchantIds.contains(o.storeId)).toList();
+    final merchants = app.storesOfType(StoreType.merchant);
+    final ids = merchants.map((s) => s.id).toSet();
+    final products = app.offers.where((o) => o.visible && ids.contains(o.storeId)).toList();
     final cheap = products.where((o) => o.price <= 1000).toList();
     return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+      padding: const EdgeInsets.only(top: 14, bottom: 24),
       children: [
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-          decoration: BoxDecoration(color: DepoColors.ink, borderRadius: BorderRadius.circular(14)),
-          child: const Text('عروض الأسبوع — باقي 3 أيام', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
-        ),
-        const SizedBox(height: 10),
-        if (cheap.isNotEmpty) ...[
-          const SectionTitle('كلشي بـ 1,000 دينار'),
-          ProductGrid(products: cheap),
-          const SizedBox(height: 6),
-        ],
-        const SectionTitle('عروض قوية اليوم'),
-        if (products.isEmpty) const EmptyState(icon: Icons.shopping_basket_outlined, text: 'ماكو عروض بالماركت هسه'),
-        ProductGrid(products: products),
-      ],
-    );
-  }
-}
-
-class ProductGrid extends StatelessWidget {
-  final List<Offer> products;
-  const ProductGrid({super.key, required this.products});
-
-  @override
-  Widget build(BuildContext context) {
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: products.length,
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        mainAxisSpacing: 10,
-        crossAxisSpacing: 10,
-        childAspectRatio: 0.58,
-      ),
-      itemBuilder: (context, i) => ProductCard(offer: products[i]),
-    );
-  }
-}
-
-class ProductCard extends StatelessWidget {
-  final Offer offer;
-  const ProductCard({super.key, required this.offer});
-
-  @override
-  Widget build(BuildContext context) {
-    final store = app.storeById(offer.storeId);
-    return InkWell(
-      borderRadius: BorderRadius.circular(16),
-      onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => OfferDetailScreen(offer: offer))),
-      child: Container(
-        padding: const EdgeInsets.all(10),
-        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), border: Border.all(color: DepoColors.line)),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          const ImagePlaceholder(height: 100, box: true, radius: 12),
-          const SizedBox(height: 6),
-          Text('${store?.name ?? ''} • ${store?.distanceKm ?? ''} كم', style: const TextStyle(fontSize: 11, color: DepoColors.muted)),
-          Text(offer.title, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800)),
-          const SizedBox(height: 2),
-          StorageChip(offer.storage),
-          const Spacer(),
-          Text(offer.expiresLabel, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF8A5A00))),
-          PriceTag(price: offer.price, original: offer.originalPrice, size: 15),
-          Text('انطلب +${offer.orderedThisWeek} هالأسبوع',
-              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: DepoColors.success)),
+        _Banners(slides: [
+          const _Slide(
+            color: DepoColors.ink,
+            title: 'عروض الأسبوع',
+            titleColor: DepoColors.accent,
+            text: 'خصومات قوية على مواد قريبة الانتهاء — باقي 3 أيام',
+            icon: Icons.local_offer_rounded,
+          ),
+          _Slide(
+            color: DepoColors.dark,
+            title: 'كلشي بـ 1,000 دينار',
+            text: 'منتجات مختارة بسعر واحد',
+            icon: Icons.sell_rounded,
+          ),
         ]),
-      ),
+        if (cheap.isNotEmpty) ...[
+          _Section(title: 'كلشي بـ 1,000 دينار'),
+          OfferStrip(offers: cheap),
+        ],
+        _Section(title: 'عروض قوية اليوم', subtitle: 'من محلات الموصل مباشرة'),
+        if (products.isEmpty)
+          const EmptyState(icon: Icons.shopping_basket_outlined, text: 'ماكو عروض بالماركت هسه')
+        else
+          Padding(padding: const EdgeInsets.symmetric(horizontal: 16), child: ProductGrid(products: products)),
+        _Section(title: 'المحلات'),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Column(children: [for (final s in merchants) StoreTile(store: s)]),
+        ),
+      ],
     );
   }
 }
