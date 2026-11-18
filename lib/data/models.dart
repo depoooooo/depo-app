@@ -109,6 +109,7 @@ class Store {
   bool sponsored;
   bool suspended;
   int approvedAt; // بداية الشهر المجاني
+  String imageId; // صورة/شعار المحل ('' = ماكو)
 
   Store({
     required this.id,
@@ -124,6 +125,7 @@ class Store {
     this.sponsored = false,
     this.suspended = false,
     int? approvedAt,
+    this.imageId = '',
   }) : approvedAt = approvedAt ?? _now();
 
   String get fullName => '$name — $area';
@@ -142,6 +144,7 @@ class Store {
         'sponsored': sponsored,
         'suspended': suspended,
         'approvedAt': approvedAt,
+        'imageId': imageId,
       };
 
   factory Store.fromJson(Map<String, dynamic> j) => Store(
@@ -158,6 +161,7 @@ class Store {
         sponsored: (j['sponsored'] ?? false) as bool,
         suspended: (j['suspended'] ?? false) as bool,
         approvedAt: j['approvedAt'] as int?,
+        imageId: (j['imageId'] ?? '') as String,
       );
 }
 
@@ -177,6 +181,7 @@ class Offer {
   bool active;
   bool hidden; // مخفي من المشرف
   int createdAt;
+  String imageId; // صورة العرض ('' = ماكو)
 
   Offer({
     required this.id,
@@ -194,6 +199,7 @@ class Offer {
     this.active = true,
     this.hidden = false,
     int? createdAt,
+    this.imageId = '',
   }) : createdAt = createdAt ?? _now();
 
   int get discountPercent =>
@@ -216,6 +222,7 @@ class Offer {
         'active': active,
         'hidden': hidden,
         'createdAt': createdAt,
+        'imageId': imageId,
       };
 
   factory Offer.fromJson(Map<String, dynamic> j) => Offer(
@@ -234,6 +241,7 @@ class Offer {
         active: (j['active'] ?? true) as bool,
         hidden: (j['hidden'] ?? false) as bool,
         createdAt: j['createdAt'] as int?,
+        imageId: (j['imageId'] ?? '') as String,
       );
 }
 

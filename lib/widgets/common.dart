@@ -1,4 +1,6 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import '../data/images.dart';
 import '../data/models.dart';
 import '../theme.dart';
 
@@ -225,4 +227,76 @@ int? parseInt(String s) {
     b.write(i >= 0 ? '$i' : ch);
   }
   return int.tryParse(b.toString().replaceAll(',', '').replaceAll('٬', '').trim());
+}
+
+/// صورة من Firebase (برقمها)، وإذا ماكو صورة يطلع البديل
+class AppImage extends StatefulWidget {
+  final String imageId;
+  final double height;
+  final double? width;
+  final double radius;
+  final Widget fallback;
+  const AppImage({super.key, required this.imageId, required this.fallback, this.height = 110, this.width, this.radius = 0});
+
+  @override
+  State<AppImage> createState() => _AppImageState();
+}
+
+class _AppImageState extends State<AppImage> {
+  Future<Uint8List?>? _f;
+
+  void _load() => _f = widget.imageId.isEmpty ? null : Images.get(widget.imageId);
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  @override
+  void didUpdateWidget(AppImage old) {
+    super.didUpdateWidget(old);
+    if (old.imageId != widget.imageId) _load();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_f == null) return widget.fallback;
+    final cached = Images.cached(widget.imageId);
+    Widget img(Uint8List b) => ClipRRect(
+          borderRadius: BorderRadius.circular(widget.radius),
+          child: Image.memory(b, height: widget.height, width: widget.width ?? double.infinity, fit: BoxFit.cover, gaplessPlayback: true),
+        );
+    if (cached != null) return img(cached);
+    return FutureBuilder<Uint8List?>(
+      future: _f,
+      builder: (context, snap) {
+        if (snap.data != null) return img(snap.data!);
+        if (snap.connectionState != ConnectionState.done) {
+          return Container(
+            height: widget.height,
+            width: widget.width,
+            decoration: BoxDecoration(color: DepoColors.soft, borderRadius: BorderRadius.circular(widget.radius)),
+          );
+        }
+        return widget.fallback;
+      },
+    );
+  }
+}
+
+/// صورة العرض: الحقيقية إذا موجودة، وإلا الملوّنة
+class OfferImage extends StatelessWidget {
+  final Offer offer;
+  final double height;
+  final double radius;
+  const OfferImage({super.key, required this.offer, this.height = 112, this.radius = 0});
+
+  @override
+  Widget build(BuildContext context) => AppImage(
+        imageId: offer.imageId,
+        height: height,
+        radius: radius,
+        fallback: ImagePlaceholder(height: height, box: offer.surpriseBox, radius: radius, seed: offer.title),
+      );
 }

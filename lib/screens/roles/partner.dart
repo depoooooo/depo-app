@@ -1,9 +1,36 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import '../../data/images.dart';
+import '../../widgets/offer_cards.dart';
 import '../../data/app_state.dart';
 import '../../data/models.dart';
 import '../../theme.dart';
 import '../../widgets/common.dart';
 import '../orders.dart';
+
+/// يختار صورة ويرفعها، ويرجّع رقمها (أو null)
+Future<String?> pickAndUpload(BuildContext context, {String owner = ''}) async {
+  final camera = await showModalBottomSheet<bool>(
+    context: context,
+    showDragHandle: true,
+    builder: (c) => SafeArea(
+      child: Column(mainAxisSize: MainAxisSize.min, children: [
+        ListTile(leading: const Icon(Icons.photo_camera_outlined), title: const Text('صوّر هسه'), onTap: () => Navigator.pop(c, true)),
+        ListTile(leading: const Icon(Icons.photo_library_outlined), title: const Text('من المعرض'), onTap: () => Navigator.pop(c, false)),
+        const SizedBox(height: 8),
+      ]),
+    ),
+  );
+  if (camera == null) return null;
+  try {
+    final b = await Images.pick(camera: camera);
+    if (b == null) return null;
+    return await Images.put(b, owner: owner);
+  } catch (e) {
+    if (context.mounted) toast(context, 'ما انرفعت الصورة: $e');
+    return null;
+  }
+}
 
 /// واجهة المطعم والتاجر
 class PartnerHome extends StatelessWidget {
@@ -79,6 +106,8 @@ class _DashboardState extends State<_Dashboard> {
           const AppCard(color: Color(0xFFFDECED), child: Text('المحل موقوف مؤقتاً. تواصل ويه المشرف.', style: TextStyle(color: DepoColors.danger, fontWeight: FontWeight.w800))),
         if (free > 0)
           AppCard(color: const Color(0xFFFFF6E5), child: Text('الشهر المجاني: باقي $free يوم بدون عمولة', style: const TextStyle(fontWeight: FontWeight.w800))),
+        _PublishHero(store: s),
+        const SizedBox(height: 12),
         StatGrid([
           StatTile('طلبات اليوم', '${today.length}'),
           StatTile('المتابعين', '${app.followersOf(s.id)}'),
@@ -138,6 +167,22 @@ class _MyOffers extends StatelessWidget {
           AppCard(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Row(children: [
+                InkWell(
+                  borderRadius: BorderRadius.circular(12),
+                  onTap: () async {
+                    final id = await pickAndUpload(context, owner: store.id);
+                    if (id != null) app.setOfferImage(o, id);
+                  },
+                  child: SizedBox(
+                    width: 56,
+                    height: 56,
+                    child: Stack(children: [
+                      OfferImage(offer: o, height: 56, radius: 12),
+                      const Positioned(bottom: 2, left: 2, child: Icon(Icons.photo_camera, size: 16, color: Colors.white, shadows: [Shadow(blurRadius: 4)])),
+                    ]),
+                  ),
+                ),
+                const SizedBox(width: 10),
                 Expanded(child: Text(o.title, style: const TextStyle(fontWeight: FontWeight.w900))),
                 if (o.hidden) const Badge2('مخفي من المشرف', bg: Color(0xFFFDECED), fg: DepoColors.danger)
                 else Badge2(o.visible ? 'فعّال' : (o.quantityLeft == 0 ? 'خلص' : 'موقوف'), bg: o.visible ? DepoColors.brand : DepoColors.soft),
@@ -274,6 +319,17 @@ class _PublishOfferScreenState extends State<PublishOfferScreen> {
   final desc = TextEditingController();
   bool surprise = true;
   Storage storage = Storage.normal;
+  Uint8List? photo;
+  bool busy = false;
+
+  Future<void> _pickPhoto(bool camera) async {
+    try {
+      final b = await Images.pick(camera: camera);
+      if (b != null) setState(() => photo = b);
+    } catch (e) {
+      if (mounted) toast(context, '$e');
+    }
+  }
 
   bool get isRest => widget.store.type == StoreType.restaurant;
 
@@ -302,7 +358,8 @@ class _PublishOfferScreenState extends State<PublishOfferScreen> {
     return ((1 - p / o) * 100).round();
   }
 
-  void _publish() {
+  Future<void> _publish() async {
+    if (busy) return;
     final o = parseInt(original.text);
     final p = parseInt(price.text);
     final q = parseInt(qty.text);
@@ -315,7 +372,22 @@ class _PublishOfferScreenState extends State<PublishOfferScreen> {
       toast(context, 'الخصم لازم يكون $minDiscount% أو أكثر');
       return;
     }
+    var imageId = '';
+    if (photo != null) {
+      setState(() => busy = true);
+      try {
+        imageId = await Images.put(photo!, owner: widget.store.id);
+      } catch (e) {
+        if (mounted) {
+          setState(() => busy = false);
+          toast(context, 'ما انرفعت الصورة: $e');
+        }
+        return;
+      }
+    }
+    if (!mounted) return;
     app.publishOffer(app.newOffer(
+      imageId: imageId,
       storeId: widget.store.id,
       title: title.text.trim(),
       originalPrice: o,
@@ -347,8 +419,15 @@ class _PublishOfferScreenState extends State<PublishOfferScreen> {
           else
             OutlinedButton.icon(onPressed: () => toast(context, 'مسح الباركود يتفعل بالتطبيق على التلفون'), icon: const Icon(Icons.qr_code_scanner), label: const Text('امسح الباركود')),
           const SizedBox(height: 10),
-          OutlinedButton.icon(onPressed: () => toast(context, 'رفع الصور يتفعل ويه Firebase'), icon: const Icon(Icons.add_a_photo_outlined), label: const Text('أضف صور')),
-          const SizedBox(height: 10),
+          _PhotoBox(photo: photo, onPick: _pickPhoto, onClear: () => setState(() => photo = null)),
+          const SizedBox(height: 12),
+          if (isRest) ...[
+            Wrap(spacing: 8, runSpacing: 4, children: [
+              for (final t in ['صندوق مشاوي', 'صندوق معجنات', 'صندوق حلويات', 'وجبة كاملة', 'صمون حار'])
+                ActionChip(label: Text(t), onPressed: () => setState(() => title.text = t)),
+            ]),
+            const SizedBox(height: 8),
+          ],
           TextField(controller: title, decoration: InputDecoration(labelText: isRest ? 'اسم العرض' : 'اسم المنتج')),
           const SizedBox(height: 10),
           Row(children: [
@@ -384,7 +463,12 @@ class _PublishOfferScreenState extends State<PublishOfferScreen> {
           const SizedBox(height: 10),
           TextField(controller: desc, maxLines: 2, decoration: const InputDecoration(labelText: 'وصف (اختياري)')),
           const SizedBox(height: 16),
-          FilledButton(onPressed: _publish, child: Text(isRest ? 'انشر هسه' : 'حفظ ونشر')),
+          FilledButton(
+            onPressed: busy ? null : _publish,
+            child: busy
+                ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white))
+                : Text(isRest ? 'انشر هسه' : 'حفظ ونشر'),
+          ),
           if (isRest)
             const Padding(
               padding: EdgeInsets.only(top: 8),
@@ -392,6 +476,175 @@ class _PublishOfferScreenState extends State<PublishOfferScreen> {
             ),
         ],
       ),
+    );
+  }
+}
+
+
+/// مربع الصورة بشاشة النشر
+class _PhotoBox extends StatelessWidget {
+  final Uint8List? photo;
+  final void Function(bool camera) onPick;
+  final VoidCallback onClear;
+  const _PhotoBox({required this.photo, required this.onPick, required this.onClear});
+
+  @override
+  Widget build(BuildContext context) {
+    if (photo != null) {
+      return Stack(children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(18),
+          child: Image.memory(photo!, height: 200, width: double.infinity, fit: BoxFit.cover),
+        ),
+        Positioned(
+          top: 8,
+          left: 8,
+          child: IconButton.filled(
+            style: IconButton.styleFrom(backgroundColor: Colors.black54),
+            onPressed: onClear,
+            icon: const Icon(Icons.close, color: Colors.white),
+            tooltip: 'شيل الصورة',
+          ),
+        ),
+      ]);
+    }
+    return Container(
+      height: 170,
+      decoration: BoxDecoration(
+        color: DepoColors.soft,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: DepoColors.brand, width: 1.5),
+      ),
+      child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+        const Icon(Icons.add_a_photo_rounded, size: 40, color: DepoColors.dark),
+        const SizedBox(height: 6),
+        const Text('صورة حلوة = طلبات أكثر', style: TextStyle(fontWeight: FontWeight.w900)),
+        const SizedBox(height: 10),
+        Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+          FilledButton.icon(
+            style: FilledButton.styleFrom(minimumSize: const Size(0, 42)),
+            onPressed: () => onPick(true),
+            icon: const Icon(Icons.photo_camera_outlined),
+            label: const Text('صوّر'),
+          ),
+          const SizedBox(width: 10),
+          OutlinedButton.icon(
+            style: OutlinedButton.styleFrom(minimumSize: const Size(0, 42)),
+            onPressed: () => onPick(false),
+            icon: const Icon(Icons.photo_library_outlined),
+            label: const Text('من المعرض'),
+          ),
+        ]),
+      ]),
+    );
+  }
+}
+
+/// البطاقة الكبيرة فوق اللوحة: انشر الحين + انشر بضغطة + صورة المحل
+class _PublishHero extends StatelessWidget {
+  final Store store;
+  const _PublishHero({required this.store});
+
+  Future<void> _quick(BuildContext context, Offer t) async {
+    var qty = t.surpriseBox ? 3 : 5;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (c) => StatefulBuilder(
+        builder: (c, set) => AlertDialog(
+          title: Text('انشر «${t.title}»'),
+          content: Column(mainAxisSize: MainAxisSize.min, children: [
+            Text('${iqd(t.price)} بدل ${iqd(t.originalPrice)}', style: const TextStyle(color: DepoColors.muted)),
+            const SizedBox(height: 12),
+            const Text('شكد عندك؟', style: TextStyle(fontWeight: FontWeight.w800)),
+            Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+              IconButton.filledTonal(onPressed: qty > 1 ? () => set(() => qty--) : null, icon: const Icon(Icons.remove)),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 18),
+                child: Text('$qty', style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w900)),
+              ),
+              IconButton.filledTonal(onPressed: () => set(() => qty++), icon: const Icon(Icons.add)),
+            ]),
+          ]),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('إلغاء')),
+            FilledButton(style: FilledButton.styleFrom(minimumSize: const Size(0, 44)), onPressed: () => Navigator.pop(c, true), child: const Text('انشر')),
+          ],
+        ),
+      ),
+    );
+    if (ok == true) {
+      app.repostOffer(t, qty);
+      if (context.mounted) toast(context, 'انتشرت! وصل إشعار لمتابعينك');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isRest = store.type == StoreType.restaurant;
+    final templates = app.recentTemplates(store.id);
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(colors: [DepoColors.dark, Color(0xFF0A5F68)]),
+        borderRadius: BorderRadius.circular(22),
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Row(children: [
+          InkWell(
+            borderRadius: BorderRadius.circular(16),
+            onTap: () async {
+              final id = await pickAndUpload(context, owner: store.id);
+              if (id != null) app.setStoreImage(store, id);
+            },
+            child: Stack(clipBehavior: Clip.none, children: [
+              StoreAvatar(store: store, size: 52),
+              const Positioned(
+                bottom: -4,
+                left: -4,
+                child: CircleAvatar(radius: 11, backgroundColor: Colors.white, child: Icon(Icons.photo_camera, size: 13, color: DepoColors.dark)),
+              ),
+            ]),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(store.name, style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w900)),
+              Text(isRest ? 'عندك أكل زايد اليوم؟ لا ترميه، انشره!' : 'عندك بضاعة قريبة الانتهاء؟ صرّفها',
+                  style: const TextStyle(color: Colors.white70, fontSize: 12)),
+            ]),
+          ),
+        ]),
+        const SizedBox(height: 14),
+        SizedBox(
+          height: 60,
+          child: FilledButton.icon(
+            style: FilledButton.styleFrom(
+              backgroundColor: DepoColors.accent,
+              foregroundColor: DepoColors.ink,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+              textStyle: const TextStyle(fontFamily: 'Tajawal', fontSize: 19, fontWeight: FontWeight.w900),
+            ),
+            onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => PublishOfferScreen(store: store))),
+            icon: const Icon(Icons.campaign_rounded, size: 28),
+            label: Text(isRest ? 'انشر رواجع الحين' : 'أضف منتج الحين'),
+          ),
+        ),
+        if (templates.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          const Text('أو انشر بضغطة وحدة:', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 13)),
+          const SizedBox(height: 6),
+          Wrap(spacing: 8, runSpacing: 6, children: [
+            for (final t in templates)
+              ActionChip(
+                backgroundColor: Colors.white,
+                side: BorderSide.none,
+                avatar: const Icon(Icons.replay_rounded, size: 18, color: DepoColors.dark),
+                label: Text('${t.title} • ${iqd(t.price)}', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12)),
+                onPressed: () => _quick(context, t),
+              ),
+          ]),
+        ],
+      ]),
     );
   }
 }

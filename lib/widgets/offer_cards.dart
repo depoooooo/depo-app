@@ -122,7 +122,7 @@ class OfferCard extends StatelessWidget {
           onTap: () => openOffer(context, offer),
           child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             Stack(children: [
-              ImagePlaceholder(height: 112, box: offer.surpriseBox, radius: 0, seed: offer.title),
+              OfferImage(offer: offer, height: 112),
               Positioned(
                 top: 8,
                 right: 8,
@@ -232,7 +232,7 @@ class ProductCard extends StatelessWidget {
         onTap: () => openOffer(context, offer),
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           Stack(children: [
-            ImagePlaceholder(height: 110, box: false, radius: 0, seed: offer.title),
+            OfferImage(offer: offer, height: 110),
             Positioned(top: 8, right: 8, child: Badge2('-${offer.discountPercent}%')),
             if (offer.storage != Storage.normal) Positioned(top: 8, left: 8, child: StorageChip(offer.storage)),
           ]),
@@ -314,7 +314,7 @@ class StoreAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    final letter = Container(
       width: size,
       height: size,
       decoration: BoxDecoration(
@@ -325,5 +325,6 @@ class StoreAvatar extends StatelessWidget {
       child: Text(store.name.replaceFirst('مطعم ', '').replaceFirst('محل ', '').characters.first,
           style: TextStyle(color: Colors.white, fontSize: size * 0.42, fontWeight: FontWeight.w900)),
     );
+    return AppImage(imageId: store.imageId, height: size, width: size, radius: size * 0.3, fallback: letter);
   }
 }

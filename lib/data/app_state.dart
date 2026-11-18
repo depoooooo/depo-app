@@ -392,6 +392,7 @@ class AppState extends ChangeNotifier {
     String pickupWindow = '',
     Storage storage = Storage.normal,
     String description = '',
+    String imageId = '',
   }) =>
       Offer(
         id: _id('o'),
@@ -405,7 +406,46 @@ class AppState extends ChangeNotifier {
         pickupWindow: pickupWindow,
         storage: storage,
         description: description,
+        imageId: imageId,
       );
+
+  /// ينشر نفس عرض قديم من جديد (بكمية جديدة) — للنشر السريع
+  void repostOffer(Offer old, int qty) {
+    publishOffer(newOffer(
+      storeId: old.storeId,
+      title: old.title,
+      originalPrice: old.originalPrice,
+      price: old.price,
+      qty: qty,
+      expiresLabel: old.expiresLabel,
+      surpriseBox: old.surpriseBox,
+      pickupWindow: old.pickupWindow,
+      storage: old.storage,
+      description: old.description,
+      imageId: old.imageId,
+    ));
+  }
+
+  /// آخر العروض المختلفة اللي نشرها المحل (للنشر بضغطة)
+  List<Offer> recentTemplates(String storeId) {
+    final seen = <String>{};
+    final out = <Offer>[];
+    for (final o in offers.where((o) => o.storeId == storeId)) {
+      if (seen.add(o.title)) out.add(o);
+      if (out.length >= 4) break;
+    }
+    return out;
+  }
+
+  void setStoreImage(Store s, String imageId) {
+    s.imageId = imageId;
+    _changed();
+  }
+
+  void setOfferImage(Offer o, String imageId) {
+    o.imageId = imageId;
+    _changed();
+  }
 
   void setOfferActive(Offer o, bool active) {
     o.active = active;

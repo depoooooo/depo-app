@@ -49,7 +49,7 @@ class _OfferDetailScreenState extends State<OfferDetailScreen> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          ImagePlaceholder(height: 210, box: o.surpriseBox || !isRawaji),
+          OfferImage(offer: o, height: 230, radius: 18),
           const SizedBox(height: 12),
           Wrap(spacing: 6, runSpacing: 6, children: [
             Badge2(o.surpriseBox ? 'صندوق مفاجأة' : 'خصم ${o.discountPercent}%',
