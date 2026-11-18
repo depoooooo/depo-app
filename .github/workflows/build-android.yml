@@ -39,7 +39,7 @@ jobs:
           if [ ! -d web ]; then
             flutter create --platforms=web --org com.depo --project-name depo .
           fi
-          sed -i 's/android:label="depo"/android:label="Depo"/' android/app/src/main/AndroidManifest.xml || true
+          python3 branding/apply_branding.py
 
       - run: flutter pub get
 
