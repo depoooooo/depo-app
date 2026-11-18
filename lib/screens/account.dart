@@ -267,25 +267,9 @@ class AddressesScreen extends StatelessWidget {
                   ]),
                 ),
               FilledButton.icon(
-                onPressed: () {
-                  final ctl = TextEditingController();
-                  showDialog(
-                    context: context,
-                    builder: (c) => AlertDialog(
-                      title: const Text('عنوان جديد'),
-                      content: TextField(controller: ctl, autofocus: true, decoration: const InputDecoration(hintText: 'مثلاً: حي النور — قرب الجامع')),
-                      actions: [
-                        TextButton(onPressed: () => Navigator.pop(c), child: const Text('إلغاء')),
-                        FilledButton(
-                          onPressed: () {
-                            if (ctl.text.trim().isNotEmpty) app.addAddress(ctl.text.trim());
-                            Navigator.pop(c);
-                          },
-                          child: const Text('حفظ'),
-                        ),
-                      ],
-                    ),
-                  );
+                onPressed: () async {
+                  final a = await askAddress(context);
+                  if (a != null) app.addAddress(a);
                 },
                 icon: const Icon(Icons.add),
                 label: const Text('أضف عنوان'),

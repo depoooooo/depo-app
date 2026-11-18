@@ -37,6 +37,11 @@ class _JoinScreenState extends State<JoinScreen> {
   Future<void> _submit() async {
     if (!await ensureLoggedIn(context, reason: 'سجّل أول حتى نربط الطلب برقمك')) return;
     if (!mounted) return;
+    final block = app.joinBlocker();
+    if (block != null) {
+      toast(context, block);
+      return;
+    }
     if (type != Role.courier && (storeName.text.trim().isEmpty || area.text.trim().isEmpty)) {
       toast(context, 'اكتب اسم المحل والحي');
       return;

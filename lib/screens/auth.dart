@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../data/app_state.dart';
+import '../data/models.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
 
@@ -22,12 +23,15 @@ class LoginScreen extends StatefulWidget {
   State<LoginScreen> createState() => _LoginScreenState();
 }
 
-enum _Step { phone, code, name }
+enum _Step { phone, code, name, pin, newPin }
 
 class _LoginScreenState extends State<LoginScreen> {
   final phone = TextEditingController(text: '07');
   final code = TextEditingController();
   final name = TextEditingController();
+  final pin = TextEditingController();
+  final pin2 = TextEditingController();
+  int pinAttempts = 0;
   _Step step = _Step.phone;
   String demoCode = '';
   int attempts = 0;
@@ -55,6 +59,8 @@ class _LoginScreenState extends State<LoginScreen> {
     phone.dispose();
     code.dispose();
     name.dispose();
+    pin.dispose();
+    pin2.dispose();
     super.dispose();
   }
 
@@ -85,9 +91,54 @@ class _LoginScreenState extends State<LoginScreen> {
         toast(context, 'هذا الحساب موقوف. تواصل ويه الدعم.');
         return;
       }
+      if (u != null && app.needsPin(u)) {
+        pin.clear();
+        pin2.clear();
+        setState(() => step = u.pinHash.isEmpty ? _Step.newPin : _Step.pin);
+        return;
+      }
       app.login(phoneNorm);
       Navigator.of(context).pop(true);
     }
+  }
+
+  /// الحسابات الخاصة (مطعم/تاجر/مندوب/مشرف/مدير) تحتاج رمز سري فوق رمز التحقق
+  void _checkPin() {
+    final u = app.userByPhone(phoneNorm);
+    if (u == null) return;
+    if (pinAttempts >= 5) {
+      toast(context, 'محاولات كثيرة. تواصل ويه المدير.');
+      return;
+    }
+    if (!app.checkPin(u, pin.text.trim())) {
+      pinAttempts++;
+      toast(context, 'الرمز السري غلط (${5 - pinAttempts} محاولات باقية)');
+      return;
+    }
+    app.login(phoneNorm);
+    Navigator.of(context).pop(true);
+  }
+
+  void _savePin() {
+    final u = app.userByPhone(phoneNorm);
+    if (u == null) return;
+    final a = pin.text.trim();
+    if (!RegExp(r'^\d{4,6}$').hasMatch(a)) {
+      toast(context, 'الرمز السري من 4 إلى 6 أرقام');
+      return;
+    }
+    if (a != pin2.text.trim()) {
+      toast(context, 'الرمزين مو نفس الشي');
+      return;
+    }
+    if (RegExp(r'^(\d)\1+$').hasMatch(a) || '0123456789'.contains(a) || '9876543210'.contains(a)) {
+      toast(context, 'اختار رمز أصعب (مو 1234 أو 1111)');
+      return;
+    }
+    app.setPin(u, a);
+    app.login(phoneNorm);
+    toast(context, 'انحفظ رمزك السري. لا تنطيه لأحد.');
+    Navigator.of(context).pop(true);
   }
 
   void _finish() {
@@ -97,8 +148,17 @@ class _LoginScreenState extends State<LoginScreen> {
     }
     app.login(phoneNorm, name: name.text.trim());
     final u = app.me;
-    if (u != null && u.role.name == 'admin') {
-      toast(context, 'أهلاً! هذا أول حساب بالجهاز فصار هو المدير العام (للتجربة)');
+    if (u == null) {
+      toast(context, 'ما كدرنا نسجّلك، جرّب مرة ثانية');
+      return;
+    }
+    if (u.role == Role.admin) {
+      // المدير لازم يسوي رمز سري من أول يوم
+      pin.clear();
+      pin2.clear();
+      toast(context, 'أهلاً! هذا أول حساب بالسيرفر فصار هو المدير العام. سوّي رمز سري يحميه.');
+      setState(() => step = _Step.newPin);
+      return;
     }
     Navigator.of(context).pop(true);
   }
@@ -154,6 +214,39 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
             FilledButton(onPressed: code.text.trim().length == 6 ? _verify : null, child: const Text('تأكيد')),
             TextButton(onPressed: () => setState(() => step = _Step.phone), child: const Text('غيّر الرقم أو أعد الإرسال')),
+          ],
+          if (step == _Step.pin || step == _Step.newPin) ...[
+            Text(step == _Step.pin ? 'الرمز السري' : 'سوّي رمز سري', style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w900)),
+            const SizedBox(height: 4),
+            Text(
+              step == _Step.pin
+                  ? 'هذا حساب ${roleNames[app.userByPhone(phoneNorm)?.role] ?? ''}، فنحتاج رمزك السري'
+                  : 'حسابك ${roleNames[app.userByPhone(phoneNorm)?.role] ?? ''}. سوّي رمز سري (4–6 أرقام) يحميه حتى لو أحد عرف رقمك',
+              style: const TextStyle(color: DepoColors.muted, height: 1.5),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: pin,
+              obscureText: true,
+              keyboardType: TextInputType.number,
+              textDirection: TextDirection.ltr,
+              textAlign: TextAlign.center,
+              maxLength: 6,
+              style: const TextStyle(fontSize: 24, letterSpacing: 8),
+              decoration: const InputDecoration(labelText: 'الرمز السري'),
+            ),
+            if (step == _Step.newPin)
+              TextField(
+                controller: pin2,
+                obscureText: true,
+                keyboardType: TextInputType.number,
+                textDirection: TextDirection.ltr,
+                textAlign: TextAlign.center,
+                maxLength: 6,
+                style: const TextStyle(fontSize: 24, letterSpacing: 8),
+                decoration: const InputDecoration(labelText: 'أعد الرمز'),
+              ),
+            FilledButton(onPressed: step == _Step.pin ? _checkPin : _savePin, child: const Text('دخول')),
           ],
           if (step == _Step.name) ...[
             const Text('شنو اسمك؟', style: TextStyle(fontSize: 26, fontWeight: FontWeight.w900)),

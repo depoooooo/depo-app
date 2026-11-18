@@ -13,7 +13,7 @@ class CartScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
-      listenable: cart,
+      listenable: Listenable.merge([cart, app]),
       builder: (context, _) {
         final appBar = AppBar(title: const Text('السلة'), automaticallyImplyLeading: !embedded);
         if (cart.isEmpty) {
@@ -24,6 +24,7 @@ class CartScreen extends StatelessWidget {
         }
         final store = app.storeById(cart.storeId!);
         final remaining = app.settings.freeDeliveryThreshold - cart.total;
+        final problem = _problem();
         return Scaffold(
           appBar: appBar,
           body: ListView(
@@ -33,19 +34,21 @@ class CartScreen extends StatelessWidget {
               for (final line in cart.lines)
                 AppCard(
                   child: Row(children: [
-                    SizedBox(width: 60, child: ImagePlaceholder(height: 60, box: line.offer.surpriseBox, radius: 12)),
+                    SizedBox(width: 60, child: OfferImage(offer: line.offer, height: 60, radius: 12)),
                     const SizedBox(width: 10),
                     Expanded(
                       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                         Text(line.offer.title, style: const TextStyle(fontWeight: FontWeight.w800)),
                         PriceTag(price: line.offer.price, original: line.offer.originalPrice, size: 15),
+                        if (_lineIssue(line) != null)
+                          Text(_lineIssue(line)!, style: const TextStyle(fontSize: 12, color: DepoColors.danger, fontWeight: FontWeight.w800)),
                       ]),
                     ),
                     IconButton(tooltip: 'أقل', onPressed: () => cart.setQty(line, line.qty - 1), icon: const Icon(Icons.remove_circle_outline)),
                     Text('${line.qty}', style: const TextStyle(fontWeight: FontWeight.w900)),
                     IconButton(
                       tooltip: 'أكثر',
-                      onPressed: line.qty < line.offer.quantityLeft ? () => cart.setQty(line, line.qty + 1) : null,
+                      onPressed: line.qty < (app.offerById(line.offer.id)?.quantityLeft ?? 0) ? () => cart.setQty(line, line.qty + 1) : null,
                       icon: const Icon(Icons.add_circle_outline),
                     ),
                   ]),
@@ -55,7 +58,9 @@ class CartScreen extends StatelessWidget {
                 borderColor: DepoColors.successBg,
                 child: Text('وفّرت ${iqd(cart.saved)} بهذا الطلب', style: const TextStyle(color: DepoColors.success, fontWeight: FontWeight.w800)),
               ),
-              if (remaining > 0)
+              if (problem != null)
+                AppCard(color: const Color(0xFFFDECED), borderColor: const Color(0xFFFDECED), child: Text(problem, style: const TextStyle(color: DepoColors.danger, fontWeight: FontWeight.w800))),
+              if (remaining > 0 && !app.eligibleFirstOrder)
                 Text('أضف ${iqd(remaining)} بعد ويصير التوصيل مجاني تلقائياً',
                     style: const TextStyle(fontSize: 12, color: DepoColors.success, fontWeight: FontWeight.w700)),
               TextButton.icon(onPressed: cart.clear, icon: const Icon(Icons.delete_outline), label: const Text('فرّغ السلة')),
@@ -71,7 +76,7 @@ class CartScreen extends StatelessWidget {
                 ]),
                 const SizedBox(height: 10),
                 FilledButton(
-                  onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const CheckoutScreen())),
+                  onPressed: problem != null ? null : () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const CheckoutScreen())),
                   child: const Text('إكمال الطلب'),
                 ),
               ]),
@@ -80,5 +85,22 @@ class CartScreen extends StatelessWidget {
         );
       },
     );
+  }
+
+  /// مشكلة بسطر من السلة (العرض خلص أو الكمية ما تكفي)
+  static String? _lineIssue(CartLine l) {
+    final of = app.offerById(l.offer.id);
+    if (of == null || !of.visible) return 'خلص هذا العرض — شيله';
+    if (of.quantityLeft < l.qty) return 'باقي ${of.quantityLeft} بس';
+    return null;
+  }
+
+  static String? _problem() {
+    final s = app.storeById(cart.storeId ?? '');
+    if (s == null || s.suspended) return 'المحل مو متوفر هسه';
+    for (final l in cart.lines) {
+      if (_lineIssue(l) != null) return 'بالسلة شي خلص أو كميته ما تكفي. عدّله حتى تكمل.';
+    }
+    return null;
   }
 }

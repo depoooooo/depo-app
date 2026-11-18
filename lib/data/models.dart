@@ -51,6 +51,7 @@ class AppUser {
   List<String> follows; // معرفات المحلات المتابَعة
   List<String> notifications;
   int createdAt;
+  String pinHash; // رمز سري للحسابات الخاصة (مطعم/تاجر/مندوب/مشرف/مدير)
 
   AppUser({
     required this.phone,
@@ -63,7 +64,8 @@ class AppUser {
     List<String>? follows,
     List<String>? notifications,
     int? createdAt,
-  })  : addresses = addresses ?? ['حي الزهور — الجانب الأيسر'],
+    this.pinHash = '',
+  })  : addresses = addresses ?? [],
         follows = follows ?? [],
         notifications = notifications ?? [],
         createdAt = createdAt ?? _now();
@@ -79,6 +81,7 @@ class AppUser {
         'follows': follows,
         'notifications': notifications,
         'createdAt': createdAt,
+        'pinHash': pinHash,
       };
 
   factory AppUser.fromJson(Map<String, dynamic> j) => AppUser(
@@ -92,6 +95,7 @@ class AppUser {
         follows: List<String>.from(j['follows'] ?? const []),
         notifications: List<String>.from(j['notifications'] ?? const []),
         createdAt: j['createdAt'] as int?,
+        pinHash: (j['pinHash'] ?? '') as String,
       );
 }
 
@@ -182,6 +186,7 @@ class Offer {
   bool hidden; // مخفي من المشرف
   int createdAt;
   String imageId; // صورة العرض ('' = ماكو)
+  int expiresAt; // وقت انتهاء العرض (0 = بدون)
 
   Offer({
     required this.id,
@@ -200,11 +205,23 @@ class Offer {
     this.hidden = false,
     int? createdAt,
     this.imageId = '',
+    this.expiresAt = 0,
   }) : createdAt = createdAt ?? _now();
 
   int get discountPercent =>
       originalPrice == 0 ? 0 : ((1 - price / originalPrice) * 100).round();
-  bool get visible => active && !hidden && quantityLeft > 0;
+  bool get expired => expiresAt > 0 && _now() >= expiresAt;
+  bool get visible => active && !hidden && quantityLeft > 0 && !expired;
+
+  /// نص الانتهاء: يتحسب من الوقت إذا موجود
+  String get expiryText {
+    if (expiresAt <= 0) return expiresLabel;
+    final left = Duration(milliseconds: expiresAt - _now());
+    if (left.isNegative) return 'خلص وقته';
+    if (left.inMinutes < 60) return 'باقي ${left.inMinutes + 1} د';
+    if (left.inHours < 24) return 'باقي ${left.inHours} ساعة';
+    return 'باقي ${left.inDays} يوم';
+  }
 
   Map<String, dynamic> toJson() => {
         'id': id,
@@ -223,6 +240,7 @@ class Offer {
         'hidden': hidden,
         'createdAt': createdAt,
         'imageId': imageId,
+        'expiresAt': expiresAt,
       };
 
   factory Offer.fromJson(Map<String, dynamic> j) => Offer(
@@ -242,6 +260,7 @@ class Offer {
         hidden: (j['hidden'] ?? false) as bool,
         createdAt: j['createdAt'] as int?,
         imageId: (j['imageId'] ?? '') as String,
+        expiresAt: (j['expiresAt'] ?? 0) as int,
       );
 }
 
@@ -280,6 +299,7 @@ class Order {
   int rating; // 0 = ما مقيّم
   String rejectReason;
   int createdAt;
+  bool cashSettled; // المندوب سلّم النقد لـ Depo
 
   Order({
     required this.id,
@@ -297,6 +317,7 @@ class Order {
     this.rating = 0,
     this.rejectReason = '',
     int? createdAt,
+    this.cashSettled = false,
   }) : createdAt = createdAt ?? _now();
 
   int get itemsTotal => lines.fold(0, (s, l) => s + l.price * l.qty);
@@ -320,6 +341,7 @@ class Order {
         'rating': rating,
         'rejectReason': rejectReason,
         'createdAt': createdAt,
+        'cashSettled': cashSettled,
       };
 
   factory Order.fromJson(Map<String, dynamic> j) => Order(
@@ -338,6 +360,7 @@ class Order {
         rating: (j['rating'] ?? 0) as int,
         rejectReason: (j['rejectReason'] ?? '') as String,
         createdAt: j['createdAt'] as int?,
+        cashSettled: (j['cashSettled'] ?? false) as bool,
       );
 }
 

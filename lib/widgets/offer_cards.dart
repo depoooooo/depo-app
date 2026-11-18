@@ -244,7 +244,7 @@ class ProductCard extends StatelessWidget {
                     style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w900, height: 1.3)),
                 const SizedBox(height: 2),
                 Text(store?.name ?? '', maxLines: 1, style: const TextStyle(fontSize: 11, color: DepoColors.muted)),
-                Text(offer.expiresLabel, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF8A5A00))),
+                Text(offer.expiryText, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF8A5A00))),
                 const Spacer(),
                 Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
                   Expanded(

@@ -33,7 +33,16 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       return;
     }
     setState(() => placing = true);
-    final order = app.placeOrder(pickup: pickup, address: addr);
+    final Order order;
+    try {
+      order = await app.placeOrder(pickup: pickup, address: addr);
+    } on OrderError catch (e) {
+      if (mounted) {
+        setState(() => placing = false);
+        toast(context, e.message);
+      }
+      return;
+    }
     if (!mounted) return;
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute(builder: (_) => OrderDetailScreen(orderId: order.id)),
@@ -41,11 +50,23 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     );
   }
 
+  Future<void> _addAddress() async {
+    if (!await ensureLoggedIn(context, reason: 'سجّل حتى نحفظ عنوانك') || !mounted) return;
+    final a = await askAddress(context);
+    if (a != null) {
+      app.addAddress(a);
+      setState(() => address = a);
+    }
+  }
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => ListenableBuilder(listenable: Listenable.merge([app, cart]), builder: (context, _) => _build(context));
+
+  Widget _build(BuildContext context) {
     final deliveryFee = app.settings.deliveryFee;
     final remaining = app.settings.freeDeliveryThreshold - cart.total;
-    final addresses = app.me?.addresses ?? const ['حي الزهور — الجانب الأيسر'];
+    final addresses = app.me?.addresses ?? const <String>[];
+    final firstFree = !pickup && app.eligibleFirstOrder && cart.total < app.settings.freeDeliveryThreshold;
     return Scaffold(
       appBar: AppBar(title: const Text('إكمال الطلب')),
       body: ListView(
@@ -79,6 +100,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 subtitle: '',
                 onTap: () => setState(() => address = a),
               ),
+            OutlinedButton.icon(
+              style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(46)),
+              onPressed: _addAddress,
+              icon: const Icon(Icons.add_location_alt_outlined),
+              label: Text(addresses.isEmpty ? 'أضف عنوان التوصيل' : 'عنوان جديد'),
+            ),
+            const SizedBox(height: 10),
           ],
           const SizedBox(height: 6),
           const Text('الدفع', style: TextStyle(fontWeight: FontWeight.w900)),
@@ -88,7 +116,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             child: Column(children: [
               _Line('الطلب', iqd(cart.total)),
               _Line('التوصيل', fee == 0 ? 'مجاني' : iqd(fee)),
-              if (!pickup && remaining > 0)
+              if (firstFree)
+                const Align(
+                  alignment: AlignmentDirectional.centerStart,
+                  child: Text('🎉 أول طلب: التوصيل علينا', style: TextStyle(fontSize: 12, color: DepoColors.success, fontWeight: FontWeight.w800)),
+                ),
+              if (!pickup && fee > 0 && remaining > 0)
                 Align(
                   alignment: AlignmentDirectional.centerStart,
                   child: Text('أضف ${iqd(remaining)} بعد ويصير التوصيل مجاني تلقائياً',
@@ -104,7 +137,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(mainAxisSize: MainAxisSize.min, children: [
-            FilledButton(onPressed: placing || cart.isEmpty ? null : _confirm, child: const Text('تأكيد الطلب')),
+            FilledButton(
+              onPressed: placing || cart.isEmpty ? null : _confirm,
+              child: placing
+                  ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white))
+                  : Text('تأكيد الطلب • ${iqd(cart.total + fee)}'),
+            ),
             const SizedBox(height: 6),
             Text(app.loggedIn ? 'الطلب يوصل للمحل فوراً' : 'إذا ما مسجّل، نطلب رقمك بهاي الخطوة بس',
                 style: const TextStyle(fontSize: 12, color: DepoColors.muted)),

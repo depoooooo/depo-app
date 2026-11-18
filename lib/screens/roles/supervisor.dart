@@ -162,6 +162,40 @@ class OrdersMonitorTab extends StatelessWidget {
       children: [
         StatGrid([StatTile('طلبات مفتوحة', '${open.length}'), StatTile('متأخرة (+40 د)', '${late.length}')]),
         const SizedBox(height: 10),
+        if (app.couriersCash.isNotEmpty) ...[
+          const SectionTitle('النقد عند المندوبين'),
+          for (final e in app.couriersCash.entries)
+            AppCard(
+              child: Row(children: [
+                const Icon(Icons.delivery_dining, color: DepoColors.dark),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(app.userByPhone(e.key)?.name ?? e.key, style: const TextStyle(fontWeight: FontWeight.w800)),
+                    Text('${e.key} • بيده ${iqd(e.value)}', style: const TextStyle(fontSize: 12, color: DepoColors.muted)),
+                  ]),
+                ),
+                TextButton(
+                  onPressed: () async {
+                    final ok = await showDialog<bool>(
+                      context: context,
+                      builder: (c) => AlertDialog(
+                        title: const Text('استلمت النقد؟'),
+                        content: Text('تأكد إنك استلمت ${iqd(e.value)} من المندوب قبل ما تصفّر حسابه.'),
+                        actions: [
+                          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('لا')),
+                          FilledButton(style: FilledButton.styleFrom(minimumSize: const Size(0, 44)), onPressed: () => Navigator.pop(c, true), child: const Text('إي، استلمت')),
+                        ],
+                      ),
+                    );
+                    if (ok == true) app.settleCourier(e.key);
+                  },
+                  child: const Text('استلمت'),
+                ),
+              ]),
+            ),
+          const SizedBox(height: 6),
+        ],
         if (app.orders.isEmpty) const EmptyState(icon: Icons.receipt_long_outlined, text: 'ماكو طلبات بعد'),
         for (final o in app.orders.take(50))
           AppCard(
@@ -178,7 +212,22 @@ class OrdersMonitorTab extends StatelessWidget {
               if (o.isOpen)
                 Align(
                   alignment: AlignmentDirectional.centerEnd,
-                  child: TextButton(onPressed: () => app.setStatus(o, OrderStatus.cancelled, reason: 'ألغاه الدعم'), child: const Text('إلغاء الطلب')),
+                  child: TextButton(
+                    onPressed: () async {
+                      final ok = await showDialog<bool>(
+                        context: context,
+                        builder: (c) => AlertDialog(
+                          title: Text('إلغاء الطلب #${o.id}؟'),
+                          actions: [
+                            TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('لا')),
+                            FilledButton(style: FilledButton.styleFrom(minimumSize: const Size(0, 44)), onPressed: () => Navigator.pop(c, true), child: const Text('إلغاء الطلب')),
+                          ],
+                        ),
+                      );
+                      if (ok == true) app.setStatus(o, OrderStatus.cancelled, reason: 'ألغاه الدعم');
+                    },
+                    child: const Text('إلغاء الطلب'),
+                  ),
                 ),
             ]),
           ),
@@ -262,7 +311,7 @@ class _UsersTabState extends State<UsersTab> {
                   Text('${u.phone} • ${roleNames[u.role]}${u.suspended ? ' • موقوف' : ''}', style: const TextStyle(fontSize: 12, color: DepoColors.muted)),
                 ]),
               ),
-              if (u.phone != app.currentPhone)
+              if (app.canManage(u))
                 PopupMenuButton<String>(
                   tooltip: 'إجراءات',
                   onSelected: (v) {

@@ -32,7 +32,7 @@ class CourierHome extends StatelessWidget {
               value: app.courierAvailable,
               onChanged: app.setCourierAvailable,
               title: Text(app.courierAvailable ? 'متاح للتوصيل' : 'غير متاح', style: const TextStyle(fontWeight: FontWeight.w900)),
-              subtitle: const Text('إذن الموقع بالخلفية ينطلب بالتطبيق على التلفون بس'),
+              subtitle: const Text('لازم تكون متاح حتى تشوف المهام الجديدة'),
             ),
           ),
           AppCard(
@@ -43,7 +43,12 @@ class CourierHome extends StatelessWidget {
               if (overCap)
                 const Padding(
                   padding: EdgeInsets.only(top: 8),
-                  child: Text('وصلت السقف. سلّم النقد لـ Depo حتى تجيك مهام جديدة.', style: TextStyle(color: DepoColors.danger, fontWeight: FontWeight.w800)),
+                  child: Text('وصلت السقف. سلّم النقد للمشرف حتى تجيك مهام جديدة.', style: TextStyle(color: DepoColors.danger, fontWeight: FontWeight.w800)),
+                )
+              else
+                const Padding(
+                  padding: EdgeInsets.only(top: 6),
+                  child: Text('المشرف يصفّر الرصيد من يستلم منك النقد', style: TextStyle(fontSize: 12, color: DepoColors.muted)),
                 ),
             ]),
           ),
@@ -65,7 +70,13 @@ class CourierHome extends StatelessWidget {
                   Text('سلّم إلى: ${o.address}', style: const TextStyle(fontWeight: FontWeight.w700)),
                   Text('حصّل من الزبون: ${iqd(o.total)}', style: const TextStyle(color: DepoColors.dark, fontWeight: FontWeight.w800)),
                   const SizedBox(height: 6),
-                  FilledButton(onPressed: () => app.takeTask(o), child: const Text('قبول المهمة')),
+                  FilledButton(
+                    onPressed: () async {
+                      final ok = await app.takeTask(o);
+                      if (context.mounted) toast(context, ok ? 'المهمة صارت إلك' : 'سبقك مندوب ثاني على هاي المهمة');
+                    },
+                    child: const Text('قبول المهمة'),
+                  ),
                 ]),
               ),
         ],
@@ -90,10 +101,33 @@ class CourierHome extends StatelessWidget {
         Text('حصّل: ${iqd(o.total)} نقداً', style: const TextStyle(fontWeight: FontWeight.w900)),
         const SizedBox(height: 6),
         FilledButton.icon(onPressed: () => _deliver(context, o), icon: const Icon(Icons.password), label: const Text('تأكيد التسليم برمز الزبون')),
-        TextButton(onPressed: () => toast(context, 'تسجيل «تعذّر التسليم» ويه صورة يتفعل ويه Firebase'), child: const Text('تعذّر التسليم')),
+        TextButton(onPressed: () => _fail(context, o), child: const Text('تعذّر التسليم')),
       ]);
     }
     return const SizedBox.shrink();
+  }
+
+  void _fail(BuildContext context, Order o) {
+    const reasons = ['الزبون ما يرد', 'العنوان غلط أو ما موجود', 'الزبون رفض يستلم'];
+    showModalBottomSheet(
+      context: context,
+      showDragHandle: true,
+      builder: (c) => SafeArea(
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          const Text('ليش تعذّر التسليم؟', style: TextStyle(fontWeight: FontWeight.w900)),
+          for (final r in reasons)
+            ListTile(
+              title: Text(r),
+              onTap: () {
+                Navigator.pop(c);
+                app.failDelivery(o, r);
+                toast(context, 'انسجّل، والمشرف يتابع وياك. رجّع الطلب للمحل.');
+              },
+            ),
+          const SizedBox(height: 8),
+        ]),
+      ),
+    );
   }
 
   void _deliver(BuildContext context, Order o) {

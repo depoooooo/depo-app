@@ -185,10 +185,10 @@ class _MyOffers extends StatelessWidget {
                 const SizedBox(width: 10),
                 Expanded(child: Text(o.title, style: const TextStyle(fontWeight: FontWeight.w900))),
                 if (o.hidden) const Badge2('مخفي من المشرف', bg: Color(0xFFFDECED), fg: DepoColors.danger)
-                else Badge2(o.visible ? 'فعّال' : (o.quantityLeft == 0 ? 'خلص' : 'موقوف'), bg: o.visible ? DepoColors.brand : DepoColors.soft),
+                else Badge2(o.visible ? 'فعّال' : (o.quantityLeft == 0 ? 'خلص' : (o.expired ? 'انتهى وقته' : 'موقوف')), bg: o.visible ? DepoColors.brand : DepoColors.soft),
               ]),
               PriceTag(price: o.price, original: o.originalPrice, size: 15),
-              Text('${o.expiresLabel} • انطلب ${o.orderedThisWeek} مرة', style: const TextStyle(fontSize: 12, color: DepoColors.muted)),
+              Text('${o.expiryText} • انطلب ${o.orderedThisWeek} مرة', style: const TextStyle(fontSize: 12, color: DepoColors.muted)),
               Row(children: [
                 const Text('الكمية:'),
                 IconButton(tooltip: 'أقل', onPressed: () => app.setOfferQty(o, o.quantityLeft - 1), icon: const Icon(Icons.remove_circle_outline)),
@@ -240,14 +240,34 @@ class _StoreOrders extends StatelessWidget {
           OutlinedButton(onPressed: () => _reject(context, o), child: const Text('رفض')),
         ]);
       case OrderStatus.accepted:
-        return row([FilledButton(onPressed: () => app.setStatus(o, OrderStatus.preparing), child: const Text('بدينا نجهّز'))]);
+        return row([
+          FilledButton(onPressed: () => app.setStatus(o, OrderStatus.preparing), child: const Text('بدينا نجهّز')),
+          OutlinedButton(onPressed: () => _reject(context, o), child: const Text('إلغاء')),
+        ]);
       case OrderStatus.preparing:
         return row([FilledButton(onPressed: () => app.setStatus(o, OrderStatus.ready), child: const Text('جاهز'))]);
       case OrderStatus.ready:
         if (o.pickup) {
           return row([FilledButton.icon(onPressed: () => _handover(context, o), icon: const Icon(Icons.qr_code_scanner), label: const Text('تسليم للزبون (الرمز)'))]);
         }
-        return row([Text(o.courierPhone == null ? 'ننتظر مندوب يستلم' : 'المندوب جاي يستلم', style: const TextStyle(fontWeight: FontWeight.w700))]);
+        if (o.courierPhone == null) {
+          return row([
+            OutlinedButton.icon(
+              onPressed: () {
+                app.deliverBySelf(o);
+                toast(context, 'خلّي مندوبك ياخذ رمز الزبون وقت التسليم');
+              },
+              icon: const Icon(Icons.two_wheeler),
+              label: const Text('أوصله بمندوبي'),
+            ),
+          ]);
+        }
+        return row([const Text('مندوب Depo جاي يستلم', style: TextStyle(fontWeight: FontWeight.w700))]);
+      case OrderStatus.onTheWay:
+        if (o.courierPhone == app.currentPhone) {
+          return row([FilledButton.icon(onPressed: () => _handover(context, o), icon: const Icon(Icons.password), label: const Text('تم التسليم (رمز الزبون)'))]);
+        }
+        return null;
       default:
         return null;
     }
@@ -314,7 +334,8 @@ class _PublishOfferScreenState extends State<PublishOfferScreen> {
   final original = TextEditingController();
   final price = TextEditingController();
   final qty = TextEditingController(text: '3');
-  final expires = TextEditingController();
+  final expires = TextEditingController(); // التاجر: كم يوم باقي على انتهاء المنتج
+  int hours = 3; // المطعم: العرض يبقى كم ساعة
   final pickupWindow = TextEditingController(text: '10–11 م');
   final desc = TextEditingController();
   bool surprise = true;
@@ -336,7 +357,7 @@ class _PublishOfferScreenState extends State<PublishOfferScreen> {
   @override
   void initState() {
     super.initState();
-    expires.text = isRest ? 'ينتهي 11:30 م' : 'ينتهي بعد 7 أيام';
+    expires.text = '7';
     if (!isRest) {
       surprise = false;
       qty.text = '20';
@@ -360,12 +381,31 @@ class _PublishOfferScreenState extends State<PublishOfferScreen> {
 
   Future<void> _publish() async {
     if (busy) return;
+    if (widget.store.suspended) {
+      toast(context, 'المحل موقوف مؤقتاً، ما تكدر تنشر');
+      return;
+    }
     final o = parseInt(original.text);
     final p = parseInt(price.text);
     final q = parseInt(qty.text);
     if (title.text.trim().isEmpty || o == null || p == null || q == null || q <= 0) {
       toast(context, 'املي الاسم والأسعار والكمية');
       return;
+    }
+    if (o <= p || p <= 0) {
+      toast(context, 'السعر بعد الخصم لازم يكون أقل من الأصلي');
+      return;
+    }
+    if (q > 500) {
+      toast(context, 'الكمية كبيرة، تأكد منها');
+      return;
+    }
+    if (!isRest) {
+      final d = parseInt(expires.text) ?? 0;
+      if (d < 2) {
+        toast(context, 'ما ينقبل منتج باقي على انتهائه أقل من يومين (48 ساعة)');
+        return;
+      }
     }
     final minDiscount = isRest ? 40 : 20;
     if (discount < minDiscount) {
@@ -393,7 +433,8 @@ class _PublishOfferScreenState extends State<PublishOfferScreen> {
       originalPrice: o,
       price: p,
       qty: q,
-      expiresLabel: expires.text.trim(),
+      expiresLabel: isRest ? 'لمدة $hours ساعة' : 'ينتهي بعد ${parseInt(expires.text) ?? 0} أيام',
+      expiresAt: DateTime.now().add(isRest ? Duration(hours: hours) : Duration(days: parseInt(expires.text) ?? 0)).millisecondsSinceEpoch,
       surpriseBox: surprise,
       pickupWindow: isRest ? pickupWindow.text.trim() : '',
       storage: storage,
@@ -440,8 +481,25 @@ class _PublishOfferScreenState extends State<PublishOfferScreen> {
           Row(children: [
             Expanded(child: TextField(controller: qty, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'الكمية'))),
             const SizedBox(width: 10),
-            Expanded(child: TextField(controller: expires, decoration: InputDecoration(labelText: isRest ? 'ينتهي العرض' : 'تاريخ الانتهاء'))),
+            if (!isRest)
+              Expanded(
+                child: TextField(
+                  controller: expires,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(labelText: 'باقي على الانتهاء (أيام)'),
+                ),
+              ),
           ]),
+          if (isRest) ...[
+            const SizedBox(height: 10),
+            const Text('العرض يبقى معروض لمدة:', style: TextStyle(fontWeight: FontWeight.w800)),
+            const SizedBox(height: 6),
+            Wrap(spacing: 8, children: [
+              for (final h in [1, 2, 3, 5])
+                ChoiceChip(label: Text(h == 1 ? 'ساعة' : (h == 2 ? 'ساعتين' : '$h ساعات')), selected: hours == h, onSelected: (_) => setState(() => hours = h)),
+            ]),
+            const Text('بعدها يختفي تلقائياً حتى ما ينطلب أكل بايت', style: TextStyle(fontSize: 12, color: DepoColors.muted)),
+          ],
           const SizedBox(height: 10),
           if (isRest)
             TextField(controller: pickupWindow, decoration: const InputDecoration(labelText: 'وقت الاستلام'))
@@ -573,6 +631,10 @@ class _PublishHero extends StatelessWidget {
       ),
     );
     if (ok == true) {
+      if (store.suspended) {
+        if (context.mounted) toast(context, 'المحل موقوف مؤقتاً، ما تكدر تنشر');
+        return;
+      }
       app.repostOffer(t, qty);
       if (context.mounted) toast(context, 'انتشرت! وصل إشعار لمتابعينك');
     }

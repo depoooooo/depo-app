@@ -156,9 +156,31 @@ class OrderDetailScreen extends StatelessWidget {
                   if (!o.pickup && o.address.isNotEmpty) Text('العنوان: ${o.address}', style: const TextStyle(fontSize: 12, color: DepoColors.muted)),
                 ]),
               ),
-              if (o.status == OrderStatus.placed)
-                OutlinedButton(onPressed: () => app.setStatus(o, OrderStatus.cancelled, reason: 'ألغاه الزبون'), child: const Text('إلغاء الطلب')),
-              if (o.status == OrderStatus.delivered && o.rating == 0) ...[
+              if (o.status == OrderStatus.placed && o.customerPhone == app.currentPhone)
+                OutlinedButton(
+                  onPressed: () async {
+                    final ok = await showDialog<bool>(
+                      context: context,
+                      builder: (c) => AlertDialog(
+                        title: const Text('تلغي الطلب؟'),
+                        content: const Text('تكدر تلغي بس قبل ما يقبله المحل.'),
+                        actions: [
+                          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('لا')),
+                          FilledButton(style: FilledButton.styleFrom(minimumSize: const Size(0, 44)), onPressed: () => Navigator.pop(c, true), child: const Text('إلغاء الطلب')),
+                        ],
+                      ),
+                    );
+                    if (ok != true) return;
+                    final cur = app.orderById(o.id);
+                    if (cur == null || cur.status != OrderStatus.placed) {
+                      if (context.mounted) toast(context, 'المحل قبل الطلب، ما ينلغى هسه. تواصل ويه الدعم.');
+                      return;
+                    }
+                    app.setStatus(cur, OrderStatus.cancelled, reason: 'ألغاه الزبون');
+                  },
+                  child: const Text('إلغاء الطلب'),
+                ),
+              if (o.status == OrderStatus.delivered && o.rating == 0 && o.customerPhone == app.currentPhone) ...[
                 const SizedBox(height: 8),
                 const Text('شلون كان الطلب؟', style: TextStyle(fontWeight: FontWeight.w900)),
                 Row(mainAxisAlignment: MainAxisAlignment.center, children: [
@@ -227,6 +249,10 @@ class _ComplaintScreenState extends State<ComplaintScreen> {
           const SizedBox(height: 12),
           FilledButton(
             onPressed: () {
+              if (text.text.trim().length < 5 && type == 'أخرى') {
+                toast(context, 'اشرح المشكلة شوية');
+                return;
+              }
               app.addComplaint(o: widget.order, type: type, text: text.text.trim());
               toast(context, 'وصلت شكواك، راح نتواصل وياك');
               Navigator.pop(context);

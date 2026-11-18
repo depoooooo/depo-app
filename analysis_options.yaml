@@ -1,0 +1,12 @@
+include: package:flutter_lints/flutter.yaml
+
+analyzer:
+  errors:
+    # Flutter نقل Material لحزمة جديدة؛ هذا تنبيه مستقبلي مو خطأ
+    deprecated_member_use: ignore
+    deprecated_member_use_from_same_package: ignore
+linter:
+  rules:
+    avoid_print: true
+    prefer_const_constructors: false
+    use_build_context_synchronously: true

@@ -300,3 +300,36 @@ class OfferImage extends StatelessWidget {
         fallback: ImagePlaceholder(height: height, box: offer.surpriseBox, radius: radius, seed: offer.title),
       );
 }
+
+/// يسأل عن عنوان: الحي + أقرب نقطة دالة
+Future<String?> askAddress(BuildContext context) async {
+  final area = TextEditingController();
+  final near = TextEditingController();
+  final r = await showDialog<String>(
+    context: context,
+    builder: (c) => AlertDialog(
+      title: const Text('عنوان التوصيل'),
+      content: Column(mainAxisSize: MainAxisSize.min, children: [
+        TextField(controller: area, autofocus: true, decoration: const InputDecoration(labelText: 'الحي', hintText: 'مثلاً: النور، الزهور، المثنى')),
+        const SizedBox(height: 10),
+        TextField(controller: near, decoration: const InputDecoration(labelText: 'أقرب نقطة دالة', hintText: 'مثلاً: قرب جامع النور، بيت رقم 12')),
+      ]),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(c), child: const Text('إلغاء')),
+        FilledButton(
+          style: FilledButton.styleFrom(minimumSize: const Size(0, 44)),
+          onPressed: () {
+            final a = area.text.trim();
+            if (a.length < 2) return;
+            final n = near.text.trim();
+            Navigator.pop(c, n.isEmpty ? 'حي $a' : 'حي $a — $n');
+          },
+          child: const Text('حفظ'),
+        ),
+      ],
+    ),
+  );
+  area.dispose();
+  near.dispose();
+  return r;
+}

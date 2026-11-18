@@ -66,7 +66,7 @@ class _OfferDetailScreenState extends State<OfferDetailScreen> {
           Row(children: [
             _Info(label: 'باقي', value: o.quantityLeft <= 2 ? '${o.quantityLeft} بس' : '${o.quantityLeft}', danger: o.quantityLeft <= 2),
             const SizedBox(width: 8),
-            _Info(label: isRawaji ? 'ينتهي العرض' : 'الصلاحية', value: o.expiresLabel),
+            _Info(label: isRawaji ? 'ينتهي العرض' : 'الصلاحية', value: o.expiryText),
             if (o.pickupWindow.isNotEmpty) ...[
               const SizedBox(width: 8),
               _Info(label: 'الاستلام', value: o.pickupWindow),
