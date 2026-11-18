@@ -106,7 +106,7 @@ class _Header extends StatelessWidget {
               labelStyle: const TextStyle(fontFamily: 'Tajawal', fontWeight: FontWeight.w800, fontSize: 15),
               tabs: const [
                 Tab(icon: Icon(Icons.restaurant_outlined, size: 18), text: 'رواجع المطاعم', iconMargin: EdgeInsets.zero),
-                Tab(icon: Icon(Icons.shopping_basket_outlined, size: 18), text: 'عروض التجار', iconMargin: EdgeInsets.zero),
+                Tab(icon: Icon(Icons.shopping_basket_outlined, size: 18), text: 'الماركت', iconMargin: EdgeInsets.zero),
               ],
             ),
           ),

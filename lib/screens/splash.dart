@@ -33,7 +33,7 @@ class SplashScreen extends StatelessWidget {
               ),
               const SizedBox(height: 10),
               const Text(
-                'الموصل — رواجع المطاعم وعروض التجار',
+                'الموصل — رواجع المطاعم والماركت',
                 style: TextStyle(fontSize: 12, color: DepoColors.ink),
               ),
             ],
