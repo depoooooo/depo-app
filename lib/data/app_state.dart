@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
 import 'package:flutter/foundation.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_firestore/cloud_firestore.dart' as fs;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'cloud.dart';
 import 'models.dart';
@@ -83,7 +83,7 @@ class AppState extends ChangeNotifier {
   // ---- Firestore ----
   Future<void> _loadCloud() async {
     final db = Cloud.db!;
-    final first = <String, QuerySnapshot<Map<String, dynamic>>>{};
+    final first = <String, fs.QuerySnapshot<Map<String, dynamic>>>{};
     for (final c in _cols) {
       first[c] = await db.collection(c).get().timeout(const Duration(seconds: 15));
     }
@@ -134,7 +134,7 @@ class AppState extends ChangeNotifier {
   /// الأقسام الي الجديد بيها ينضاف بالأول (الأحدث فوق)
   static const _newestFirst = {'offers', 'orders', 'joinRequests', 'complaints'};
 
-  void _applyDocs(String c, List<QueryDocumentSnapshot<Map<String, dynamic>>> docs) {
+  void _applyDocs(String c, List<fs.QueryDocumentSnapshot<Map<String, dynamic>>> docs) {
     final list = docs.toList()
       ..sort((a, b) {
         final ta = (a.data()['_ts'] ?? 0) as num, tb = (b.data()['_ts'] ?? 0) as num;
