@@ -1,4 +1,4 @@
-name: بناء تطبيق أندرويد (APK)
+name: بناء التطبيق (أندرويد + رابط ويب)
 
 on:
   push:
@@ -7,6 +7,12 @@ on:
 
 permissions:
   contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
 
 jobs:
   build:
@@ -24,11 +30,14 @@ jobs:
           channel: stable
           cache: true
 
-      # يولّد ملفات أندرويد إذا مو موجودة (ما يمس مجلد lib)
-      - name: تجهيز ملفات أندرويد
+      # يولّد ملفات أندرويد والويب إذا مو موجودة (ما يمس مجلد lib)
+      - name: تجهيز ملفات أندرويد والويب
         run: |
           if [ ! -d android ]; then
             flutter create --platforms=android --org com.depo --project-name depo .
+          fi
+          if [ ! -d web ]; then
+            flutter create --platforms=web --org com.depo --project-name depo .
           fi
           sed -i 's/android:label="depo"/android:label="Depo"/' android/app/src/main/AndroidManifest.xml || true
 
@@ -46,6 +55,14 @@ jobs:
           name: depo-apk
           path: build/app/outputs/flutter-apk/app-release.apk
 
+      - name: بناء نسخة الويب
+        run: flutter build web --release --base-href /depo-app/
+
+      - name: تجهيز رابط الويب
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: build/web
+
       - name: نشر نسخة للتحميل من التلفون
         uses: softprops/action-gh-release@v2
         with:
@@ -53,3 +70,14 @@ jobs:
           name: Depo تجريبي ${{ github.run_number }}
           prerelease: true
           files: build/app/outputs/flutter-apk/app-release.apk
+
+  deploy-web:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: نشر رابط الويب على GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
