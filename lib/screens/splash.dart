@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../data/app_state.dart';
+import '../data/notifier.dart';
 import '../theme.dart';
 import 'shell.dart';
 
@@ -15,7 +16,7 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   void initState() {
     super.initState();
-    app.load();
+    app.load().then((_) => Notifier.start());
   }
 
   void _go() => Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const Shell()));

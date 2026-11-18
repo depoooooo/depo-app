@@ -14,6 +14,8 @@ man = os.path.join(ROOT, "android/app/src/main/AndroidManifest.xml")
 if os.path.exists(man):
     s = open(man, encoding="utf-8").read()
     s = re.sub(r'android:label="[^"]*"', 'android:label="Depo"', s, count=1)
+    if "POST_NOTIFICATIONS" not in s:
+        s = s.replace("<application", '<uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>\n    <application', 1)
     open(man, "w", encoding="utf-8").write(s)
 
 # Firebase يحتاج أندرويد 7 فما فوق (minSdk 24)
@@ -23,6 +25,22 @@ for g in ("android/app/build.gradle.kts", "android/app/build.gradle"):
         s = open(gp, encoding="utf-8").read()
         s = re.sub(r"minSdk(Version)?\s*=?\s*flutter\.minSdkVersion", "minSdk = 24", s)
         open(gp, "w", encoding="utf-8").write(s)
+
+# الإشعارات المحلية تحتاج desugaring بالأندرويد
+gk = os.path.join(ROOT, "android/app/build.gradle.kts")
+gg = os.path.join(ROOT, "android/app/build.gradle")
+if os.path.exists(gk):
+    s = open(gk, encoding="utf-8").read()
+    if "isCoreLibraryDesugaringEnabled" not in s:
+        s = s.replace("compileOptions {", "compileOptions {\n        isCoreLibraryDesugaringEnabled = true", 1)
+        s += '\ndependencies {\n    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")\n}\n'
+        open(gk, "w", encoding="utf-8").write(s)
+elif os.path.exists(gg):
+    s = open(gg, encoding="utf-8").read()
+    if "coreLibraryDesugaringEnabled" not in s:
+        s = s.replace("compileOptions {", "compileOptions {\n        coreLibraryDesugaringEnabled true", 1)
+        s += "\ndependencies {\n    coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.4'\n}\n"
+        open(gg, "w", encoding="utf-8").write(s)
 
 # فحص lint بأندرويد يتعطل ويه إضافات Firebase، نطفيه وقت البناء (ما يأثر على التطبيق)
 LINT_OFF = 'subprojects { tasks.matching { it.name.contains("lintVital") }.configureEach { enabled = false } }'

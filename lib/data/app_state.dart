@@ -372,7 +372,7 @@ class AppState extends ChangeNotifier {
     offers.insert(0, o);
     final s = storeById(o.storeId);
     if (s != null) {
-      // الإشعار المتدرّج: المرحلة الأولى للمتابعين (المراحل الجاية مع Firebase)
+      // إشعار بقائمة المتابعين؛ والإشعار المتدرّج على الشاشة يتحسب بجهاز كل زبون (notifier.dart)
       for (final u in users.where((u) => u.follows.contains(s.id))) {
         notify(u.phone, '${s.fullName} نشر: ${o.title} بـ ${iqd(o.price)}');
       }

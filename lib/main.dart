@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'data/notifier.dart';
 import 'screens/splash.dart';
 import 'theme.dart';
 
@@ -14,6 +15,8 @@ class DepoApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Depo',
+      navigatorKey: navigatorKey,
+      scaffoldMessengerKey: messengerKey,
       debugShowCheckedModeBanner: false,
       theme: buildDepoTheme(),
       locale: const Locale('ar'),
