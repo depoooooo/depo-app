@@ -41,7 +41,10 @@ class AppState extends ChangeNotifier {
 
   Future<void> load() async {
     // كل دقيقة نحدّث الشاشات (العروض اللي خلص وقتها تختفي، والعدّاد ينقص)
-    _tick ??= Timer.periodic(const Duration(minutes: 1), (_) => notifyListeners());
+    _tick ??= Timer.periodic(const Duration(minutes: 1), (_) {
+      if (Cloud.enabled && Cloud.status.startsWith('تعذر الحفظ')) _save(); // نعيد المحاولة
+      notifyListeners();
+    });
     final prefs = await SharedPreferences.getInstance();
     currentPhone = prefs.getString('depo_phone');
     courierAvailable = prefs.getBool('depo_courier_available') ?? true;
@@ -244,6 +247,19 @@ class AppState extends ChangeNotifier {
   }
 
   Future<void> _save() async {
+    // السيرفر أول (بدون انتظار قبله) حتى ما يجي تحديث من جهاز ثاني ويمسح تغييرنا قبل ما ينحفظ
+    Future<void>? push;
+    if (Cloud.enabled) {
+      push = _pushCloud().then((_) {
+        if (Cloud.status.startsWith('تعذر الحفظ')) {
+          Cloud.status = 'متصل بالسيرفر ✓';
+          notifyListeners();
+        }
+      }).catchError((Object e) {
+        Cloud.status = 'تعذر الحفظ بالسيرفر — راح نعيد المحاولة';
+        notifyListeners();
+      });
+    }
     final prefs = await SharedPreferences.getInstance();
     if (currentPhone == null) {
       await prefs.remove('depo_phone');
@@ -251,13 +267,8 @@ class AppState extends ChangeNotifier {
       await prefs.setString('depo_phone', currentPhone!);
     }
     await prefs.setBool('depo_courier_available', courierAvailable);
-    if (Cloud.enabled) {
-      try {
-        await _pushCloud();
-      } catch (e) {
-        Cloud.status = 'تعذر الحفظ بالسيرفر: $e';
-        notifyListeners();
-      }
+    if (push != null) {
+      await push;
       return;
     }
     await prefs.setString(
@@ -678,7 +689,8 @@ class AppState extends ChangeNotifier {
           _markSynced('offers', id);
         }
       }
-      orders.insert(0, o);
+      // ممكن السيرفر سبقنا ودزّ الطلب بالـ listener، فما نضيفه مرتين
+      if (orderById(o.id) == null) orders.insert(0, o);
       _markSynced('orders', o.id, ts: ts);
     } else {
       for (final l in cart.lines) {
@@ -691,7 +703,7 @@ class AppState extends ChangeNotifier {
     notify(s.ownerPhone, 'طلب جديد #${o.id} — ${iqd(o.itemsTotal)}');
     cart.clear();
     _changed();
-    return o;
+    return orderById(o.id) ?? o;
   }
 
   List<Order> get myOrders => orders.where((o) => o.customerPhone == currentPhone).toList();
