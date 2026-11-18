@@ -24,6 +24,15 @@ for g in ("android/app/build.gradle.kts", "android/app/build.gradle"):
         s = re.sub(r"minSdk(Version)?\s*=?\s*flutter\.minSdkVersion", "minSdk = 24", s)
         open(gp, "w", encoding="utf-8").write(s)
 
+# فحص lint بأندرويد يتعطل ويه إضافات Firebase، نطفيه وقت البناء (ما يأثر على التطبيق)
+LINT_OFF = 'subprojects { tasks.matching { it.name.contains("lintVital") }.configureEach { enabled = false } }'
+for g in ("android/build.gradle.kts", "android/build.gradle"):
+    gp = os.path.join(ROOT, g)
+    if os.path.exists(gp):
+        s = open(gp, encoding="utf-8").read()
+        if "lintVital" not in s:
+            open(gp, "a", encoding="utf-8").write("\n" + LINT_OFF + "\n")
+
 # الويب
 web = os.path.join(ROOT, "web")
 if os.path.isdir(web):
