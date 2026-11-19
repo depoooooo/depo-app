@@ -29,9 +29,7 @@ class AccountScreen extends StatelessWidget {
         ]),
       );
     }
-    final delivered = app.myOrders.where((o) => o.status == OrderStatus.delivered).toList();
-    final saved = delivered.fold(0, (s, o) => s + (o.originalTotal - o.itemsTotal));
-    final meals = delivered.fold(0, (s, o) => s + o.lines.fold(0, (a, l) => a + l.qty));
+    final saved = app.impactOf(u.phone).saved; // نفس رقم كارت التوفير
     final pending = app.myJoinRequest;
     return Scaffold(
       appBar: AppBar(title: const Text('حسابي'), automaticallyImplyLeading: false),
@@ -58,7 +56,7 @@ class AccountScreen extends StatelessWidget {
               Row(children: [
                 _Stat(iqd(saved), 'وفّرتها'),
                 const SizedBox(width: 8),
-                _Stat('$meals', 'وجبة ومنتج أنقذتها'),
+                _Stat('${app.impactOf(u.phone).orders}', 'طلب'),
                 const SizedBox(width: 8),
                 _Stat('${u.points}', 'نقطة'),
               ]),
@@ -124,7 +122,7 @@ class AccountScreen extends StatelessWidget {
   }
 
   void _invite(BuildContext context) {
-    shareText(context, 'جرّب ديبو: أكل المطاعم ومنتجات الماركت بنص السعر بالموصل، وتنقذ أكل من الرمي.\nhttps://depoooooo.github.io/depo-app/');
+    shareText(context, 'جرّب ديبو: أكل المطاعم ومنتجات الماركت بنص السعر بالموصل، وتوفّر ويه كل طلب.\nhttps://depoooooo.github.io/depo-app/');
   }
 
   void _editName(BuildContext context) {
@@ -420,16 +418,16 @@ class MarketsTile extends StatelessWidget {
 }
 
 
-/// «أنقذ وجبة»: مستوى المنقذ، التقدّم للمستوى الجاي، ومشاركة الإنجاز
+/// «شكد وفّرت»: مستوى الموفّر حسب مجموع التوفير بكل الطلبات، التقدّم، والمشاركة
 class SaverCard extends StatelessWidget {
   const SaverCard({super.key});
 
   @override
   Widget build(BuildContext context) {
     final i = app.impactOf(app.currentPhone);
-    final lvl = saverLevelOf(i.meals);
+    final lvl = saverLevelOf(i.saved);
     final c = Color(lvl.color);
-    final progress = lvl.next == 0 ? 1.0 : (i.meals - lvl.from) / (lvl.next - lvl.from);
+    final progress = lvl.next == 0 ? 1.0 : (i.saved - lvl.from) / (lvl.next - lvl.from);
     final nextName = lvl.next == 0 ? '' : saverLevels.firstWhere((l) => l.from == lvl.next).name;
     return AppCard(
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -442,18 +440,19 @@ class SaverCard extends StatelessWidget {
               gradient: LinearGradient(colors: [Color.lerp(c, Colors.white, 0.35)!, c]),
               boxShadow: [BoxShadow(color: c.withValues(alpha: 0.4), blurRadius: 10, offset: const Offset(0, 3))],
             ),
-            child: const Icon(Icons.eco_rounded, color: Colors.white, size: 26),
+            child: const Icon(Icons.savings_rounded, color: Colors.white, size: 26),
           ),
           const SizedBox(width: 12),
           Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text(lvl.name, style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900, color: Color.lerp(c, DepoColors.ink, 0.35))),
-              Text('أنقذت ${i.meals} ${i.meals == 1 ? 'وجبة' : 'وجبات ومنتجات'} من الرمي', style: const TextStyle(fontSize: 12, color: DepoColors.muted)),
+              Text(i.orders == 0 ? 'اطلب من المطاعم أو الماركت وشوف شكد توفّر' : 'وفّرت ${iqd(i.saved)} من ${i.orders} ${i.orders == 1 ? 'طلب' : 'طلبات'}',
+                  style: const TextStyle(fontSize: 12, color: DepoColors.muted)),
             ]),
           ),
           IconButton(
             tooltip: 'شارك إنجازك',
-            onPressed: i.meals == 0 ? null : () => shareText(context, app.impactShareText(i)),
+            onPressed: i.saved == 0 ? null : () => shareText(context, app.impactShareText(i)),
             icon: const Icon(Icons.ios_share_rounded, color: DepoColors.dark),
           ),
         ]),
@@ -464,10 +463,9 @@ class SaverCard extends StatelessWidget {
         ),
         const SizedBox(height: 6),
         Text(
-          lvl.next == 0 ? 'وصلت لأعلى مستوى — بطل ديبو!' : 'باقي ${lvl.next - i.meals} حتى تصير «$nextName»',
+          lvl.next == 0 ? 'وصلت لأعلى مستوى — بطل التوفير!' : 'باقي ${iqd(lvl.next - i.saved)} توفير حتى تصير «$nextName»',
           style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
         ),
-        if (i.saved > 0) Text('ووفّرت ${iqd(i.saved)} من جيبك', style: const TextStyle(fontSize: 12, color: DepoColors.success, fontWeight: FontWeight.w700)),
       ]),
     );
   }

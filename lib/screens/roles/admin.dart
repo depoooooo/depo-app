@@ -116,7 +116,7 @@ class _ReportsTabState extends State<ReportsTab> {
         AppCard(
           color: DepoColors.successBg,
           borderColor: DepoColors.successBg,
-          child: Text('$label: وفّرنا للزبائن ${iqd(saved)} وأنقذنا ${delivered.fold(0, (s, o) => s + o.lines.fold(0, (a, l) => a + l.qty))} وجبة ومنتج',
+          child: Text('$label: وفّرنا للزبائن ${iqd(saved)} وبعنا ${delivered.fold(0, (s, o) => s + o.lines.fold(0, (a, l) => a + l.qty))} وجبة ومنتج',
               style: const TextStyle(color: DepoColors.success, fontWeight: FontWeight.w800)),
         ),
         SectionTitle('حسب المحل ($label)'),

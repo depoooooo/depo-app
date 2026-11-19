@@ -2356,29 +2356,29 @@ String dateTimeLabel(int ms) {
 
 // ======================= النمو: القرب، الأثر، الشارات، تقييم المندوب، التتبّع =======================
 class Impact {
-  final int meals; // وجبات/منتجات انقذت من الرمي
+  final int meals; // عدد الوجبات والمنتجات اللي اشتراها
   final int saved; // الفلوس اللي وفّرها
   final int orders;
   const Impact(this.meals, this.saved, this.orders);
 }
 
-/// مستوى «المنقذ»
+/// مستوى «الموفّر» (حسب مجموع اللي وفّره بالدينار)
 class SaverLevel {
   final String name;
-  final int from; // يبدي من كم وجبة
+  final int from; // يبدي من كم دينار توفير
   final int next; // المستوى الجاي (0 = آخر مستوى)
   final int color;
   const SaverLevel(this.name, this.from, this.next, this.color);
 }
 
 const saverLevels = [
-  SaverLevel('منقذ جديد', 0, 5, 0xFF4BCDDB),
-  SaverLevel('منقذ برونزي', 5, 20, 0xFFCD7F32),
-  SaverLevel('منقذ فضي', 20, 50, 0xFF9AA5AE),
-  SaverLevel('منقذ ذهبي', 50, 0, 0xFFF5A524),
+  SaverLevel('موفّر جديد', 0, 25000, 0xFF4BCDDB),
+  SaverLevel('موفّر برونزي', 25000, 100000, 0xFFCD7F32),
+  SaverLevel('موفّر فضي', 100000, 250000, 0xFF9AA5AE),
+  SaverLevel('موفّر ذهبي', 250000, 0, 0xFFF5A524),
 ];
 
-SaverLevel saverLevelOf(int meals) => saverLevels.lastWhere((l) => meals >= l.from);
+SaverLevel saverLevelOf(int saved) => saverLevels.lastWhere((l) => saved >= l.from);
 
 /// تقرير المحل لشهر
 class StoreImpact {
@@ -2454,7 +2454,7 @@ extension Growth on AppState {
     return d < 1 ? '${(d * 1000).round()} م' : '${d.toStringAsFixed(1)} كم';
   }
 
-  /// أثري: الوجبات اللي انقذتها والفلوس اللي وفّرتها
+  /// توفيري: شكد وفّر الزبون بكل طلباته (مطاعم وماركت)
   Impact impactOf(String? phone) {
     if (phone == null) return const Impact(0, 0, 0);
     var meals = 0, saved = 0, n = 0;
@@ -2470,9 +2470,9 @@ extension Growth on AppState {
 
   /// نص للمشاركة
   String impactShareText(Impact i) {
-    final lvl = saverLevelOf(i.meals);
-    return 'أنقذت ${i.meals} ${i.meals == 1 ? 'وجبة' : 'وجبات'} من الرمي ووفّرت ${iqd(i.saved)} ويه ديبو\n'
-        'صرت «${lvl.name}». جرّب ديبو: أكل المطاعم ومنتجات الماركت بنص السعر.';
+    final lvl = saverLevelOf(i.saved);
+    return 'وفّرت ${iqd(i.saved)} ويه ديبو على ${i.orders} ${i.orders == 1 ? 'طلب' : 'طلبات'}، وصرت «${lvl.name}».\n'
+        'جرّب ديبو: أكل المطاعم ومنتجات الماركت بأسعار أقل بكثير.';
   }
 
   StoreImpact storeImpact(Store s, String month) {
@@ -2500,7 +2500,7 @@ extension Growth on AppState {
 
   String storeImpactText(Store s, String month, StoreImpact i) =>
       'تقرير ${s.name} — $month ويه ديبو\n'
-      'بدل ما ينرمى: بعنا ${i.meals} ${s.type == StoreType.restaurant ? 'وجبة' : 'منتج'} لـ ${i.customers} زبون\n'
+      'بعنا ${i.meals} ${s.type == StoreType.restaurant ? 'وجبة' : 'منتج'} لـ ${i.customers} زبون\n'
       'المبيعات: ${iqd(i.sales)} • العمولة: ${iqd(i.commission)} • صافي لك: ${iqd(i.earnings)}'
       '${i.topItem.isEmpty ? '' : '\nالأكثر طلباً: ${i.topItem}'}';
 

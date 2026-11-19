@@ -791,7 +791,7 @@ class _ImpactReportState extends State<_ImpactReport> {
             const DepoGlyph('🌱', size: 34),
             const SizedBox(width: 10),
             Expanded(
-              child: Text(i.meals == 0 ? 'بعد ما بعت رواجع ${monthLabel(month)}' : 'بدل ما ينرمى، بعت ${i.meals} $unit',
+              child: Text(i.meals == 0 ? 'بعد ما بعت رواجع ${monthLabel(month)}' : 'بعت ${i.meals} $unit',
                   style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w900)),
             ),
           ]),
