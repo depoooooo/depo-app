@@ -178,3 +178,62 @@ class CatPicker extends StatelessWidget {
     ]);
   }
 }
+
+
+/// شريط أقسام أفقي بدوائر (للرئيسية)
+class CatStrip extends StatelessWidget {
+  final List<Cat> cats;
+  final bool market;
+  const CatStrip({super.key, required this.cats, required this.market});
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 112,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        itemCount: cats.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 14),
+        itemBuilder: (context, i) {
+          final c = cats[i];
+          final n = countIn(c, market: market);
+          return InkWell(
+            borderRadius: BorderRadius.circular(40),
+            onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => CategoryResults(cat: c, market: market))),
+            child: SizedBox(
+              width: 74,
+              child: Column(children: [
+                Stack(clipBehavior: Clip.none, children: [
+                  Container(
+                    width: 70,
+                    height: 70,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Colors.white,
+                      boxShadow: const [BoxShadow(color: Color(0x1F06363C), blurRadius: 8, offset: Offset(0, 3))],
+                      gradient: RadialGradient(colors: [Colors.white, c.color.withValues(alpha: 0.22)], radius: 0.9),
+                    ),
+                    child: Icon(c.icon, size: 34, color: c.color),
+                  ),
+                  if (n > 0)
+                    Positioned(
+                      top: -2,
+                      left: -2,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                        decoration: BoxDecoration(color: DepoColors.accent, borderRadius: BorderRadius.circular(10), border: Border.all(color: Colors.white, width: 1.5)),
+                        child: Text('$n', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w900)),
+                      ),
+                    ),
+                ]),
+                const SizedBox(height: 6),
+                Text(c.name, maxLines: 1, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800)),
+              ]),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
