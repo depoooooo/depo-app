@@ -97,6 +97,25 @@ class AppState extends ChangeNotifier {
   }
 
   // ---- Firestore ----
+  /// السحب للتحديث: نجيب آخر نسخة من السيرفر (والتغييرات توصل لحالها أصلاً)
+  Future<void> refreshFromServer() async {
+    final started = DateTime.now();
+    if (Cloud.enabled) {
+      try {
+        final db = Cloud.db!;
+        for (final c in _cols) {
+          final qs = await db.collection(c).get(const fs.GetOptions(source: fs.Source.server)).timeout(const Duration(seconds: 12));
+          _applyDocs(c, qs.docs);
+        }
+        if (Cloud.status.startsWith('تعذر') || Cloud.status.startsWith('انقطع')) Cloud.status = 'متصل بالسيرفر ✓';
+      } catch (_) {}
+    }
+    // نخلي الحركة تبين شوية حتى لو التحديث سريع
+    final left = const Duration(milliseconds: 700) - DateTime.now().difference(started);
+    if (left > Duration.zero) await Future<void>.delayed(left);
+    notifyListeners();
+  }
+
   Future<void> _loadCloud() async {
     final db = Cloud.db!;
     final first = <String, fs.QuerySnapshot<Map<String, dynamic>>>{};

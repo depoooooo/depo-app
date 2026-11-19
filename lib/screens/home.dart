@@ -4,6 +4,7 @@ import '../data/app_state.dart';
 import '../data/categories.dart';
 import '../data/models.dart';
 import 'categories_screen.dart';
+import '../widgets/depo_refresh.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
 import '../widgets/offer_cards.dart';
@@ -198,7 +199,10 @@ class _RawajiTabState extends State<_RawajiTab> {
     final campaign = restaurants.where((s) => app.offersOf(s.id).any((o) => o.discountPercent >= st.campaignMinDiscount)).toList();
     final filtering = filter != _Filter.none;
 
-    return ListView(
+    return DepoRefresh(
+      onRefresh: app.refreshFromServer,
+      child: ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.only(top: 12, bottom: 24),
       children: [
         if (st.promoText.isNotEmpty && app.eligibleFirstOrder) _PromoStrip(text: st.promoText),
@@ -286,6 +290,7 @@ class _RawajiTabState extends State<_RawajiTab> {
           ),
         ],
       ],
+      ),
     );
   }
 
@@ -565,7 +570,10 @@ class _MarketTab extends StatelessWidget {
     final ids = merchants.map((s) => s.id).toSet();
     final products = app.offers.where((o) => o.visible && ids.contains(o.storeId)).toList();
     final cheap = products.where((o) => o.price <= 1000).toList();
-    return ListView(
+    return DepoRefresh(
+      onRefresh: app.refreshFromServer,
+      child: ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.only(top: 14, bottom: 24),
       children: [
         _Banners(slides: [
@@ -603,6 +611,7 @@ class _MarketTab extends StatelessWidget {
           child: Column(children: [for (final s in merchants) StoreTile(store: s)]),
         ),
       ],
+      ),
     );
   }
 }

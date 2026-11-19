@@ -13,7 +13,7 @@ for d in ("mdpi", "hdpi", "xhdpi", "xxhdpi", "xxxhdpi"):
 man = os.path.join(ROOT, "android/app/src/main/AndroidManifest.xml")
 if os.path.exists(man):
     s = open(man, encoding="utf-8").read()
-    s = re.sub(r'android:label="[^"]*"', 'android:label="Depo"', s, count=1)
+    s = re.sub(r'android:label="[^"]*"', 'android:label="ديبو"', s, count=1)
     if "POST_NOTIFICATIONS" not in s:
         s = s.replace("<application", '<uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>\n    <application', 1)
     open(man, "w", encoding="utf-8").write(s)
@@ -61,15 +61,15 @@ if os.path.isdir(web):
     mf = os.path.join(web, "manifest.json")
     if os.path.exists(mf):
         m = json.load(open(mf, encoding="utf-8"))
-        m.update({"name": "Depo — ديبو", "short_name": "Depo", "background_color": BRAND,
+        m.update({"name": "ديبو", "short_name": "ديبو", "background_color": BRAND,
                   "theme_color": BRAND, "description": "رواجع المطاعم والماركت بأرخص سعر — الموصل",
                   "lang": "ar", "dir": "rtl"})
         json.dump(m, open(mf, "w", encoding="utf-8"), ensure_ascii=False, indent=2)
     ix = os.path.join(web, "index.html")
     if os.path.exists(ix):
         s = open(ix, encoding="utf-8").read()
-        s = re.sub(r"<title>.*?</title>", "<title>Depo — ديبو</title>", s, flags=re.S)
-        s = s.replace('content="depo"', 'content="Depo"')
+        s = re.sub(r"<title>.*?</title>", "<title>ديبو</title>", s, flags=re.S)
+        s = s.replace('content="depo"', 'content="ديبو"').replace('content="Depo"', 'content="ديبو"')
         s = re.sub(r'<meta name="description" content="[^"]*">',
                    '<meta name="description" content="رواجع المطاعم والماركت بأرخص سعر — الموصل">', s)
         if 'name="theme-color"' not in s:

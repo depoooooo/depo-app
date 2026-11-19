@@ -3,6 +3,7 @@ import '../data/app_state.dart';
 import '../data/models.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
+import '../widgets/depo_refresh.dart';
 import 'auth.dart';
 
 /// طلباتي
@@ -14,7 +15,10 @@ class OrdersScreen extends StatelessWidget {
     final list = app.myOrders;
     return Scaffold(
       appBar: AppBar(title: const Text('طلباتي'), automaticallyImplyLeading: false),
-      body: ListView(
+      body: DepoRefresh(
+        onRefresh: app.refreshFromServer,
+        child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.all(16),
         children: [
           if (!app.loggedIn) ...[
@@ -25,6 +29,7 @@ class OrdersScreen extends StatelessWidget {
           else
             for (final o in list) OrderTile(order: o, onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => OrderDetailScreen(orderId: o.id)))),
         ],
+        ),
       ),
     );
   }
