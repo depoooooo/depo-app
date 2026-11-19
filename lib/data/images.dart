@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'cloud.dart';
 
 /// الصور: تنضغط بالتلفون (~800 بكسل) وتنحفظ بـ Firestore بقسم images.
@@ -53,8 +54,15 @@ class Images {
     try {
       String? data;
       if (Cloud.enabled) {
-        final d = await Cloud.db!.collection('images').doc(id).get();
-        data = d.data()?['data'] as String?;
+        // من النسخة المحلية أول (فوري)، وإذا ماكو من السيرفر
+        try {
+          final c = await Cloud.db!.collection('images').doc(id).get(const GetOptions(source: Source.cache));
+          data = c.data()?['data'] as String?;
+        } catch (_) {}
+        if (data == null) {
+          final d = await Cloud.db!.collection('images').doc(id).get();
+          data = d.data()?['data'] as String?;
+        }
       } else {
         final prefs = await SharedPreferences.getInstance();
         data = prefs.getString('depo_img_$id');

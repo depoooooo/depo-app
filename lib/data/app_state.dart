@@ -71,7 +71,7 @@ class AppState extends ChangeNotifier {
         return;
       } catch (e) {
         Cloud.enabled = false;
-        Cloud.status = 'محلي — تعذر تحميل البيانات: $e';
+        Cloud.status = Cloud.describe(e);
       }
     }
     _loadLocal(prefs);
@@ -129,27 +129,45 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// التحميل: أول شي من النسخة المحلية على الجهاز (فوري)، والسيرفر يحدّث بالخلفية.
+  /// أول مرة بس (ماكو نسخة محلية) ننتظر السيرفر — وكل الأقسام سوا مو وحدة وحدة.
   Future<void> _loadCloud() async {
     final db = Cloud.db!;
-    final first = <String, fs.QuerySnapshot<Map<String, dynamic>>>{};
-    for (final c in _cols) {
-      first[c] = await db.collection(c).get().timeout(const Duration(seconds: 15));
-    }
-    if (first['stores']!.docs.isEmpty && first['users']!.docs.isEmpty) {
-      // أول مرة: نرفع البيانات التجريبية للسيرفر
-      _seed();
-      await _pushCloud();
-    } else {
-      for (final c in _cols) {
-        _applyDocs(c, first[c]!.docs);
+    Future<fs.QuerySnapshot<Map<String, dynamic>>?> fromCache(String c) async {
+      try {
+        return await db.collection(c).get(const fs.GetOptions(source: fs.Source.cache)).timeout(const Duration(seconds: 3));
+      } catch (_) {
+        return null;
       }
     }
+
+    final cached = await Future.wait(_cols.map(fromCache));
+    final hasCache = cached.every((x) => x != null) && (cached[_cols.indexOf('stores')]!.docs.isNotEmpty || cached[_cols.indexOf('users')]!.docs.isNotEmpty);
+    if (hasCache) {
+      for (var i = 0; i < _cols.length; i++) {
+        _applyDocs(_cols[i], cached[i]!.docs);
+      }
+    } else {
+      final first = await Future.wait(_cols.map((c) => db.collection(c).get().timeout(const Duration(seconds: 20))));
+      final byCol = {for (var i = 0; i < _cols.length; i++) _cols[i]: first[i]};
+      if (byCol['stores']!.docs.isEmpty && byCol['users']!.docs.isEmpty) {
+        // أول مرة: نرفع البيانات التجريبية للسيرفر
+        _seed();
+        await _pushCloud();
+      } else {
+        for (final c in _cols) {
+          _applyDocs(c, byCol[c]!.docs);
+        }
+      }
+      Cloud.status = 'متصل بالسيرفر ✓';
+    }
     for (final c in _cols) {
-      _subs.add(db.collection(c).snapshots().listen((qs) {
+      _subs.add(db.collection(c).snapshots(includeMetadataChanges: true).listen((qs) {
+        if (!qs.metadata.isFromCache && !Cloud.status.startsWith('تعذر الحفظ')) Cloud.status = 'متصل بالسيرفر ✓';
         _applyDocs(c, qs.docs);
         notifyListeners();
       }, onError: (e) {
-        Cloud.status = 'انقطع الاتصال: $e';
+        Cloud.status = 'انقطع الاتصال: ${Cloud.describe(e as Object)}';
         notifyListeners();
       }));
     }

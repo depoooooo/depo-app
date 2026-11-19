@@ -14,7 +14,7 @@ class SplashScreen extends StatefulWidget {
 }
 
 class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderStateMixin {
-  late final AnimationController c = AnimationController(vsync: this, duration: const Duration(milliseconds: 2600));
+  late final AnimationController c = AnimationController(vsync: this, duration: const Duration(milliseconds: 1900));
   bool _animDone = false;
   bool _left = false;
 
@@ -37,7 +37,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     });
     c.forward().then((_) {
       if (mounted) setState(() => _animDone = true);
-      Future.delayed(const Duration(milliseconds: 500), _maybeGo);
+      Future.delayed(const Duration(milliseconds: 150), _maybeGo);
     });
   }
 
@@ -45,7 +45,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     if (!mounted || _left || !app.loaded || !_animDone) return;
     _left = true;
     Navigator.of(context).pushReplacement(PageRouteBuilder(
-      transitionDuration: const Duration(milliseconds: 450),
+      transitionDuration: const Duration(milliseconds: 300),
       pageBuilder: (_, __, ___) => const Shell(),
       transitionsBuilder: (_, a, __, child) => FadeTransition(opacity: a, child: child),
     ));
