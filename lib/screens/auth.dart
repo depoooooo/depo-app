@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../data/app_state.dart';
+import 'dart:async';
 import '../data/models.dart';
+import '../data/otp.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
 
@@ -34,6 +36,10 @@ class _LoginScreenState extends State<LoginScreen> {
   int pinAttempts = 0;
   _Step step = _Step.phone;
   String demoCode = '';
+  OtpChannel channel = OtpChannel.whatsapp;
+  bool sending = false;
+  Timer? _timer;
+  int resendLeft = 0;
   int attempts = 0;
 
   String get phoneNorm {
@@ -56,6 +62,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   void dispose() {
+    _timer?.cancel();
     phone.dispose();
     code.dispose();
     name.dispose();
@@ -64,16 +71,31 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
-  void _sendCode() {
+  Future<void> _sendCode([OtpChannel? via]) async {
+    if (via != null) channel = via;
+    if (Otp.waitBeforeResend > Duration.zero && step == _Step.code && via == null) return;
+    setState(() => sending = true);
+    final shown = await Otp.send(phoneNorm, channel);
+    if (!mounted) return;
+    code.clear();
     setState(() {
-      demoCode = (100000 + DateTime.now().millisecond * 777 % 899999).toString().substring(0, 6);
+      sending = false;
+      demoCode = shown ?? '';
       step = _Step.code;
       attempts = 0;
+      resendLeft = Otp.resendAfter.inSeconds;
+    });
+    _timer?.cancel();
+    _timer = Timer.periodic(const Duration(seconds: 1), (t) {
+      if (!mounted) return t.cancel();
+      setState(() => resendLeft = Otp.waitBeforeResend.inSeconds);
+      if (resendLeft <= 0) t.cancel();
     });
   }
 
-  void _verify() {
-    if (code.text.trim() != demoCode) {
+  Future<void> _verify() async {
+    if (!await Otp.verify(code.text)) {
+      if (!mounted) return;
       attempts++;
       if (attempts >= 5) {
         toast(context, 'محاولات كثيرة، أعد إرسال الرمز');
@@ -83,6 +105,7 @@ class _LoginScreenState extends State<LoginScreen> {
       }
       return;
     }
+    if (!mounted) return;
     if (app.isNewUser(phoneNorm)) {
       setState(() => step = _Step.name);
     } else {
@@ -188,17 +211,56 @@ class _LoginScreenState extends State<LoginScreen> {
               decoration: const InputDecoration(labelText: 'رقم التلفون', hintText: '07xx xxx xxxx'),
               onChanged: (_) => setState(() {}),
             ),
-            FilledButton(onPressed: phoneValid ? _sendCode : null, child: const Text('أرسل الرمز')),
+            const Text('شلون يوصلك الرمز؟', style: TextStyle(fontWeight: FontWeight.w800)),
+            const SizedBox(height: 8),
+            Row(children: [
+              for (final ch in OtpChannel.values) ...[
+                Expanded(
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(16),
+                    onTap: () => setState(() => channel = ch),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 180),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      decoration: BoxDecoration(
+                        color: channel == ch ? (ch == OtpChannel.whatsapp ? const Color(0xFFE7F8EE) : DepoColors.soft) : Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: channel == ch ? (ch == OtpChannel.whatsapp ? const Color(0xFF25D366) : DepoColors.dark) : DepoColors.line,
+                          width: channel == ch ? 2 : 1,
+                        ),
+                      ),
+                      child: Column(children: [
+                        Icon(ch == OtpChannel.whatsapp ? Icons.chat_rounded : Icons.sms_outlined,
+                            color: ch == OtpChannel.whatsapp ? const Color(0xFF1FA855) : DepoColors.dark, size: 28),
+                        const SizedBox(height: 4),
+                        Text(otpChannelNames[ch]!, style: const TextStyle(fontWeight: FontWeight.w900)),
+                        Text(ch == OtpChannel.whatsapp ? 'أسرع ومضمون' : 'إذا ما عندك واتساب',
+                            style: const TextStyle(fontSize: 11, color: DepoColors.muted)),
+                      ]),
+                    ),
+                  ),
+                ),
+                if (ch == OtpChannel.whatsapp) const SizedBox(width: 10),
+              ],
+            ]),
+            const SizedBox(height: 14),
+            FilledButton(
+              onPressed: phoneValid && !sending ? () => _sendCode() : null,
+              child: sending
+                  ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white))
+                  : Text('أرسل الرمز على ${otpChannelNames[channel]}'),
+            ),
           ],
           if (step == _Step.code) ...[
             const Text('دخّل الرمز', style: TextStyle(fontSize: 26, fontWeight: FontWeight.w900)),
             const SizedBox(height: 4),
-            Text('دزّينا رمز من 6 أرقام على $phoneNorm', style: const TextStyle(color: DepoColors.muted)),
+            Text('دزّينا رمز من 6 أرقام على ${otpChannelNames[channel]} للرقم $phoneNorm', style: const TextStyle(color: DepoColors.muted)),
             const SizedBox(height: 12),
             Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(color: const Color(0xFFFFF6E5), borderRadius: BorderRadius.circular(12)),
-              child: Text('نسخة تجريبية: الرمز هو $demoCode\n(بعد ربط Firebase يوصلك برسالة SMS)',
+              child: Text('نسخة تجريبية: الرمز هو $demoCode\n(بعد التفعيل يوصلك على ${otpChannelNames[channel]})',
                   style: const TextStyle(fontWeight: FontWeight.w700, height: 1.6)),
             ),
             const SizedBox(height: 12),
@@ -213,7 +275,18 @@ class _LoginScreenState extends State<LoginScreen> {
               onChanged: (_) => setState(() {}),
             ),
             FilledButton(onPressed: code.text.trim().length == 6 ? _verify : null, child: const Text('تأكيد')),
-            TextButton(onPressed: () => setState(() => step = _Step.phone), child: const Text('غيّر الرقم أو أعد الإرسال')),
+            const SizedBox(height: 6),
+            if (resendLeft > 0)
+              Center(child: Text('تكدر تعيد الإرسال بعد $resendLeft ثانية', style: const TextStyle(color: DepoColors.muted)))
+            else
+              Wrap(alignment: WrapAlignment.center, spacing: 4, children: [
+                TextButton(onPressed: () => _sendCode(channel), child: const Text('أعد الإرسال')),
+                TextButton(
+                  onPressed: () => _sendCode(channel == OtpChannel.whatsapp ? OtpChannel.sms : OtpChannel.whatsapp),
+                  child: Text('ما وصل؟ دزّه على ${otpChannelNames[channel == OtpChannel.whatsapp ? OtpChannel.sms : OtpChannel.whatsapp]}'),
+                ),
+              ]),
+            TextButton(onPressed: () => setState(() => step = _Step.phone), child: const Text('غيّر الرقم')),
           ],
           if (step == _Step.pin || step == _Step.newPin) ...[
             Text(step == _Step.pin ? 'الرمز السري' : 'سوّي رمز سري', style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w900)),
