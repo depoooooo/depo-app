@@ -298,7 +298,9 @@ class OrdersMonitorTab extends StatelessWidget {
                         ],
                       ),
                     );
-                    if (ok == true) app.settleCourier(e.key);
+                    if (ok != true) return;
+                    final err = await app.settleCourier(e.key, expected: e.value);
+                    if (context.mounted) toast(context, err ?? 'انسجل الاستلام');
                   },
                   child: const Text('استلمت'),
                 ),

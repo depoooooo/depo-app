@@ -268,7 +268,13 @@ class StoreOrdersTab extends StatelessWidget {
     switch (o.status) {
       case OrderStatus.placed:
         return row([
-          FilledButton(onPressed: () => app.setStatus(o, OrderStatus.accepted), child: const Text('قبول')),
+          FilledButton(
+            onPressed: () async {
+              final err = await app.setStatusSafe(o, OrderStatus.accepted);
+              if (err != null && context.mounted) toast(context, err);
+            },
+            child: const Text('قبول'),
+          ),
           OutlinedButton(onPressed: () => _reject(context, o), child: const Text('رفض')),
         ]);
       case OrderStatus.accepted:
@@ -315,9 +321,10 @@ class StoreOrdersTab extends StatelessWidget {
           for (final r in reasons)
             ListTile(
               title: Text(r),
-              onTap: () {
-                app.setStatus(o, OrderStatus.rejected, reason: r);
+              onTap: () async {
                 Navigator.pop(c);
+                final err = await app.setStatusSafe(o, OrderStatus.rejected, reason: r);
+                if (err != null && context.mounted) toast(context, err);
               },
             ),
         ]),

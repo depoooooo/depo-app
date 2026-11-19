@@ -335,8 +335,28 @@ class AppState extends ChangeNotifier {
           final enc = jsonEncode(cur[id]);
           final old = _synced[c]![id];
           if (old == enc) continue;
-          final ts = _ts[c]![id] ??= _newestFirst.contains(c) ? now - i : now + i;
-          batch.set(db.collection(c).doc(id), {...cur[id]!, '_ts': ts});
+          final ref = db.collection(c).doc(id);
+          if (old == null) {
+            // مستند جديد: يكتب كامل
+            final ts = _ts[c]![id] ??= _newestFirst.contains(c) ? now - i : now + i;
+            batch.set(ref, {...cur[id]!, '_ts': ts});
+          } else {
+            // مستند موجود: نكتب بس الحقول اللي غيّرناها، حتى ما نمسح تغيير سواه جهاز ثاني بنفس اللحظة
+            final before = jsonDecode(old) as Map<String, dynamic>;
+            final changed = <String, dynamic>{};
+            cur[id]!.forEach((k, v) {
+              if (jsonEncode(before[k]) != jsonEncode(v)) changed[k] = v;
+            });
+            final removed = before.keys.where((k) => !cur[id]!.containsKey(k));
+            for (final k in removed) {
+              changed[k] = fs.FieldValue.delete();
+            }
+            if (changed.isEmpty) {
+              _synced[c]![id] = enc;
+              continue;
+            }
+            batch.set(ref, changed, fs.SetOptions(mergeFields: changed.keys.toList()));
+          }
           _synced[c]![id] = enc;
           undo.add(() => old == null ? _synced[c]!.remove(id) : _synced[c]![id] = old);
           if (++n >= 450) {
@@ -364,6 +384,16 @@ class AppState extends ChangeNotifier {
   }
 
   /// بعد عملية بـ transaction: نعتبر المستند محفوظ حتى ما ننكتب فوقه
+  /// حقل واحد انكتب على السيرفر بطريقة خاصة (زيادة/transaction): نعتبره محفوظ، وباقي الحقول تبقى تنكتب عادي
+  void _markFieldSynced(String c, String id, String field) {
+    final enc = _synced[c]![id];
+    final doc = _docsOf(c)[id];
+    if (enc == null || doc == null) return;
+    final m = jsonDecode(enc) as Map<String, dynamic>;
+    m[field] = jsonDecode(jsonEncode(doc[field]));
+    _synced[c]![id] = jsonEncode(m);
+  }
+
   void _markSynced(String c, String id, {int? ts}) {
     final doc = _docsOf(c)[id];
     if (doc == null) return;
@@ -546,6 +576,20 @@ class AppState extends ChangeNotifier {
     if (u == null) return;
     u.notifications.insert(0, text);
     if (u.notifications.length > 50) u.notifications.removeLast();
+    if (Cloud.enabled) {
+      // بـ transaction حتى إذا جهازين بعثوا إشعار لنفس الشخص بنفس اللحظة، ولا واحد يضيع
+      final db = Cloud.db!;
+      final ref = db.collection('users').doc(phone);
+      db.runTransaction((tx) async {
+        final d = (await tx.get(ref)).data();
+        if (d == null) return;
+        final list = List<String>.from(d['notifications'] ?? const []);
+        list.insert(0, text);
+        if (list.length > 50) list.removeRange(50, list.length);
+        tx.update(ref, {'notifications': list});
+      }).catchError((_) {});
+      _markFieldSynced('users', phone, 'notifications');
+    }
   }
 
   void _log(String text) {
@@ -882,12 +926,23 @@ class AppState extends ChangeNotifier {
   /// [restock]: ترجع الكمية للعرض (لا، إذا الأكل طلع من المحل)
   bool setStatus(Order o, OrderStatus st, {String reason = '', bool restock = true}) {
     if (!o.isOpen || o.status == st) return false;
+    _applyStatus(o, st, reason, restock);
+    return true;
+  }
+
+  void _applyStatus(Order o, OrderStatus st, String reason, bool restock) {
     o.status = st;
     if (reason.isNotEmpty) o.rejectReason = reason;
     if ((st == OrderStatus.rejected || st == OrderStatus.cancelled) && restock) {
       for (final l in o.lines) {
         final of = offerById(l.offerId);
-        if (of != null) of.quantityLeft += l.qty;
+        if (of == null || of.unlimited) continue;
+        of.quantityLeft += l.qty;
+        if (Cloud.enabled) {
+          // زيادة على السيرفر (مو كتابة رقم) حتى ما نمسح طلب انحجز بنفس اللحظة
+          Cloud.db!.collection('offers').doc(of.id).update({'quantityLeft': fs.FieldValue.increment(l.qty)}).catchError((_) {});
+          _markFieldSynced('offers', of.id, 'quantityLeft');
+        }
       }
     }
     if (st == OrderStatus.delivered) {
@@ -902,14 +957,55 @@ class AppState extends ChangeNotifier {
         o.courierPay = 0;
       }
       final u = userByPhone(o.customerPhone);
-      if (u != null) u.points += (o.itemsTotal / 1000).floor();
+      final pts = (o.itemsTotal / 1000).floor();
+      if (u != null && pts > 0) {
+        u.points += pts;
+        if (Cloud.enabled) {
+          Cloud.db!.collection('users').doc(u.phone).update({'points': fs.FieldValue.increment(pts)}).catchError((_) {});
+          _markFieldSynced('users', u.phone, 'points');
+        }
+      }
     }
     notify(o.customerPhone, 'طلبك #${o.id}: ${orderStatusNames[st]}${reason.isEmpty ? '' : ' — $reason'}');
     if (o.courierPhone != null && o.courierPhone != currentPhone && (st == OrderStatus.cancelled || st == OrderStatus.rejected)) {
       notify(o.courierPhone!, 'انلغى الطلب #${o.id}${reason.isEmpty ? '' : ' — $reason'}');
     }
     _changed();
-    return true;
+  }
+
+  /// تغيير حالة بتأكيد من السيرفر: إذا جهاز ثاني غيّر الحالة بنفس اللحظة (مثلاً الزبون ألغى والمحل قبل)
+  /// اللي يوصل أول يمشي، والثاني يوصله سبب واضح. يرجّع رسالة خطأ أو null.
+  Future<String?> setStatusSafe(Order o, OrderStatus st, {String reason = '', bool restock = true}) async {
+    final expected = o.status;
+    if (!o.isOpen || expected == st) return 'الطلب حالته تغيّرت';
+    if (Cloud.enabled) {
+      final db = Cloud.db!;
+      String? fail;
+      try {
+        await db.runTransaction((tx) async {
+          final ref = db.collection('orders').doc(o.id);
+          final d = (await tx.get(ref)).data();
+          if (d == null) {
+            fail = 'الطلب مو موجود';
+            return;
+          }
+          if (d['status'] != expected.name) {
+            final cur = OrderStatus.values.where((x) => x.name == d['status']).firstOrNull;
+            fail = 'الطلب صار «${cur == null ? d['status'] : orderStatusNames[cur]}» قبل شوية';
+            return;
+          }
+          tx.update(ref, {'status': st.name});
+        }).timeout(const Duration(seconds: 15));
+      } catch (_) {
+        return 'ماكو اتصال، جرّب مرة ثانية';
+      }
+      if (fail != null) return fail;
+      // يمكن التحديث وصل من السيرفر قبلنا وتبدّل الكائن: نطبّق على النسخة الحالية
+      _applyStatus(orderById(o.id) ?? o, st, reason, restock);
+      return null;
+    }
+    setStatus(o, st, reason: reason, restock: restock);
+    return null;
   }
 
   /// التوصيل بمندوب المحل نفسه (قرار معتمد)
@@ -975,16 +1071,15 @@ class AppState extends ChangeNotifier {
   }
 
   /// المشرف استلم النقد من المندوب
-  void settleCourier(String phone) {
-    if (!canAny([Perm.operations, Perm.finance])) return;
+  /// استلام النقد من المندوب. بالسيرفر نتأكد إن كل طلب ما انستلم نقده قبل (حتى لو مشرفين ضغطوا سوا)
+  Future<String?> settleCourier(String phone, {int? expected}) async {
+    if (!canAny([Perm.operations, Perm.finance])) return 'ما عندك صلاحية';
     final list = orders.where((o) => o.courierPhone == phone && o.status == OrderStatus.delivered && !o.cashSettled && !selfDelivered(o)).toList();
-    if (list.isEmpty) return;
+    if (list.isEmpty) return 'ماكو نقد بيده';
     final amount = list.fold(0, (s, o) => s + o.total);
-    for (final o in list) {
-      o.cashSettled = true;
-    }
+    if (expected != null && expected != amount) return 'المبلغ تغيّر هسه (صار ${iqd(amount)}) — تأكد من المندوب وأعد';
     final by = me == null ? '' : (me!.name.isEmpty ? me!.phone : me!.name);
-    settlements.insert(0, Settlement(
+    final rec = Settlement(
       id: 'cash${DateTime.now().millisecondsSinceEpoch}',
       kind: 'cash',
       target: phone,
@@ -993,10 +1088,40 @@ class AppState extends ChangeNotifier {
       at: DateTime.now().millisecondsSinceEpoch,
       by: by,
       orderIds: [for (final o in list) o.id],
-    ));
+    );
+    if (Cloud.enabled) {
+      final db = Cloud.db!;
+      String? fail;
+      try {
+        await db.runTransaction((tx) async {
+          final refs = [for (final o in list) db.collection('orders').doc(o.id)];
+          for (final r in refs) {
+            final d = (await tx.get(r)).data();
+            if (d == null || d['cashSettled'] == true || d['status'] != 'delivered') {
+              fail = 'جزء من هذا النقد انستلم قبل شوية من جهاز ثاني. حدّث الصفحة وتأكد من المبلغ';
+              return;
+            }
+          }
+          for (final r in refs) {
+            tx.update(r, {'cashSettled': true});
+          }
+          tx.set(db.collection('settlements').doc(rec.id), {...rec.toJson(), '_ts': rec.at});
+        }).timeout(const Duration(seconds: 20));
+      } catch (_) {
+        return 'ماكو اتصال، ما انسجل الاستلام. جرّب مرة ثانية';
+      }
+      if (fail != null) return fail;
+    }
+    for (final o in list) {
+      (orderById(o.id) ?? o).cashSettled = true;
+      if (Cloud.enabled) _markFieldSynced('orders', o.id, 'cashSettled');
+    }
+    settlements.insert(0, rec);
+    if (Cloud.enabled) _markSynced('settlements', rec.id, ts: rec.at);
     notify(phone, 'انستلم منك ${iqd(amount)} — صفّرنا حسابك النقدي');
-    _log('استلام نقد ${iqd(amount)} من المندوب $phone');
+    _log('استلام نقد ${iqd(amount)} من المندوب $phone (${list.length} طلب)');
     _changed();
+    return null;
   }
 
   void setCourierAvailable(bool v) {
@@ -1140,7 +1265,9 @@ class AppState extends ChangeNotifier {
   /// إلغاء طلب من الدعم أو العمليات
   void staffCancel(Order o, String reason) {
     if (!canAny([Perm.operations, Perm.support])) return;
-    if (setStatus(o, OrderStatus.cancelled, reason: reason)) _log('إلغاء الطلب #${o.id}: $reason');
+    setStatusSafe(o, OrderStatus.cancelled, reason: reason).then((err) {
+      if (err == null) _log('إلغاء الطلب #${o.id}: $reason');
+    });
   }
 
   /// المشرف ما يكدر يرفع مشرف ثاني — المدير بس
@@ -2073,8 +2200,11 @@ extension Finance on AppState {
 
   String _who() => me == null ? '' : (me!.name.isEmpty ? me!.phone : me!.name);
 
+  String _sumId(String kind, String target, String month) => 'pay_${kind}_${target}_${month.replaceAll('/', '-')}';
+
   /// تسجيل تسوية. amount بنفس إشارة المستحق (موجب: دفعنا، سالب: استلمنا). يرجع رسالة خطأ أو null.
-  String? addSettlement({required String kind, required String target, required String month, required int amount, required int remaining, String note = ''}) {
+  /// بالسيرفر: مجموع المدفوع لكل حساب/شهر محفوظ بمستند واحد، والتسجيل بـ transaction — فإذا اثنين سجّلوا بنفس اللحظة، الثاني يرفض.
+  Future<String?> addSettlement({required String kind, required String target, required String month, required int amount, required int remaining, String note = ''}) async {
     if (!canFinance) return 'ما عندك صلاحية المالية';
     if (isCurrentMonth(month)) return 'التسوية بعد ما يخلص الشهر';
     if (amount == 0) return 'المبلغ صفر';
@@ -2085,7 +2215,30 @@ extension Finance on AppState {
       final n = courierStatement(target, month).orders.where((o) => o.kmNeedsReview).length;
       if (n > 0) return 'راجع مسافة $n ${n == 1 ? 'توصيلة' : 'توصيلات'} أول (معلّمة «تحتاج مراجعة»)';
     }
-    settlements.insert(0, Settlement(id: '${kind}_${DateTime.now().millisecondsSinceEpoch}', kind: kind, target: target, month: month, amount: amount, at: DateTime.now().millisecondsSinceEpoch, by: _who(), note: note.trim()));
+    final localPaid = paymentsOf(kind, target, month).fold(0, (a, p) => a + p.amount);
+    final rec = Settlement(id: '${kind}_${DateTime.now().millisecondsSinceEpoch}', kind: kind, target: target, month: month, amount: amount, at: DateTime.now().millisecondsSinceEpoch, by: _who(), note: note.trim());
+    if (Cloud.enabled) {
+      final db = Cloud.db!;
+      String? fail;
+      try {
+        await db.runTransaction((tx) async {
+          final sumRef = db.collection('meta').doc(_sumId(kind, target, month));
+          final d = (await tx.get(sumRef)).data();
+          final serverPaid = d == null ? localPaid : ((d['paid'] ?? 0) as num).toInt();
+          if (serverPaid != localPaid) {
+            fail = 'انسجلت تسوية ثانية لنفس الحساب قبل شوية. افتح الكشف من جديد وتأكد من الباقي';
+            return;
+          }
+          tx.set(sumRef, {'paid': serverPaid + amount, 'kind': kind, 'target': target, 'month': month});
+          tx.set(db.collection('settlements').doc(rec.id), {...rec.toJson(), '_ts': rec.at});
+        }).timeout(const Duration(seconds: 20));
+      } catch (_) {
+        return 'ماكو اتصال، ما انسجلت التسوية. جرّب مرة ثانية';
+      }
+      if (fail != null) return fail;
+    }
+    settlements.insert(0, rec);
+    if (Cloud.enabled) _markSynced('settlements', rec.id, ts: rec.at);
     final left = remaining - amount;
     if (kind == 'store') {
       final st = storeById(target);
@@ -2108,16 +2261,40 @@ extension Finance on AppState {
   }
 
   /// المدير بس يلغي تسوية (إذا انسجلت بالغلط). استلام النقد يرجّع الطلبات «بيد المندوب».
-  void undoSettlement(Settlement s) {
-    if (me?.role != Role.admin) return;
+  Future<String?> undoSettlement(Settlement s) async {
+    if (me?.role != Role.admin) return 'المدير بس';
+    if (Cloud.enabled) {
+      final db = Cloud.db!;
+      try {
+        await db.runTransaction((tx) async {
+          final ref = db.collection('settlements').doc(s.id);
+          if (!(await tx.get(ref)).exists) return;
+          if (s.kind != 'cash') {
+            final sumRef = db.collection('meta').doc(_sumId(s.kind, s.target, s.month));
+            final d = (await tx.get(sumRef)).data();
+            if (d != null) tx.update(sumRef, {'paid': ((d['paid'] ?? 0) as num).toInt() - s.amount});
+          } else {
+            for (final id in s.orderIds) {
+              tx.update(db.collection('orders').doc(id), {'cashSettled': false});
+            }
+          }
+          tx.delete(ref);
+        }).timeout(const Duration(seconds: 20));
+      } catch (_) {
+        return 'ماكو اتصال، ما انلغت. جرّب مرة ثانية';
+      }
+    }
     settlements.removeWhere((x) => x.id == s.id);
+    if (Cloud.enabled) _synced['settlements']!.remove(s.id);
     if (s.kind == 'cash') {
       for (final o in orders.where((o) => s.orderIds.contains(o.id))) {
         o.cashSettled = false;
+        if (Cloud.enabled) _markFieldSynced('orders', o.id, 'cashSettled');
       }
     }
     _log('إلغاء تسوية (${s.kind}) ${s.target} لشهر ${s.month}: ${iqd(s.amount.abs())}');
     _changed();
+    return null;
   }
 
   /// كشوفات حسابي (للمحل أو المندوب)

@@ -291,7 +291,9 @@ class SettlementTile extends StatelessWidget {
               final body = s.kind == 'cash'
                   ? 'الطلبات (${s.orderIds.length}) ترجع «بيد المندوب» والمبلغ ${iqd(s.amount.abs())} يرجع عليه.'
                   : 'المبلغ ${iqd(s.amount.abs())} يرجع «باقي» بالكشف. استخدمها بس إذا انسجلت بالغلط.';
-              if (await confirmDialog(context, 'تلغي هذا السجل؟', body)) app.undoSettlement(s);
+              if (!await confirmDialog(context, 'تلغي هذا السجل؟', body)) return;
+              final err = await app.undoSettlement(s);
+              if (context.mounted) toast(context, err ?? 'انلغى السجل');
             },
           ),
       ]),
@@ -368,7 +370,7 @@ Future<void> settleDialog(BuildContext context, {required String kind, required 
   final a = parseInt(amount.text) ?? 0;
   final sure = await confirmDialog(context, 'متأكد؟', '${pay ? 'سلّمت' : 'استلمت'} ${iqd(a)} ${pay ? 'إلى' : 'من'} $whoName عن ${monthLabel(month)}.\nهذا ينسجل باسمك بسجل العمليات.', ok: 'إي، متأكد');
   if (!sure) return;
-  final err = app.addSettlement(kind: kind, target: target, month: month, amount: pay ? a : -a, remaining: rem, note: note.text);
+  final err = await app.addSettlement(kind: kind, target: target, month: month, amount: pay ? a : -a, remaining: rem, note: note.text);
   if (context.mounted) toast(context, err ?? 'انسجلت التسوية');
 }
 

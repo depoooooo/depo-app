@@ -186,7 +186,8 @@ class OrderDetailScreen extends StatelessWidget {
                       if (context.mounted) toast(context, 'المحل قبل الطلب، ما ينلغى هسه. تواصل ويه الدعم.');
                       return;
                     }
-                    app.setStatus(cur, OrderStatus.cancelled, reason: 'ألغاه الزبون');
+                    final err = await app.setStatusSafe(cur, OrderStatus.cancelled, reason: 'ألغاه الزبون');
+                    if (err != null && context.mounted) toast(context, '$err — ما ينلغى هسه، تواصل ويه الدعم');
                   },
                   child: const Text('إلغاء الطلب'),
                 ),
