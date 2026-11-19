@@ -5,6 +5,7 @@ import '../../theme.dart';
 import '../../widgets/common.dart';
 import 'supervisor.dart';
 import 'content_tab.dart';
+import 'finance_tab.dart';
 
 /// واجهة المدير العام: كل صلاحيات المشرف + التقارير والإعدادات والمشرفين وسجل العمليات
 class AdminHome extends StatelessWidget {
@@ -15,13 +16,14 @@ class AdminHome extends StatelessWidget {
     final pending = app.joinRequests.where((r) => r.status == 'pending').length;
     final openC = app.complaints.where((c) => c.status == 'open').length;
     return DefaultTabController(
-      length: 11,
+      length: 12,
       child: Scaffold(
         appBar: roleAppBar('واجهة المدير العام',
-            bottom: roleTabs(['التقارير', 'الإعدادات', 'المحتوى', 'المشرفين', 'طلبات الانضمام ($pending)', 'الطلبات', 'محادثات الدعم', 'الشكاوى ($openC)', 'المستخدمين', 'العروض والمحلات', 'سجل العمليات'])),
+            bottom: roleTabs(['التقارير', 'الحسابات', 'الإعدادات', 'المحتوى', 'المشرفين', 'طلبات الانضمام ($pending)', 'الطلبات', 'محادثات الدعم', 'الشكاوى ($openC)', 'المستخدمين', 'العروض والمحلات', 'سجل العمليات'])),
         // ignore: prefer_const_constructors
         body: TabBarView(children: [
           ReportsTab(),
+          FinanceTab(),
           _SettingsTab(),
           ContentTab(),
           _SupervisorsTab(),
@@ -166,6 +168,11 @@ class _SettingsTabState extends State<_SettingsTab> {
       'stage2Minutes': TextEditingController(text: '${s.stage2Minutes}'),
       'stage3Minutes': TextEditingController(text: '${s.stage3Minutes}'),
       'campaignMinDiscount': TextEditingController(text: '${s.campaignMinDiscount}'),
+      'courierBasePay': TextEditingController(text: '${s.courierBasePay}'),
+      'courierPerKm': TextEditingController(text: '${s.courierPerKm}'),
+      'courierMinPay': TextEditingController(text: '${s.courierMinPay}'),
+      'courierMaxKm': TextEditingController(text: '${s.courierMaxKm}'),
+      'courierCashCap': TextEditingController(text: '${s.courierCashCap}'),
     };
     campaign = TextEditingController(text: s.campaignName);
     firstFree = s.firstOrderFree;
@@ -199,6 +206,11 @@ class _SettingsTabState extends State<_SettingsTab> {
     s.stage2Minutes = v('stage2Minutes', s.stage2Minutes);
     s.stage3Minutes = v('stage3Minutes', s.stage3Minutes);
     s.campaignMinDiscount = v('campaignMinDiscount', s.campaignMinDiscount);
+    s.courierBasePay = v('courierBasePay', s.courierBasePay);
+    s.courierPerKm = v('courierPerKm', s.courierPerKm);
+    s.courierMinPay = v('courierMinPay', s.courierMinPay);
+    s.courierMaxKm = v('courierMaxKm', s.courierMaxKm).clamp(1, 200);
+    s.courierCashCap = v('courierCashCap', s.courierCashCap);
     s.campaignName = campaign.text.trim().isEmpty ? s.campaignName : campaign.text.trim();
     s.firstOrderFree = firstFree;
     app.saveSettings();
@@ -215,6 +227,21 @@ class _SettingsTabState extends State<_SettingsTab> {
         Row(children: [Expanded(child: f('merchantCommission', 'عمولة التجار %')), const SizedBox(width: 10), Expanded(child: f('freeDays', 'الشهر المجاني (يوم)'))]),
         const SectionTitle('التوصيل'),
         Row(children: [Expanded(child: f('deliveryFee', 'رسم التوصيل')), const SizedBox(width: 10), Expanded(child: f('freeDeliveryThreshold', 'توصيل مجاني فوق'))]),
+        const SectionTitle('أجرة المندوب (حسب المسافة)'),
+        Row(children: [Expanded(child: f('courierBasePay', 'ثابت لكل طلب')), const SizedBox(width: 10), Expanded(child: f('courierPerKm', 'لكل كيلومتر'))]),
+        Row(children: [Expanded(child: f('courierMinPay', 'الحد الأدنى للأجرة')), const SizedBox(width: 10), Expanded(child: f('courierMaxKm', 'أقصى مسافة تنحسب (كم)'))]),
+        f('courierCashCap', 'سقف النقد بيد المندوب'),
+        Builder(builder: (context) {
+          final t = AppSettings(
+            courierBasePay: parseInt(c['courierBasePay']!.text) ?? 0,
+            courierPerKm: parseInt(c['courierPerKm']!.text) ?? 0,
+            courierMinPay: parseInt(c['courierMinPay']!.text) ?? 0,
+            courierMaxKm: parseInt(c['courierMaxKm']!.text) ?? 30,
+          );
+          return Text('مثال: 2 كم = ${iqd(t.courierPayFor(2))} • 5 كم = ${iqd(t.courierPayFor(5))} • 10 كم = ${iqd(t.courierPayFor(10))}\nالتسوية ويا المندوبين والمطاعم شهرية من تبويب «الحسابات».',
+              style: const TextStyle(fontSize: 12, color: DepoColors.muted));
+        }),
+        const SizedBox(height: 8),
         const SectionTitle('العروض والحملات'),
         AppCard(
           padding: EdgeInsets.zero,

@@ -367,6 +367,9 @@ class Order {
   String rejectReason;
   int createdAt;
   bool cashSettled; // المندوب سلّم النقد لـ Depo
+  double distanceKm; // مسافة التوصيل (لأجرة المندوب)
+  int courierPay; // أجرة المندوب (تنحسب عند التسليم)
+  int deliveredAt; // وقت التسليم (للتسوية الشهرية)
 
   Order({
     required this.id,
@@ -385,7 +388,13 @@ class Order {
     this.rejectReason = '',
     int? createdAt,
     this.cashSettled = false,
+    this.distanceKm = 0,
+    this.courierPay = 0,
+    this.deliveredAt = 0,
   }) : createdAt = createdAt ?? _now();
+
+  /// شهر التسوية (حسب وقت التسليم)
+  String get settleMonth => monthKey(DateTime.fromMillisecondsSinceEpoch(deliveredAt > 0 ? deliveredAt : createdAt));
 
   int get itemsTotal => lines.fold(0, (s, l) => s + l.price * l.qty);
   int get originalTotal => lines.fold(0, (s, l) => s + l.originalPrice * l.qty);
@@ -409,6 +418,9 @@ class Order {
         'rejectReason': rejectReason,
         'createdAt': createdAt,
         'cashSettled': cashSettled,
+        'distanceKm': distanceKm,
+        'courierPay': courierPay,
+        'deliveredAt': deliveredAt,
       };
 
   factory Order.fromJson(Map<String, dynamic> j) => Order(
@@ -428,6 +440,34 @@ class Order {
         rejectReason: (j['rejectReason'] ?? '') as String,
         createdAt: j['createdAt'] as int?,
         cashSettled: (j['cashSettled'] ?? false) as bool,
+        distanceKm: ((j['distanceKm'] ?? 0) as num).toDouble(),
+        courierPay: (j['courierPay'] ?? 0) as int,
+        deliveredAt: (j['deliveredAt'] ?? 0) as int,
+      );
+}
+
+/// تسوية شهرية مسجّلة (محل أو مندوب)
+class Settlement {
+  final String id;
+  final String kind; // store / courier
+  final String target; // storeId أو رقم المندوب
+  final String month; // YYYY/MM
+  final int amount; // موجب = ديبو دفعت، سالب = ديبو استلمت
+  final int at;
+  final String by;
+  final String note;
+  const Settlement({required this.id, required this.kind, required this.target, required this.month, required this.amount, required this.at, required this.by, this.note = ''});
+
+  Map<String, dynamic> toJson() => {'id': id, 'kind': kind, 'target': target, 'month': month, 'amount': amount, 'at': at, 'by': by, 'note': note};
+  factory Settlement.fromJson(Map<String, dynamic> j) => Settlement(
+        id: j['id'] as String,
+        kind: j['kind'] as String,
+        target: j['target'] as String,
+        month: j['month'] as String,
+        amount: (j['amount'] ?? 0) as int,
+        at: (j['at'] ?? 0) as int,
+        by: (j['by'] ?? '') as String,
+        note: (j['note'] ?? '') as String,
       );
 }
 
@@ -551,6 +591,11 @@ class AppSettings {
   String promoText; // الشريط الصغير فوق الرئيسية ('' = مطفي)
   String campaignName; // اسم الحملة
   int campaignMinDiscount; // أقل خصم حتى يدخل المطعم بالحملة
+  int courierBasePay; // أجرة المندوب: مبلغ ثابت لكل طلب
+  int courierPerKm; // + لكل كيلومتر
+  int courierMinPay; // الحد الأدنى للأجرة
+  int courierMaxKm; // أقصى مسافة تنحسب (حماية من الأخطاء)
+  int courierCashCap; // سقف النقد بيد المندوب
 
   AppSettings({
     this.restaurantCommission = 15,
@@ -567,7 +612,20 @@ class AppSettings {
     this.promoText = 'توصيل مجاني لأول طلب',
     this.campaignName = 'خصم فوق الخصم',
     this.campaignMinDiscount = 60,
+    this.courierBasePay = 1000,
+    this.courierPerKm = 250,
+    this.courierMinPay = 1500,
+    this.courierMaxKm = 30,
+    this.courierCashCap = 100000,
   });
+
+  /// أجرة المندوب حسب المسافة: ثابت + لكل كم، وما تنزل عن الحد الأدنى (مقرّبة لـ 250)
+  int courierPayFor(double km) {
+    final k = km.clamp(0, courierMaxKm.toDouble());
+    final raw = courierBasePay + courierPerKm * k;
+    final rounded = ((raw / 250).round() * 250);
+    return rounded < courierMinPay ? courierMinPay : rounded;
+  }
 
   Map<String, dynamic> toJson() => {
         'restaurantCommission': restaurantCommission,
@@ -584,6 +642,11 @@ class AppSettings {
         'promoText': promoText,
         'campaignName': campaignName,
         'campaignMinDiscount': campaignMinDiscount,
+        'courierBasePay': courierBasePay,
+        'courierPerKm': courierPerKm,
+        'courierMinPay': courierMinPay,
+        'courierMaxKm': courierMaxKm,
+        'courierCashCap': courierCashCap,
       };
 
   factory AppSettings.fromJson(Map<String, dynamic> j) {
@@ -604,6 +667,11 @@ class AppSettings {
       promoText: (j['promoText'] ?? d.promoText) as String,
       campaignName: ((j['campaignName'] ?? d.campaignName) as String) == 'رخيييييص' ? d.campaignName : (j['campaignName'] ?? d.campaignName) as String,
       campaignMinDiscount: g('campaignMinDiscount', d.campaignMinDiscount),
+      courierBasePay: g('courierBasePay', d.courierBasePay),
+      courierPerKm: g('courierPerKm', d.courierPerKm),
+      courierMinPay: g('courierMinPay', d.courierMinPay),
+      courierMaxKm: g('courierMaxKm', d.courierMaxKm),
+      courierCashCap: g('courierCashCap', d.courierCashCap),
     );
   }
 }

@@ -4,16 +4,17 @@ import '../../data/models.dart';
 import '../../theme.dart';
 import '../../widgets/common.dart';
 import '../orders.dart';
+import '../../widgets/debt_ui.dart';
+import 'finance_tab.dart';
 
 /// واجهة المندوب
 class CourierHome extends StatelessWidget {
   const CourierHome({super.key});
 
-  static const cashCap = 100000; // سقف النقد — يضبطه المدير لاحقاً
-
   @override
   Widget build(BuildContext context) {
     final cash = app.courierCash;
+    final cashCap = app.settings.courierCashCap;
     final overCap = cash >= cashCap;
     final available = app.courierAvailable && !overCap;
     return Scaffold(
@@ -52,6 +53,7 @@ class CourierHome extends StatelessWidget {
                 ),
             ]),
           ),
+          const _Earnings(),
           const SectionTitle('مهامي'),
           if (app.myTasks.isEmpty) const Text('ماكو مهام حالية', style: TextStyle(color: DepoColors.muted)),
           for (final o in app.myTasks) OrderTile(order: o, trailing: _myTaskActions(context, o)),
@@ -140,11 +142,13 @@ class CourierHome extends StatelessWidget {
         actions: [
           TextButton(onPressed: () => Navigator.pop(c), child: const Text('إلغاء')),
           FilledButton(
-            onPressed: () {
+            onPressed: () async {
               if (ctl.text.trim() == o.pickupCode) {
-                app.setStatus(o, OrderStatus.delivered);
                 Navigator.pop(c);
-                toast(context, 'تم التسليم واستلمت ${iqd(o.total)}');
+                final km = await askKm(context, o.distanceKm, title: 'كم كيلومتر كانت التوصيلة؟');
+                if (km != null) app.setDeliveryKm(o, km);
+                app.setStatus(o, OrderStatus.delivered);
+                if (context.mounted) toast(context, 'تم التسليم واستلمت ${iqd(o.total)} • أجرتك ${iqd(o.courierPay)}');
               } else {
                 toast(context, 'الرمز غلط');
               }
@@ -153,6 +157,41 @@ class CourierHome extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+
+/// أرباح المندوب: هذا الشهر + الشهور السابقة وحالة تسويتها
+class _Earnings extends StatelessWidget {
+  const _Earnings();
+
+  @override
+  Widget build(BuildContext context) {
+    final list = app.myCourierStatements();
+    if (list.isEmpty) return const SizedBox();
+    final now = list.first;
+    final s = app.settings;
+    return AppCard(
+      onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => CourierStatementScreen(phone: app.currentPhone!, month: now.month))),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Expanded(child: Text('أجوري · ${monthLabel(now.month)}', style: const TextStyle(fontWeight: FontWeight.w900))),
+          Text(iqd(now.earned), style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: DepoColors.dark)),
+        ]),
+        Text('${now.orders.length} توصيلة • ${now.km.toStringAsFixed(1)} كم • التسوية آخر الشهر', style: const TextStyle(fontSize: 12, color: DepoColors.muted)),
+        Text('الأجرة = ${iqd(s.courierBasePay)} + ${iqd(s.courierPerKm)} لكل كم (أقل شي ${iqd(s.courierMinPay)})', style: const TextStyle(fontSize: 11, color: DepoColors.muted)),
+        for (final x in list.skip(1).take(3))
+          Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: Row(children: [
+              Expanded(child: Text(monthLabel(x.month), style: const TextStyle(fontSize: 12))),
+              Text(iqd(x.earned), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800)),
+              const SizedBox(width: 6),
+              Badge2(x.settled ? 'استلمتها' : 'بانتظار', bg: x.settled ? DepoColors.successBg : const Color(0xFFFFF6E5), fg: x.settled ? DepoColors.success : const Color(0xFF8A5A00)),
+            ]),
+          ),
+      ]),
     );
   }
 }

@@ -9,6 +9,8 @@ import '../../widgets/common.dart';
 import '../orders.dart';
 import '../categories_screen.dart';
 import '../../data/categories.dart';
+import '../../widgets/debt_ui.dart';
+import 'finance_tab.dart';
 
 /// واجهة المطعم والتاجر
 class PartnerHome extends StatelessWidget {
@@ -70,11 +72,6 @@ class _DashboardState extends State<_Dashboard> {
     final s = widget.store;
     final all = app.ordersOfStore(s.id);
     final today = all.where((o) => DateTime.fromMillisecondsSinceEpoch(o.createdAt).day == DateTime.now().day).toList();
-    final delivered = all.where((o) => o.status == OrderStatus.delivered).toList();
-    final sales = delivered.fold(0, (a, o) => a + o.itemsTotal);
-    final comm = delivered.fold(0, (a, o) => a + o.commission);
-    // المحل يحصّل النقد بالاستلام الذاتي، فالعمولة تصير دين عليه
-    final owed = delivered.where((o) => o.pickup).fold(0, (a, o) => a + o.commission);
     final free = app.freeDaysLeft(s);
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
@@ -115,18 +112,18 @@ class _DashboardState extends State<_Dashboard> {
               subtitle: Text('تنشر وحدها كل يوم بوقت تختاره وأنت تأكد الكمية بس. هسه استخدم «انشر بضغطة وحدة» فوق.'),
             ),
           ),
-        const SectionTitle('الأرباح والتسويات'),
-        AppCard(
-          child: Column(children: [
-            _row('المبيعات (طلبات مُسلّمة)', iqd(sales)),
-            _row('عمولة Depo', iqd(comm)),
-            const Divider(),
-            _row('الصافي إلك', iqd(sales - comm), bold: true),
-            _row('عليك لـ Depo (عمولة الاستلام الذاتي النقدي)', iqd(owed)),
-            const SizedBox(height: 6),
-            const Text('التسوية أسبوعية', style: TextStyle(fontSize: 12, color: DepoColors.muted)),
-          ]),
-        ),
+        const SectionTitle('الأرباح والتسوية الشهرية'),
+        for (final st in app.myStoreStatements(s).take(4))
+          InkWell(
+            onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => StoreStatementScreen(storeId: s.id, month: st.month))),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Text('${monthLabel(st.month)} • ${st.orders.length} طلب', style: const TextStyle(fontWeight: FontWeight.w800, color: DepoColors.muted)),
+              ),
+              StatementSummary(st: st),
+            ]),
+          ),
       ],
     );
   }
@@ -155,13 +152,6 @@ class _DashboardState extends State<_Dashboard> {
     );
   }
 
-  Widget _row(String a, String b, {bool bold = false}) => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 3),
-        child: Row(children: [
-          Expanded(child: Text(a, style: TextStyle(fontWeight: bold ? FontWeight.w900 : FontWeight.w500))),
-          Text(b, style: TextStyle(fontWeight: bold ? FontWeight.w900 : FontWeight.w700)),
-        ]),
-      );
 }
 
 class _MyOffers extends StatelessWidget {

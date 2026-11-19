@@ -25,6 +25,7 @@ class AppState extends ChangeNotifier {
   List<Chat> chats = [];
   List<Complaint> complaints = [];
   List<String> audit = [];
+  List<Settlement> settlements = [];
   AppSettings settings = AppSettings();
   ContentConfig content = ContentConfig.defaults();
   String? currentPhone;
@@ -98,6 +99,7 @@ class AppState extends ChangeNotifier {
       chats = l('chats').map(Chat.fromJson).toList();
       complaints = l('complaints').map(Complaint.fromJson).toList();
       audit = List<String>.from(j['audit'] ?? const []);
+      settlements = l('settlements').map(Settlement.fromJson).toList();
       settings = AppSettings.fromJson(Map<String, dynamic>.from(j['settings'] ?? const {}));
       if (j['content'] is Map) content = ContentConfig.fromJson(Map<String, dynamic>.from(j['content'] as Map));
       currentPhone ??= j['currentPhone'] as String?;
@@ -178,6 +180,7 @@ class AppState extends ChangeNotifier {
           'settings': settings.toJson(),
           'audit': {'items': audit},
           'content': content.toJson(),
+          'settlements': {'items': settlements.map((e) => e.toJson()).toList()},
         };
     }
     return {};
@@ -236,6 +239,9 @@ class AppState extends ChangeNotifier {
         for (final d in list) {
           if (d.id == 'settings') settings = AppSettings.fromJson(_clean(d.data()));
           if (d.id == 'audit') audit = List<String>.from(d.data()['items'] ?? const []);
+          if (d.id == 'settlements') {
+            settlements = ((d.data()['items'] as List?) ?? const []).map((e) => Settlement.fromJson(Map<String, dynamic>.from(e as Map))).toList();
+          }
           if (d.id == 'content') {
             content = ContentConfig.fromJson(_clean(d.data()));
             SharedPreferences.getInstance().then((p) => p.setString('depo_content_cache', jsonEncode(content.toJson())));
@@ -339,6 +345,7 @@ class AppState extends ChangeNotifier {
         'chats': chats.map((e) => e.toJson()).toList(),
         'complaints': complaints.map((e) => e.toJson()).toList(),
         'audit': audit,
+        'settlements': settlements.map((e) => e.toJson()).toList(),
         'settings': settings.toJson(),
         'content': content.toJson(),
       }),
@@ -714,6 +721,7 @@ class AppState extends ChangeNotifier {
       address: pickup ? '' : address,
       pickupCode: (1000 + _rnd.nextInt(9000)).toString(),
       commission: commissionFor(s, items),
+      distanceKm: pickup ? 0 : s.distanceKm,
     );
     final want = {for (final l in cart.lines) l.offer.id: l.qty};
 
@@ -807,6 +815,8 @@ class AppState extends ChangeNotifier {
       }
     }
     if (st == OrderStatus.delivered) {
+      o.deliveredAt = DateTime.now().millisecondsSinceEpoch;
+      o.courierPay = paidCourier(o) ? settings.courierPayFor(o.distanceKm) : 0;
       final u = userByPhone(o.customerPhone);
       if (u != null) u.points += (o.itemsTotal / 1000).floor();
     }
@@ -859,16 +869,22 @@ class AppState extends ChangeNotifier {
       .toList();
   List<Order> get myTasks => orders.where((o) => o.courierPhone == currentPhone && o.isOpen).toList();
 
+  /// المحل وصّل بنفسه (مو مندوب ديبو)
+  bool selfDelivered(Order o) => !o.pickup && o.courierPhone != null && o.courierPhone == storeById(o.storeId)?.ownerPhone;
+
+  /// الطلب ينطي أجرة لمندوب ديبو
+  bool paidCourier(Order o) => !o.pickup && o.courierPhone != null && !selfDelivered(o);
+
   /// النقد اللي بيد المندوب وبعده ما سلّمه لـ Depo
   int cashOf(String phone) => orders
-      .where((o) => o.courierPhone == phone && o.status == OrderStatus.delivered && !o.cashSettled)
+      .where((o) => o.courierPhone == phone && o.status == OrderStatus.delivered && !o.cashSettled && !selfDelivered(o))
       .fold(0, (s, o) => s + o.total);
   int get courierCash => currentPhone == null ? 0 : cashOf(currentPhone!);
 
   /// المندوبين اللي بيدهم نقد (للمشرف)
   Map<String, int> get couriersCash {
     final m = <String, int>{};
-    for (final o in orders.where((o) => o.courierPhone != null && o.status == OrderStatus.delivered && !o.cashSettled)) {
+    for (final o in orders.where((o) => o.courierPhone != null && o.status == OrderStatus.delivered && !o.cashSettled && !selfDelivered(o))) {
       m[o.courierPhone!] = (m[o.courierPhone!] ?? 0) + o.total;
     }
     return m;
@@ -1607,4 +1623,165 @@ class OrderError implements Exception {
   OrderError(this.message);
   @override
   String toString() => message;
+}
+
+// ======================= الحسابات والتسويات الشهرية =======================
+/// كشف محل لشهر: شكد ديبو تدينله وشكد هو يدين لديبو
+class StoreStatement {
+  final Store store;
+  final String month;
+  final List<Order> orders;
+  final int sales; // مبيعات الأكل/البضاعة
+  final int commission;
+  final int collectedByDepo; // سعر البضاعة اللي حصّلها مندوب ديبو (مستحق للمحل ناقص العمولة)
+  final int collectedByStore; // اللي حصّله المحل بنفسه (استلام ذاتي/مندوبه)
+  final Settlement? settlement;
+  const StoreStatement(this.store, this.month, this.orders, this.sales, this.commission, this.collectedByDepo, this.collectedByStore, this.settlement);
+
+  /// موجب = ديبو تدفع للمحل، سالب = المحل يدفع لديبو
+  int get net => collectedByDepo - commission;
+  bool get settled => settlement != null;
+}
+
+class CourierStatement {
+  final String phone;
+  final String month;
+  final List<Order> orders;
+  final int earned;
+  final double km;
+  final Settlement? settlement;
+  const CourierStatement(this.phone, this.month, this.orders, this.earned, this.km, this.settlement);
+  bool get settled => settlement != null;
+}
+
+/// ملخص ديبو لشهر
+class MonthReport {
+  final String month;
+  final int orders, sales, commission, deliveryFees, courierPay, freeDeliveryCost;
+  final int payToStores, collectFromStores, payToCouriers; // اللي بعده ما مسوّى
+  const MonthReport(this.month, this.orders, this.sales, this.commission, this.deliveryFees, this.courierPay, this.freeDeliveryCost, this.payToStores,
+      this.collectFromStores, this.payToCouriers);
+  int get profit => commission + deliveryFees - courierPay;
+}
+
+extension Finance on AppState {
+  bool get canFinance => canAny([Perm.finance]);
+
+  List<Order> deliveredIn(String month) => orders.where((o) => o.status == OrderStatus.delivered && o.settleMonth == month).toList();
+
+  /// الشهور اللي بيها طلبات + الشهر الحالي (الأحدث أول)
+  List<String> get financeMonths {
+    final set = <String>{monthKey(DateTime.now())};
+    for (final o in orders.where((o) => o.status == OrderStatus.delivered)) {
+      set.add(o.settleMonth);
+    }
+    return set.toList()..sort((a, b) => b.compareTo(a));
+  }
+
+  Settlement? settlementOf(String kind, String target, String month) {
+    for (final s in settlements) {
+      if (s.kind == kind && s.target == target && s.month == month) return s;
+    }
+    return null;
+  }
+
+  StoreStatement storeStatement(Store s, String month) {
+    final list = deliveredIn(month).where((o) => o.storeId == s.id).toList()..sort((a, b) => b.deliveredAt.compareTo(a.deliveredAt));
+    var sales = 0, comm = 0, byDepo = 0, byStore = 0;
+    for (final o in list) {
+      sales += o.itemsTotal;
+      comm += o.commission;
+      if (paidCourier(o)) {
+        byDepo += o.itemsTotal;
+      } else {
+        byStore += o.total;
+      }
+    }
+    return StoreStatement(s, month, list, sales, comm, byDepo, byStore, settlementOf('store', s.id, month));
+  }
+
+  List<StoreStatement> storeStatements(String month) {
+    final ids = {for (final o in deliveredIn(month)) o.storeId};
+    final list = [for (final id in ids) if (storeById(id) != null) storeStatement(storeById(id)!, month)];
+    list.removeWhere((x) => x.store.type == StoreType.shop);
+    list.sort((a, b) => b.net.abs().compareTo(a.net.abs()));
+    return list;
+  }
+
+  CourierStatement courierStatement(String phone, String month) {
+    final list = deliveredIn(month).where((o) => o.courierPhone == phone && paidCourier(o)).toList()..sort((a, b) => b.deliveredAt.compareTo(a.deliveredAt));
+    return CourierStatement(phone, month, list, list.fold(0, (s, o) => s + o.courierPay), list.fold(0.0, (s, o) => s + o.distanceKm), settlementOf('courier', phone, month));
+  }
+
+  List<CourierStatement> courierStatements(String month) {
+    final phones = {for (final o in deliveredIn(month)) if (paidCourier(o)) o.courierPhone!};
+    return [for (final p in phones) courierStatement(p, month)]..sort((a, b) => b.earned.compareTo(a.earned));
+  }
+
+  MonthReport monthReport(String month) {
+    final list = deliveredIn(month).where((o) => storeById(o.storeId)?.type != StoreType.shop).toList();
+    final paid = list.where(paidCourier);
+    final stores = storeStatements(month);
+    final couriers = courierStatements(month);
+    return MonthReport(
+      month,
+      list.length,
+      list.fold(0, (s, o) => s + o.itemsTotal),
+      list.fold(0, (s, o) => s + o.commission),
+      paid.fold(0, (s, o) => s + o.deliveryFee),
+      paid.fold(0, (s, o) => s + o.courierPay),
+      paid.where((o) => o.deliveryFee == 0).fold(0, (s, o) => s + o.courierPay),
+      stores.where((x) => !x.settled && x.net > 0).fold(0, (s, x) => s + x.net),
+      stores.where((x) => !x.settled && x.net < 0).fold(0, (s, x) => s - x.net),
+      couriers.where((x) => !x.settled).fold(0, (s, x) => s + x.earned),
+    );
+  }
+
+  /// تعديل مسافة طلب (قبل تسوية المندوب) — تنعاد الأجرة
+  bool setOrderDistance(Order o, double km) {
+    if (!(canFinance || canAny([Perm.operations]))) return false;
+    if (o.courierPhone != null && settlementOf('courier', o.courierPhone!, o.settleMonth) != null) return false;
+    o.distanceKm = km.clamp(0, settings.courierMaxKm.toDouble()).toDouble();
+    if (o.status == OrderStatus.delivered && paidCourier(o)) o.courierPay = settings.courierPayFor(o.distanceKm);
+    _log('تعديل مسافة الطلب #${o.id} إلى ${o.distanceKm.toStringAsFixed(1)} كم');
+    _changed();
+    return true;
+  }
+
+  /// المندوب يثبّت المسافة الفعلية عند التسليم
+  void setDeliveryKm(Order o, double km) {
+    if (o.courierPhone != currentPhone || o.status == OrderStatus.delivered) return;
+    o.distanceKm = km.clamp(0, settings.courierMaxKm.toDouble()).toDouble();
+  }
+
+  String _who() => me == null ? '' : (me!.name.isEmpty ? me!.phone : me!.name);
+
+  void settleStoreMonth(StoreStatement st, {String note = ''}) {
+    if (!canFinance || st.settled) return;
+    settlements.insert(0, Settlement(id: 'st${DateTime.now().millisecondsSinceEpoch}', kind: 'store', target: st.store.id, month: st.month, amount: st.net, at: DateTime.now().millisecondsSinceEpoch, by: _who(), note: note));
+    notify(st.store.ownerPhone, st.net >= 0 ? 'تمت تسوية ${st.month}: استلمت ${iqd(st.net)} من ديبو' : 'تمت تسوية ${st.month}: سدّدت ${iqd(-st.net)} لديبو');
+    _log('تسوية ${st.store.name} لشهر ${st.month}: ${iqd(st.net)}');
+    _changed();
+  }
+
+  void settleCourierMonth(CourierStatement st, {String note = ''}) {
+    if (!canFinance || st.settled) return;
+    settlements.insert(0, Settlement(id: 'sc${DateTime.now().millisecondsSinceEpoch}', kind: 'courier', target: st.phone, month: st.month, amount: st.earned, at: DateTime.now().millisecondsSinceEpoch, by: _who(), note: note));
+    notify(st.phone, 'تمت تسوية أجورك لشهر ${st.month}: ${iqd(st.earned)}');
+    _log('تسوية أجور المندوب ${st.phone} لشهر ${st.month}: ${iqd(st.earned)}');
+    _changed();
+  }
+
+  /// المدير بس يلغي تسوية (إذا انسجلت بالغلط)
+  void undoSettlement(Settlement s) {
+    if (me?.role != Role.admin) return;
+    settlements.removeWhere((x) => x.id == s.id);
+    _log('إلغاء تسوية ${s.kind == 'store' ? 'محل' : 'مندوب'} ${s.target} لشهر ${s.month}');
+    _changed();
+  }
+
+  /// كشوفات حسابي (للمحل أو المندوب)
+  List<StoreStatement> myStoreStatements(Store s) => [for (final m in financeMonths) storeStatement(s, m)].where((x) => x.orders.isNotEmpty || x.month == monthKey(DateTime.now())).toList();
+  List<CourierStatement> myCourierStatements() =>
+      currentPhone == null ? [] : [for (final m in financeMonths) courierStatement(currentPhone!, m)].where((x) => x.orders.isNotEmpty || x.month == monthKey(DateTime.now())).toList();
 }
