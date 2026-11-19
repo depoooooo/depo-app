@@ -744,3 +744,74 @@ class DebtEntry {
 }
 
 String monthKey(DateTime d) => '${d.year}/${d.month.toString().padLeft(2, '0')}';
+
+// ======================= المحادثات داخل التطبيق =======================
+class ChatMsg {
+  final String from; // رقم المرسل
+  final String text;
+  final bool staff; // من فريق الدعم أو صاحب المحل
+  final int at;
+  ChatMsg({required this.from, required this.text, required this.staff, int? at}) : at = at ?? _now();
+  Map<String, dynamic> toJson() => {'from': from, 'text': text, 'staff': staff, 'at': at};
+  factory ChatMsg.fromJson(Map<String, dynamic> j) =>
+      ChatMsg(from: (j['from'] ?? '') as String, text: (j['text'] ?? '') as String, staff: (j['staff'] ?? false) as bool, at: j['at'] as int?);
+}
+
+/// محادثة: دعم ديبو (support) أو ويه محل (shop)
+class Chat {
+  String id;
+  String kind; // support / shop
+  String userPhone;
+  String userName;
+  String storeId; // للمحل بس
+  List<ChatMsg> messages;
+  bool open;
+  int updatedAt;
+  int userReadAt;
+  int staffReadAt;
+
+  Chat({
+    required this.id,
+    required this.kind,
+    required this.userPhone,
+    this.userName = '',
+    this.storeId = '',
+    List<ChatMsg>? messages,
+    this.open = true,
+    int? updatedAt,
+    this.userReadAt = 0,
+    this.staffReadAt = 0,
+  })  : messages = messages ?? [],
+        updatedAt = updatedAt ?? _now();
+
+  int unreadFor({required bool staff}) {
+    final read = staff ? staffReadAt : userReadAt;
+    return messages.where((m) => m.staff != staff && m.at > read).length;
+  }
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'kind': kind,
+        'userPhone': userPhone,
+        'userName': userName,
+        'storeId': storeId,
+        'messages': messages.map((m) => m.toJson()).toList(),
+        'open': open,
+        'updatedAt': updatedAt,
+        'userReadAt': userReadAt,
+        'staffReadAt': staffReadAt,
+      };
+
+  factory Chat.fromJson(Map<String, dynamic> j) => Chat(
+        id: j['id'] as String,
+        kind: (j['kind'] ?? 'support') as String,
+        userPhone: (j['userPhone'] ?? '') as String,
+        userName: (j['userName'] ?? '') as String,
+        storeId: (j['storeId'] ?? '') as String,
+        messages: (j['messages'] as List? ?? const []).map((e) => ChatMsg.fromJson(Map<String, dynamic>.from(e as Map))).toList(),
+        open: (j['open'] ?? true) as bool,
+        updatedAt: j['updatedAt'] as int?,
+        userReadAt: (j['userReadAt'] ?? 0) as int,
+        staffReadAt: (j['staffReadAt'] ?? 0) as int,
+      );
+}

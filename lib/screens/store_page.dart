@@ -5,6 +5,7 @@ import '../theme.dart';
 import '../widgets/common.dart';
 import 'auth.dart';
 import 'home.dart';
+import 'chat_screen.dart';
 
 /// صفحة المطعم أو المتجر: متابعة + كل عروضه، ويكدر الزبون يطلب منها مباشرة
 class StorePage extends StatelessWidget {
@@ -43,6 +44,17 @@ class StorePage extends StatelessWidget {
                   ]),
                   const SizedBox(height: 12),
                   Row(children: [
+                    if (s.type == StoreType.shop && !app.ownsStore(s.id)) ...[
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(backgroundColor: Colors.white),
+                          onPressed: () => openShopChat(context, s.id),
+                          icon: const Icon(Icons.chat_bubble_outline),
+                          label: const Text('راسل المحل'),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                    ],
                     Expanded(
                       child: following
                           ? FilledButton.icon(

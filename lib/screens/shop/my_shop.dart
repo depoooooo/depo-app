@@ -7,6 +7,7 @@ import '../../widgets/debt_ui.dart';
 import '../../widgets/offer_cards.dart';
 import '../roles/partner.dart';
 import 'debtor_screen.dart';
+import '../chat_screen.dart';
 
 /// «محلي»: يفتح المتجر المجاني، أو يدخل عليه إذا موجود
 class MyShopScreen extends StatelessWidget {
@@ -102,6 +103,21 @@ class _ShopHome extends StatelessWidget {
             const SizedBox(width: 10),
             Expanded(child: Text(store.name, overflow: TextOverflow.ellipsis)),
           ]),
+          actions: [
+            IconButton(
+              tooltip: 'رسائل الزبائن',
+              onPressed: () => Navigator.of(context).push(MaterialPageRoute(
+                builder: (_) => Scaffold(
+                  appBar: AppBar(title: const Text('رسائل الزبائن')),
+                  body: ListenableBuilder(listenable: app, builder: (context, _) => ChatListView(source: () => app.shopChats(store.id))),
+                ),
+              )),
+              icon: Badge(
+                isLabelVisible: app.shopChats(store.id).any((c) => c.unreadFor(staff: true) > 0),
+                child: const Icon(Icons.forum_outlined),
+              ),
+            ),
+          ],
           bottom: TabBar(
             labelStyle: const TextStyle(fontFamily: 'Tajawal', fontWeight: FontWeight.w900),
             tabs: [const Tab(text: 'الزبائن والديون'), const Tab(text: 'المنتجات'), Tab(text: newOrders > 0 ? 'الطلبات ($newOrders)' : 'الطلبات')],
@@ -280,9 +296,9 @@ class _OverdueReport extends StatelessWidget {
                   ),
                   Text(iqd(app.summaryOf(d.id).overdue), style: const TextStyle(fontWeight: FontWeight.w900, color: DepoColors.danger)),
                   IconButton(
-                    tooltip: 'تذكير بالواتساب',
+                    tooltip: 'إرسال تذكير',
                     onPressed: () => sendDebtReminder(context, d),
-                    icon: const Icon(Icons.chat_rounded, color: Color(0xFF1FA855)),
+                    icon: const Icon(Icons.notifications_active_outlined, color: DepoColors.dark),
                   ),
                 ]),
               ),

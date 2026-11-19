@@ -4,6 +4,7 @@ import '../../data/models.dart';
 import '../../theme.dart';
 import '../../widgets/common.dart';
 import 'admin.dart';
+import '../chat_screen.dart';
 
 AppBar roleAppBar(String title, {PreferredSizeWidget? bottom}) => AppBar(
       backgroundColor: DepoColors.ink,
@@ -35,6 +36,7 @@ class SupervisorHome extends StatelessWidget {
     final tabs = <(String, Widget)>[
       if (app.canAny([Perm.partnerships, Perm.quality, Perm.operations])) ('طلبات الانضمام ($pending)', JoinRequestsTab()),
       if (app.canAny([Perm.operations, Perm.support, Perm.finance])) ('الطلبات', OrdersMonitorTab()),
+      if (app.can(Perm.support)) ('محادثات الدعم${_unreadSupport()}', SupportChatsTab()),
       if (app.canAny([Perm.support, Perm.quality])) ('الشكاوى ($openC)', ComplaintsTab()),
       if (app.canAny([Perm.tech, Perm.support, Perm.operations])) ('المستخدمين', UsersTab()),
       if (app.canAny([Perm.quality, Perm.partnerships, Perm.sales])) ('العروض والمحلات', OffersStoresTab()),
@@ -494,4 +496,18 @@ class OffersStoresTab extends StatelessWidget {
       ],
     );
   }
+}
+
+
+String _unreadSupport() {
+  final n = app.supportChats.where((c) => c.unreadFor(staff: true) > 0).length;
+  return n > 0 ? ' ($n)' : '';
+}
+
+/// محادثات الدعم داخل التطبيق (زبائن، مطاعم، تجار، مندوبين)
+class SupportChatsTab extends StatelessWidget {
+  const SupportChatsTab({super.key});
+
+  @override
+  Widget build(BuildContext context) => ChatListView(source: () => app.supportChats);
 }

@@ -3,6 +3,7 @@ import '../data/app_state.dart';
 import '../data/models.dart';
 import '../theme.dart';
 import 'following.dart';
+import 'chat_screen.dart';
 import 'shop/markets.dart';
 import 'shop/my_debts.dart';
 import 'shop/my_shop.dart';
@@ -110,7 +111,7 @@ class AccountScreen extends StatelessWidget {
           _MenuItem(Icons.notifications_none, 'الإشعارات (${u.notifications.length})', () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const NotificationsScreen()))),
           _MenuItem(Icons.location_on_outlined, 'عناويني', () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const AddressesScreen()))),
           _MenuItem(Icons.card_giftcard, 'دعوة صديق', () => _invite(context)),
-          _MenuItem(Icons.support_agent, 'الدعم', () => toast(context, 'الدعم عبر واتساب يتفعل قبل الإطلاق')),
+          _MenuItem(Icons.support_agent, _supportLabel(), () => openSupport(context)),
           _MenuItem(Icons.settings_outlined, 'الإعدادات', () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const SettingsScreen()))),
           _MenuItem(Icons.logout, 'تسجيل الخروج', () {
             app.logout();
@@ -374,4 +375,10 @@ class SettingsScreen extends StatelessWidget {
       ),
     );
   }
+}
+
+String _supportLabel() {
+  final mine = app.chats.where((c) => c.kind != 'support' ? false : c.userPhone == app.currentPhone);
+  final n = mine.fold(0, (s, c) => s + c.unreadFor(staff: false));
+  return n > 0 ? 'الدعم ($n رسالة جديدة)' : 'الدعم';
 }

@@ -21,6 +21,7 @@ class AppState extends ChangeNotifier {
   List<JoinRequest> joinRequests = [];
   List<Debtor> debtors = [];
   List<DebtEntry> debts = [];
+  List<Chat> chats = [];
   List<Complaint> complaints = [];
   List<String> audit = [];
   AppSettings settings = AppSettings();
@@ -30,7 +31,7 @@ class AppState extends ChangeNotifier {
 
   // ---------------- التخزين ----------------
   /// الأقسام اللي تنحفظ بالسيرفر (كل قسم = collection بـ Firestore)
-  static const _cols = ['users', 'stores', 'offers', 'orders', 'joinRequests', 'complaints', 'meta', 'debtors', 'debts'];
+  static const _cols = ['users', 'stores', 'offers', 'orders', 'joinRequests', 'complaints', 'meta', 'debtors', 'debts', 'chats'];
 
   /// آخر نسخة نعرفها من كل مستند بالسيرفر (للمقارنة وكتابة الي تغيّر بس)
   final Map<String, Map<String, String>> _synced = {for (final c in _cols) c: {}};
@@ -85,6 +86,7 @@ class AppState extends ChangeNotifier {
       joinRequests = l('joinRequests').map(JoinRequest.fromJson).toList();
       debtors = l('debtors').map(Debtor.fromJson).toList();
       debts = l('debts').map(DebtEntry.fromJson).toList();
+      chats = l('chats').map(Chat.fromJson).toList();
       complaints = l('complaints').map(Complaint.fromJson).toList();
       audit = List<String>.from(j['audit'] ?? const []);
       settings = AppSettings.fromJson(Map<String, dynamic>.from(j['settings'] ?? const {}));
@@ -138,6 +140,8 @@ class AppState extends ChangeNotifier {
         return {for (final x in debtors) x.id: x.toJson()};
       case 'debts':
         return {for (final x in debts) x.id: x.toJson()};
+      case 'chats':
+        return {for (final x in chats) x.id: x.toJson()};
       case 'complaints':
         return {for (final x in complaints) x.id: x.toJson()};
       case 'meta':
@@ -192,6 +196,9 @@ class AppState extends ChangeNotifier {
       case 'debts':
         final old = {for (final x in debts) x.id: x};
         debts = [for (final d in list) keep(d.id, d.data(), DebtEntry.fromJson, old[d.id])];
+      case 'chats':
+        final old = {for (final x in chats) x.id: x};
+        chats = [for (final d in list) keep(d.id, d.data(), Chat.fromJson, old[d.id])];
       case 'complaints':
         final old = {for (final x in complaints) x.id: x};
         complaints = [for (final d in list) keep(d.id, d.data(), Complaint.fromJson, old[d.id])];
@@ -295,6 +302,7 @@ class AppState extends ChangeNotifier {
         'joinRequests': joinRequests.map((e) => e.toJson()).toList(),
         'debtors': debtors.map((e) => e.toJson()).toList(),
         'debts': debts.map((e) => e.toJson()).toList(),
+        'chats': chats.map((e) => e.toJson()).toList(),
         'complaints': complaints.map((e) => e.toJson()).toList(),
         'audit': audit,
         'settings': settings.toJson(),
@@ -337,6 +345,7 @@ class AppState extends ChangeNotifier {
     joinRequests = [];
     debtors = [];
     debts = [];
+    chats = [];
     complaints = [];
     audit = [];
     settings = AppSettings();
@@ -1113,6 +1122,94 @@ class AppState extends ChangeNotifier {
 
 final app = AppState();
 
+extension Chats on AppState {
+  bool get isSupportStaff => can(Perm.support);
+
+  Chat? chatById(String id) {
+    for (final c in chats) {
+      if (c.id == id) return c;
+    }
+    return null;
+  }
+
+  /// محادثة الدعم مالتي (تنفتح إذا ماكو)
+  Chat? myChat({required String kind, String storeId = ''}) {
+    final u = me;
+    if (u == null) return null;
+    for (final c in chats) {
+      if (c.kind == kind && c.userPhone == u.phone && c.storeId == storeId) return c;
+    }
+    final c = Chat(id: 'ch${DateTime.now().millisecondsSinceEpoch}', kind: kind, userPhone: u.phone, userName: u.name, storeId: storeId);
+    chats.insert(0, c);
+    _changedPublic();
+    return c;
+  }
+
+  /// أنا بهاي المحادثة من «الفريق» (الدعم أو صاحب المحل)؟
+  bool isStaffIn(Chat c) {
+    if (c.userPhone == currentPhone) return false;
+    if (c.kind == 'support') return isSupportStaff;
+    return ownsStore(c.storeId);
+  }
+
+  bool canSeeChat(Chat c) => c.userPhone == currentPhone || isStaffIn(c);
+
+  void sendChat(Chat c, String text) {
+    final u = me;
+    final t = text.trim();
+    if (u == null || t.isEmpty || !canSeeChat(c)) return;
+    final staff = isStaffIn(c);
+    c.messages.add(ChatMsg(from: u.phone, text: t.length > 1000 ? t.substring(0, 1000) : t, staff: staff));
+    if (c.messages.length > 300) c.messages.removeAt(0);
+    c.open = true;
+    c.updatedAt = DateTime.now().millisecondsSinceEpoch;
+    if (staff) {
+      c.staffReadAt = c.updatedAt;
+      final who = c.kind == 'support' ? 'دعم ديبو' : (storeById(c.storeId)?.name ?? 'المحل');
+      notify(c.userPhone, 'رسالة جديدة من $who: ${t.length > 60 ? '${t.substring(0, 60)}…' : t}');
+    } else {
+      c.userReadAt = c.updatedAt;
+      if (c.userName.isEmpty) c.userName = u.name;
+      if (c.kind == 'support') {
+        for (final x in users.where((x) => x.role == Role.admin || (x.role == Role.supervisor && x.perms.contains(Perm.support.name)))) {
+          notify(x.phone, 'رسالة جديدة للدعم من ${u.name.isEmpty ? u.phone : u.name}');
+        }
+      } else {
+        final owner = storeById(c.storeId)?.ownerPhone;
+        if (owner != null && owner.isNotEmpty) notify(owner, 'رسالة جديدة من ${u.name.isEmpty ? 'زبون' : u.name}');
+      }
+    }
+    _changedPublic();
+  }
+
+  void markChatRead(Chat c) {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    if (isStaffIn(c)) {
+      if (c.unreadFor(staff: true) == 0) return;
+      c.staffReadAt = now;
+    } else if (c.userPhone == currentPhone) {
+      if (c.unreadFor(staff: false) == 0) return;
+      c.userReadAt = now;
+    } else {
+      return;
+    }
+    _changedPublic();
+  }
+
+  void closeChat(Chat c) {
+    if (!isStaffIn(c)) return;
+    c.open = false;
+    c.messages.add(ChatMsg(from: currentPhone ?? '', text: 'انغلقت المحادثة. إذا عندك شي ثاني اكتبلنا بأي وقت.', staff: true));
+    c.updatedAt = DateTime.now().millisecondsSinceEpoch;
+    _changedPublic();
+  }
+
+  List<Chat> get supportChats =>
+      chats.where((c) => c.kind == 'support' && c.messages.isNotEmpty).toList()..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+  List<Chat> shopChats(String storeId) =>
+      chats.where((c) => c.kind == 'shop' && c.storeId == storeId && c.messages.isNotEmpty).toList()..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+}
+
 /// ملخص دين زبون
 class DebtSummary {
   final int ordered, paid, remaining, overdue;
@@ -1304,6 +1401,21 @@ extension DebtBook on AppState {
     d.name = name.trim();
     d.phone = phone.trim();
     _changedPublic();
+  }
+
+  /// تذكير داخل التطبيق: يوصل للزبون اللي ضاف رمزه. يرجّع عدد الحسابات اللي وصلها
+  int remindDebtor(Debtor d) {
+    if (!ownsStore(d.storeId)) return 0;
+    final s = summaryOf(d.id);
+    if (s.remaining <= 0) return 0;
+    final store = storeById(d.storeId);
+    final due = s.overdue > 0 ? ' — منها ${iqd(s.overdue)} متأخرة' : (s.nextDue > 0 ? ' — موعدها ${DateTime.fromMillisecondsSinceEpoch(s.nextDue).day}/${DateTime.fromMillisecondsSinceEpoch(s.nextDue).month}' : '');
+    final linked = users.where((u) => u.debtCodes.contains(d.code)).toList();
+    for (final u in linked) {
+      notify(u.phone, 'تذكير من ${store?.name ?? 'المحل'}: المتبقي عليك ${iqd(s.remaining)}$due');
+    }
+    if (linked.isNotEmpty) _changedPublic();
+    return linked.length;
   }
 
   // ---------- جهة الزبون ----------

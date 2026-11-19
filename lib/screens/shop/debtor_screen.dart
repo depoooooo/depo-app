@@ -4,6 +4,7 @@ import '../../data/models.dart';
 import '../../theme.dart';
 import '../../widgets/common.dart';
 import '../../widgets/debt_ui.dart';
+import '../chat_screen.dart';
 
 /// صفحة زبون بالدفتر. readOnly = الزبون نفسه يشوف ديونه
 class DebtorScreen extends StatelessWidget {
@@ -79,20 +80,20 @@ class DebtorScreen extends StatelessWidget {
                 if (d.phone.isNotEmpty) const SizedBox(width: 10),
                 Expanded(
                   child: OutlinedButton.icon(
-                    style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(44), foregroundColor: const Color(0xFF1FA855), side: const BorderSide(color: Color(0xFF1FA855))),
+                    style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(44)),
                     onPressed: sum.remaining > 0 ? () => sendDebtReminder(context, d) : null,
-                    icon: const Icon(Icons.chat_rounded),
-                    label: const Text('تذكير بالواتساب'),
+                    icon: const Icon(Icons.notifications_active_outlined),
+                    label: const Text('إرسال تذكير'),
                   ),
                 ),
               ]),
               const SizedBox(height: 12),
               _CodeCard(d: d),
-            ] else if (store != null && store.ownerPhone.isNotEmpty) ...[
+            ] else if (store != null) ...[
               OutlinedButton.icon(
                 style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(44)),
-                onPressed: () => openWhatsApp(context, store.ownerPhone, 'مرحبا، بخصوص حسابي باسم ${d.name} بـ ${store.name}'),
-                icon: const Icon(Icons.chat_rounded),
+                onPressed: () => openShopChat(context, store.id),
+                icon: const Icon(Icons.chat_bubble_outline),
                 label: const Text('راسل المحل'),
               ),
             ],
@@ -167,7 +168,7 @@ class _CodeCard extends StatelessWidget {
         const SizedBox(height: 8),
         Row(children: [
           Expanded(child: TextButton.icon(onPressed: () => copyText(context, d.code, done: 'انسخ الرمز'), icon: const Icon(Icons.copy, size: 18), label: const Text('نسخ'))),
-          Expanded(child: TextButton.icon(onPressed: () => openWhatsApp(context, d.phone, msg), icon: const Icon(Icons.send, size: 18), label: const Text('إرسال للزبون'))),
+          Expanded(child: TextButton.icon(onPressed: () => copyText(context, msg, done: 'انسخت رسالة فيها الرمز وطريقة الاستخدام'), icon: const Icon(Icons.share_outlined, size: 18), label: const Text('رسالة جاهزة'))),
           Expanded(
             child: TextButton.icon(
               onPressed: () async {
@@ -196,13 +197,10 @@ class _CodeCard extends StatelessWidget {
   }
 }
 
+/// تذكير داخل التطبيق (إشعار) — يوصل للزبون إذا ضاف رمزه بديبو
 Future<void> sendDebtReminder(BuildContext context, Debtor d) async {
-  final s = app.summaryOf(d.id);
-  final store = app.storeById(d.storeId);
-  final due = s.overdue > 0 ? 'منها ${iqd(s.overdue)} متأخرة' : (s.nextDue > 0 ? 'موعدها ${dateLabel(s.nextDue)}' : '');
-  final msg = 'هلا ${d.name}، تذكير لطيف من ${store?.name ?? 'المحل'} 🌷\nالمتبقي عليك: ${iqd(s.remaining)} $due\n'
-      'تكدر تشوف التفاصيل بتطبيق ديبو برمزك: ${d.code}';
-  await openWhatsApp(context, d.phone, msg);
+  final n = app.remindDebtor(d);
+  toast(context, n > 0 ? 'وصل التذكير للزبون كإشعار بالتطبيق' : 'الزبون بعده ما ضاف رمزه بديبو، فما يوصله التذكير. انطيه الرمز أول من «رمز الزبون».');
 }
 
 Future<Debtor?> addDebtorDialog(BuildContext context, Store store) async {

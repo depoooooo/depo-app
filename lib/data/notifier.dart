@@ -157,6 +157,8 @@ class Notifier {
     if (t.startsWith('طلبك')) return 'تحديث طلبك';
     if (t.contains('انضمام')) return 'طلبات الانضمام';
     if (t.contains('عاجل')) return 'عاجل ⚠️';
+    if (t.startsWith('تذكير')) return 'تذكير بالدين 🔔';
+    if (t.startsWith('رسالة جديدة')) return 'رسالة جديدة 💬';
     return 'ديبو';
   }
 

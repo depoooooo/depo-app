@@ -14,10 +14,10 @@ class AdminHome extends StatelessWidget {
     final pending = app.joinRequests.where((r) => r.status == 'pending').length;
     final openC = app.complaints.where((c) => c.status == 'open').length;
     return DefaultTabController(
-      length: 9,
+      length: 10,
       child: Scaffold(
         appBar: roleAppBar('واجهة المدير العام',
-            bottom: roleTabs(['التقارير', 'الإعدادات', 'المشرفين', 'طلبات الانضمام ($pending)', 'الطلبات', 'الشكاوى ($openC)', 'المستخدمين', 'العروض والمحلات', 'سجل العمليات'])),
+            bottom: roleTabs(['التقارير', 'الإعدادات', 'المشرفين', 'طلبات الانضمام ($pending)', 'الطلبات', 'محادثات الدعم', 'الشكاوى ($openC)', 'المستخدمين', 'العروض والمحلات', 'سجل العمليات'])),
         // ignore: prefer_const_constructors
         body: TabBarView(children: [
           ReportsTab(),
@@ -25,6 +25,7 @@ class AdminHome extends StatelessWidget {
           _SupervisorsTab(),
           JoinRequestsTab(),
           OrdersMonitorTab(),
+          SupportChatsTab(),
           ComplaintsTab(),
           UsersTab(),
           OffersStoresTab(),
