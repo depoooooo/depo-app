@@ -336,7 +336,7 @@ Future<String?> askAddress(BuildContext context) async {
 }
 
 /// يختار صورة ويرفعها، ويرجّع رقمها (أو null)
-Future<String?> pickAndUpload(BuildContext context, {String owner = ''}) async {
+Future<String?> pickAndUpload(BuildContext context, {String owner = '', double maxSide = 800, int quality = 60}) async {
   final camera = await showModalBottomSheet<bool>(
     context: context,
     showDragHandle: true,
@@ -350,7 +350,7 @@ Future<String?> pickAndUpload(BuildContext context, {String owner = ''}) async {
   );
   if (camera == null) return null;
   try {
-    final b = await Images.pick(camera: camera);
+    final b = await Images.pick(camera: camera, maxSide: maxSide, quality: quality);
     if (b == null) return null;
     return await Images.put(b, owner: owner);
   } catch (e) {

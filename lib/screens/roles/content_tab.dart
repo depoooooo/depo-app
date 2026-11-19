@@ -145,7 +145,7 @@ class ImagePickField extends StatelessWidget {
       Expanded(child: Text(label, style: const TextStyle(fontWeight: FontWeight.w800))),
       TextButton.icon(
         onPressed: () async {
-          final id = await pickAndUpload(context, owner: 'content');
+          final id = await pickAndUpload(context, owner: 'content', maxSide: 1200, quality: 80);
           if (id != null) onChanged(id);
         },
         icon: const Icon(Icons.upload),

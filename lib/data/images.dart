@@ -13,12 +13,12 @@ class Images {
   static final _rnd = Random();
 
   /// يختار صورة من الكاميرا أو المعرض ويضغطها
-  static Future<Uint8List?> pick({required bool camera}) async {
+  static Future<Uint8List?> pick({required bool camera, double maxSide = 800, int quality = 60}) async {
     final x = await ImagePicker().pickImage(
       source: camera ? ImageSource.camera : ImageSource.gallery,
-      maxWidth: 800,
-      maxHeight: 800,
-      imageQuality: 60,
+      maxWidth: maxSide,
+      maxHeight: maxSide,
+      imageQuality: quality,
     );
     if (x == null) return null;
     final bytes = await x.readAsBytes();

@@ -522,9 +522,9 @@ class _BannersState extends State<_Banners> {
                     Padding(
                       padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
                       child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.center, children: [
-                        Text(s.title, style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: s.titleColor)),
-                        const SizedBox(height: 4),
-                        Text(s.text, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: s.textColor)),
+                        if (s.title.isNotEmpty) Text(s.title, style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: s.titleColor)),
+                        if (s.title.isNotEmpty && s.text.isNotEmpty) const SizedBox(height: 4),
+                        if (s.text.isNotEmpty) Text(s.text, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: s.textColor)),
                       ]),
                     ),
                   ]),
