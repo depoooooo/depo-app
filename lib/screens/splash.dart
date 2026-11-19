@@ -4,7 +4,7 @@ import '../data/notifier.dart';
 import '../theme.dart';
 import 'shell.dart';
 
-/// شاشة البداية المتحركة: ظل الموصل ← منارة الحدباء والجامع يطلعون من تحت ← شعار ديبو ← الجملة
+/// شاشة البداية المتحركة (مثل كيو): ظل الموصل ← منارة الحدباء تدخل من اليسار والجامع من اليمين ← شعار ديبو ← الجملة
 /// وبعدها تدخل للتطبيق تلقائياً (التصفح بدون تسجيل — قرار معتمد)
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -14,18 +14,19 @@ class SplashScreen extends StatefulWidget {
 }
 
 class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderStateMixin {
-  late final AnimationController c = AnimationController(vsync: this, duration: const Duration(milliseconds: 2300));
+  late final AnimationController c = AnimationController(vsync: this, duration: const Duration(milliseconds: 2600));
   bool _animDone = false;
   bool _left = false;
 
   Animation<double> _iv(double a, double b, [Curve curve = Curves.easeOutCubic]) =>
       CurvedAnimation(parent: c, curve: Interval(a, b, curve: curve));
 
-  late final skyline = _iv(0.0, 0.35);
-  late final minaret = _iv(0.08, 0.55, Curves.easeOutBack);
-  late final mosque = _iv(0.18, 0.62, Curves.easeOutBack);
-  late final logo = _iv(0.50, 0.78, Curves.easeOutBack);
-  late final tagline = _iv(0.70, 0.95);
+  late final skyline = _iv(0.0, 0.18);
+  late final minaret = _iv(0.10, 0.42);
+  late final mosque = _iv(0.16, 0.48);
+  late final logo = _iv(0.50, 0.68, Curves.easeOut);
+  late final line1 = _iv(0.66, 0.80, Curves.easeOut);
+  late final line2 = _iv(0.78, 0.92, Curves.easeOut);
 
   @override
   void initState() {
@@ -71,20 +72,20 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
           Positioned(
             left: -w * 0.06,
             right: -w * 0.06,
-            bottom: -10 - 60 * (1 - skyline.value),
+            bottom: -10,
             child: Opacity(opacity: skyline.value, child: Image.asset('assets/splash/skyline.png', fit: BoxFit.fitWidth)),
           ),
-          // منارة الحدباء (يسار) تطلع من تحت
+          // منارة الحدباء تدخل من حافة الشاشة اليسار
           Positioned(
-            left: -w * 0.03,
-            bottom: -minaretH * (1 - minaret.value) - 6,
+            left: -w * 0.03 - (minaretH * 0.26) * (1 - minaret.value),
+            bottom: -6,
             height: minaretH,
             child: Image.asset('assets/splash/minaret.png', fit: BoxFit.fitHeight),
           ),
-          // الجامع (يمين)
+          // الجامع يدخل من حافة الشاشة اليمين
           Positioned(
-            right: -w * 0.04,
-            bottom: -(mosqueW * 1.9) * (1 - mosque.value) - 6,
+            right: -w * 0.04 - mosqueW * (1 - mosque.value),
+            bottom: -6,
             width: mosqueW,
             child: Image.asset('assets/splash/mosque.png', fit: BoxFit.fitWidth),
           ),
@@ -96,18 +97,16 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
             child: Column(children: [
               Opacity(
                 opacity: logo.value.clamp(0.0, 1.0),
-                child: Transform.scale(
-                  scale: 0.7 + 0.3 * logo.value,
-                  child: Image.asset('assets/logo/depo-ar-white.png', width: w * 0.5, semanticLabel: 'ديبو'),
-                ),
+                child: Image.asset('assets/logo/depo-ar-white.png', width: w * 0.5, semanticLabel: 'ديبو'),
               ),
               const SizedBox(height: 14),
               Opacity(
-                opacity: tagline.value,
-                child: Transform.translate(
-                  offset: Offset(0, 12 * (1 - tagline.value)),
-                  child: const Text('أكل طيب.. بسعر أطيب', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: DepoColors.ink)),
-                ),
+                opacity: line1.value,
+                child: const Text('أكل طيب', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: Colors.white)),
+              ),
+              Opacity(
+                opacity: line2.value,
+                child: const Text('بسعر أطيب', style: TextStyle(fontSize: 21, fontWeight: FontWeight.w900, color: DepoColors.ink)),
               ),
             ]),
           ),
