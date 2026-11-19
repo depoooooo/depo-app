@@ -331,7 +331,7 @@ class _PromoStrip extends StatelessWidget {
   }
 }
 
-/// قسم الحملة (مثل «رخيييييص»)
+/// قسم الحملة (مثل «خصم فوق الخصم»)
 class _Campaign extends StatelessWidget {
   final String name;
   final int minDiscount;

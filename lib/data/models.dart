@@ -32,7 +32,7 @@ const permDesc = {
   Perm.quality: 'تفتيش المحلات قبل وبعد الانضمام، سحب العروض، إيقاف المحلات، الشكاوى الصحية',
   Perm.partnerships: 'طلبات انضمام المطاعم والتجار: قبول ورفض، ومتابعة المحلات',
   Perm.sales: 'أداء المحلات ومبيعاتها، الإعلانات الممولة (الظهور المميز)',
-  Perm.marketing: 'الشريط الترويجي، التوصيل المجاني لأول طلب، الحملات (مثل رخيييييص)',
+  Perm.marketing: 'الشريط الترويجي، التوصيل المجاني لأول طلب، الحملات (مثل خصم فوق الخصم)',
   Perm.finance: 'التقارير والعمولات، استلام النقد من المندوبين',
   Perm.tech: 'الحسابات والأدوار (زبون/مندوب)، إيقاف الحسابات، سجل العمليات',
 };
@@ -531,7 +531,7 @@ class AppSettings {
     this.stage3Minutes = 10,
     this.firstOrderFree = true,
     this.promoText = 'توصيل مجاني لأول طلب',
-    this.campaignName = 'رخيييييص',
+    this.campaignName = 'خصم فوق الخصم',
     this.campaignMinDiscount = 60,
   });
 
@@ -568,7 +568,7 @@ class AppSettings {
       stage3Minutes: g('stage3Minutes', d.stage3Minutes),
       firstOrderFree: (j['firstOrderFree'] ?? d.firstOrderFree) as bool,
       promoText: (j['promoText'] ?? d.promoText) as String,
-      campaignName: (j['campaignName'] ?? d.campaignName) as String,
+      campaignName: ((j['campaignName'] ?? d.campaignName) as String) == 'رخيييييص' ? d.campaignName : (j['campaignName'] ?? d.campaignName) as String,
       campaignMinDiscount: g('campaignMinDiscount', d.campaignMinDiscount),
     );
   }
