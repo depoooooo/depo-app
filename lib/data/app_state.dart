@@ -471,7 +471,7 @@ class AppState extends ChangeNotifier {
   }
 
   /// يمسح كل البيانات ويرجع للبيانات التجريبية (بالسيرفر: المدير بس)
-  bool get canResetDemo => !online || me?.role == Role.admin;
+  bool get canResetDemo => !online; // بالسيرفر ممنوع: يمسح بيانات الكل (حذف التجريبي بس من واجهة المدير)
   Future<void> resetDemo() async {
     if (!canResetDemo) return;
     users = [];

@@ -25,7 +25,7 @@ class AccountScreen extends StatelessWidget {
           const EmptyState(icon: Icons.person_outline, text: 'سجّل برقم تلفونك حتى تطلب وتتابع مطاعمك وتجمع نقاط'),
           FilledButton(onPressed: () => ensureLoggedIn(context), child: const Text('تسجيل الدخول')),
           const SizedBox(height: 24),
-          const _DemoHelp(),
+          if (!app.online) const _DemoHelp(),
         ]),
       );
     }
@@ -109,7 +109,7 @@ class AccountScreen extends StatelessWidget {
           _MenuItem(Icons.favorite_border, 'محلاتي (${u.follows.length})', () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const FollowingScreen()))),
           _MenuItem(Icons.notifications_none, 'الإشعارات (${u.notifications.length})', () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const NotificationsScreen()))),
           _MenuItem(Icons.location_on_outlined, 'عناويني', () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const AddressesScreen()))),
-          _MenuItem(Icons.card_giftcard, 'دعوة صديق', () => _invite(context)),
+          _MenuItem(Icons.ios_share_rounded, 'شارك ديبو ويه أصدقائك', () => _invite(context)),
           _MenuItem(Icons.support_agent, _supportLabel(), () => openSupport(context)),
           _MenuItem(Icons.settings_outlined, 'الإعدادات', () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const SettingsScreen()))),
           _MenuItem(Icons.logout, 'تسجيل الخروج', () {
@@ -117,22 +117,14 @@ class AccountScreen extends StatelessWidget {
             toast(context, 'سجّلت خروج');
           }),
           const SizedBox(height: 16),
-          const _DemoHelp(),
+          if (!app.online) const _DemoHelp(),
         ],
       ),
     );
   }
 
   void _invite(BuildContext context) {
-    final code = 'DEPO${app.me!.phone.substring(app.me!.phone.length - 4)}';
-    showDialog(
-      context: context,
-      builder: (c) => AlertDialog(
-        title: const Text('ادعُ صديقك'),
-        content: Text('رمز الدعوة مالتك: $code\n\nدزّه لأصدقائك. مكافأة الدعوة (نقاط إلك وإله) تتفعل قريباً.'),
-        actions: [TextButton(onPressed: () => Navigator.pop(c), child: const Text('تمام'))],
-      ),
-    );
+    shareText(context, 'جرّب ديبو: أكل المطاعم ومنتجات الماركت بنص السعر بالموصل، وتنقذ أكل من الرمي.\nhttps://depoooooo.github.io/depo-app/');
   }
 
   void _editName(BuildContext context) {

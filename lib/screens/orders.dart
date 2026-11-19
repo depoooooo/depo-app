@@ -3,6 +3,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import '../data/geo.dart';
 import 'address/address_ui.dart';
+import '../widgets/debt_ui.dart';
 import '../data/app_state.dart';
 import '../data/models.dart';
 import '../theme.dart';
@@ -136,7 +137,7 @@ class OrderDetailScreen extends StatelessWidget {
                         style: const TextStyle(fontSize: 34, fontWeight: FontWeight.w900, letterSpacing: 8, color: DepoColors.dark)),
                     Text(o.pickup ? 'اعرضه للمحل وقت الاستلام' : 'اعرضه للمندوب وقت التسليم', style: const TextStyle(fontSize: 12, color: DepoColors.muted)),
                     TextButton.icon(
-                      onPressed: () => toast(context, 'دز الرمز ${o.pickupCode} لصديقك حتى يستلم بدالك'),
+                      onPressed: () => shareText(context, 'رمز استلام طلبي من ديبو: ${o.pickupCode}\nاعرضه ${o.pickup ? 'للمحل' : 'للمندوب'} وقت الاستلام.'),
                       icon: const Icon(Icons.share_outlined),
                       label: const Text('خلّي صديقك يستلم'),
                     ),
@@ -149,7 +150,7 @@ class OrderDetailScreen extends StatelessWidget {
                     const CircleAvatar(backgroundColor: DepoColors.soft, child: Icon(Icons.delivery_dining, color: DepoColors.dark)),
                     const SizedBox(width: 10),
                     const Expanded(child: Text('المندوب بالطريق إلك', style: TextStyle(fontWeight: FontWeight.w800))),
-                    IconButton.filled(tooltip: 'اتصل بالمندوب', onPressed: () => toast(context, 'الاتصال عبر التطبيق يتفعل ويه Firebase'), icon: const Icon(Icons.phone)),
+                    IconButton.filled(tooltip: 'اتصل بالمندوب', onPressed: () => callPhone(context, o.courierPhone!), icon: const Icon(Icons.phone)),
                   ]),
                 ),
               AppCard(

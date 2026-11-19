@@ -130,15 +130,6 @@ class _DashboardState extends State<_Dashboard> {
           StatTile('عروض فعّالة', '${app.offersOf(s.id).length}'),
         ]),
         const SizedBox(height: 12),
-        if (s.type == StoreType.restaurant)
-          AppCard(
-            child: const ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: Icon(Icons.schedule_rounded, color: DepoColors.muted),
-              title: Text('رواجع يومية تلقائية (قريباً)', style: TextStyle(fontWeight: FontWeight.w800)),
-              subtitle: Text('تنشر وحدها كل يوم بوقت تختاره وأنت تأكد الكمية بس. هسه استخدم «انشر بضغطة وحدة» فوق.'),
-            ),
-          ),
         _ImpactReport(store: s),
         const SectionTitle('الأرباح والتسوية الشهرية'),
         for (final st in app.myStoreStatements(s).take(4))
@@ -501,9 +492,7 @@ class _PublishOfferScreenState extends State<PublishOfferScreen> {
               segments: const [ButtonSegment(value: true, label: Text('صندوق مفاجأة')), ButtonSegment(value: false, label: Text('وجبة محددة'))],
               selected: {surprise},
               onSelectionChanged: (v) => setState(() => surprise = v.first),
-            )
-          else
-            OutlinedButton.icon(onPressed: () => toast(context, 'مسح الباركود يتفعل بالتطبيق على التلفون'), icon: const Icon(Icons.qr_code_scanner), label: const Text('امسح الباركود')),
+            ),
           const SizedBox(height: 10),
           _QuickFill(onParsed: (r) => setState(() {
             if (r.title.isNotEmpty) title.text = r.title;
