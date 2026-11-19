@@ -7,6 +7,7 @@ import '../data/models.dart';
 import 'categories_screen.dart';
 import 'address/address_ui.dart';
 import '../widgets/mode_switch.dart';
+import '../widgets/depo_glyph.dart';
 import '../widgets/depo_refresh.dart';
 import '../widgets/typewriter_hint.dart';
 import '../theme.dart';
@@ -234,7 +235,7 @@ class _RawajiTabState extends State<_RawajiTab> {
           ],
           if (app.content.show('campaign') && campaign.isNotEmpty) _Campaign(name: st.campaignName, minDiscount: st.campaignMinDiscount, stores: campaign),
           if (app.content.show('boxes') && boxes.isNotEmpty) ...[
-            _Section(title: 'صناديق المفاجأة', subtitle: 'قيمتها 3 أضعاف سعرها'),
+            _Section(title: 'صناديق المفاجأة 🎁', subtitle: 'قيمتها 3 أضعاف سعرها'),
             OfferStrip(offers: boxes),
           ],
           if (app.content.show('stores')) ...[
@@ -291,12 +292,7 @@ class _Campaign extends StatelessWidget {
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         Row(children: [
-          Container(
-            width: 34,
-            height: 34,
-            decoration: BoxDecoration(color: DepoColors.dark, borderRadius: BorderRadius.circular(11)),
-            child: const Icon(Icons.local_offer_rounded, size: 19, color: Colors.white),
-          ),
+          const DepoGlyph('🔥', size: 30),
           const SizedBox(width: 8),
           Text(name, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: DepoColors.dark)),
           const Spacer(),
@@ -322,7 +318,7 @@ class _Section extends StatelessWidget {
       child: Row(children: [
         Expanded(
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
+            DepoText(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
             if (subtitle.isNotEmpty) Text(subtitle, style: const TextStyle(fontSize: 12, color: DepoColors.muted)),
           ]),
         ),
@@ -514,9 +510,9 @@ class _BannersState extends State<_Banners> {
                     Padding(
                       padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
                       child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.center, children: [
-                        if (s.title.isNotEmpty) Text(s.title, style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: s.titleColor)),
+                        if (s.title.isNotEmpty) DepoText(s.title, style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: s.titleColor)),
                         if (s.title.isNotEmpty && s.text.isNotEmpty) const SizedBox(height: 4),
-                        if (s.text.isNotEmpty) Text(s.text, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: s.textColor)),
+                        if (s.text.isNotEmpty) DepoText(s.text, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: s.textColor)),
                       ]),
                     ),
                   ]),

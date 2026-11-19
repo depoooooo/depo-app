@@ -7,6 +7,7 @@ import 'auth.dart';
 import 'orders.dart';
 import '../data/geo.dart';
 import 'address/address_ui.dart';
+import '../widgets/depo_glyph.dart';
 
 class CheckoutScreen extends StatefulWidget {
   const CheckoutScreen({super.key});
@@ -141,7 +142,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               _Line('التوصيل', fee == 0 ? 'مجاني' : iqd(fee)),
               if (firstFree)
                 const Row(children: [
-                  Icon(Icons.card_giftcard_rounded, size: 16, color: DepoColors.success),
+                  DepoGlyph('🎉', size: 18),
                   SizedBox(width: 6),
                   Text('أول طلب: التوصيل علينا', style: TextStyle(fontSize: 12, color: DepoColors.success, fontWeight: FontWeight.w800)),
                 ]),

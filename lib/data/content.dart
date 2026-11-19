@@ -108,8 +108,8 @@ class BannerItem {
 
   factory BannerItem.fromJson(Map<String, dynamic> j) => BannerItem(
         id: (j['id'] ?? '') as String,
-        title: noEmoji((j['title'] ?? '') as String),
-        text: noEmoji((j['text'] ?? '') as String),
+        title: (j['title'] ?? '') as String,
+        text: (j['text'] ?? '') as String,
         bg: (j['bg'] ?? 0xFF06363C) as int,
         darkText: (j['darkText'] ?? false) as bool,
         imageId: (j['imageId'] ?? '') as String,
@@ -204,7 +204,7 @@ class ContentConfig {
       banners: l('banners', BannerItem.fromJson, d.banners),
       restCats: l('restCats', CatItem.fromJson, d.restCats),
       marketCats: l('marketCats', CatItem.fromJson, d.marketCats),
-      searchPhrases: j['searchPhrases'] is List ? [for (final x in j['searchPhrases'] as List) noEmoji('$x')] : d.searchPhrases,
+      searchPhrases: j['searchPhrases'] is List ? [for (final x in j['searchPhrases'] as List) noEmoji('$x')] : d.searchPhrases, // شريط البحث نص بس
       splash1: (j['splash1'] ?? d.splash1) as String,
       splash2: (j['splash2'] ?? d.splash2) as String,
       sections: {...d.sections, ...Map<String, bool>.from((j['sections'] ?? const {}) as Map)},
@@ -215,7 +215,7 @@ class ContentConfig {
 
   factory ContentConfig.defaults() => ContentConfig(
         banners: [
-          BannerItem(id: 'b1', title: '{campaign}', text: 'رواجع المطاعم تبدي من 1,000 دينار', bg: 0xFF06363C, icon: 'fire', tab: 'rawaji'),
+          BannerItem(id: 'b1', title: '{campaign} 🔥', text: 'رواجع المطاعم تبدي من 1,000 دينار', bg: 0xFF06363C, icon: 'fire', tab: 'rawaji'),
           BannerItem(id: 'b2', title: 'استلم بنفسك', text: 'ووفّر {fee} رسم التوصيل', bg: 0xFF0E7F8A, icon: 'store', tab: 'rawaji'),
           BannerItem(id: 'b3', title: 'سجّل واكسب نقاط', text: 'كل 1,000 دينار = نقطة، بدّلها بصناديق مجانية', bg: 0xFFF5A524, darkText: true, icon: 'star', tab: 'rawaji', action: 'login', guestOnly: true),
           BannerItem(id: 'b4', title: 'عندك مطعم أو محل؟', text: 'انضم لديبو — أول شهر مجاني للمطاعم', bg: 0xFF2B5F66, icon: 'hand', tab: 'rawaji', action: 'join'),

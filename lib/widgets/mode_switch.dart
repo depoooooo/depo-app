@@ -14,6 +14,11 @@ class ModeSwitch extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // الخط الكبير بالتلفون ما يخرّب المفتاح
+    return MediaQuery.withClampedTextScaling(maxScaleFactor: 1.1, child: _box());
+  }
+
+  Widget _box() {
     return Container(
       height: 64,
       padding: const EdgeInsets.all(5),
@@ -26,7 +31,7 @@ class ModeSwitch extends StatelessWidget {
         animation: controller.animation!,
         builder: (context, _) {
           final t = controller.animation!.value.clamp(0.0, 1.0);
-          return Stack(children: [
+          return Stack(fit: StackFit.expand, children: [
             // الحبّة البيضاء
             Align(
               alignment: AlignmentDirectional(lerpDouble(-1, 1, t)!, 0),
@@ -42,7 +47,7 @@ class ModeSwitch extends StatelessWidget {
                 ),
               ),
             ),
-            Row(children: [
+            Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
               for (var i = 0; i < _items.length; i++)
                 Expanded(
                   child: _Seg(
