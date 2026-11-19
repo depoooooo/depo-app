@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../data/app_state.dart';
 import '../../data/content.dart';
+import '../../data/images.dart';
 import '../../data/models.dart';
 import '../../theme.dart';
 import '../../widgets/common.dart';
@@ -123,13 +124,62 @@ class IconPick extends StatelessWidget {
 }
 
 /// صورة (رفع/شيل)
-class ImagePickField extends StatelessWidget {
+class ImagePickField extends StatefulWidget {
   final String imageId;
   final ValueChanged<String> onChanged;
   final String label;
   final String hint; // ملاحظة للمصمم (القياس)
   final double maxSide;
-  const ImagePickField({super.key, required this.imageId, required this.onChanged, this.label = 'صورة (اختياري)', this.hint = '', this.maxSide = 1200});
+  final ValueChanged<bool>? onBusy; // حتى الشاشة تقفل زر الحفظ لحد ما تخلص الصورة
+  const ImagePickField({super.key, required this.imageId, required this.onChanged, this.label = 'صورة (اختياري)', this.hint = '', this.maxSide = 1200, this.onBusy});
+
+  @override
+  State<ImagePickField> createState() => _ImagePickFieldState();
+}
+
+class _ImagePickFieldState extends State<ImagePickField> {
+  bool busy = false;
+
+  Future<void> _pick() async {
+    final camera = await showModalBottomSheet<bool>(
+      context: context,
+      showDragHandle: true,
+      builder: (c) => SafeArea(
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          ListTile(leading: const Icon(Icons.photo_library_outlined), title: const Text('من المعرض'), onTap: () => Navigator.pop(c, false)),
+          ListTile(leading: const Icon(Icons.photo_camera_outlined), title: const Text('صوّر هسه'), onTap: () => Navigator.pop(c, true)),
+          const SizedBox(height: 8),
+        ]),
+      ),
+    );
+    if (camera == null || !mounted) return;
+    setState(() => busy = true);
+    widget.onBusy?.call(true);
+    String? err;
+    try {
+      final b = await Images.pick(camera: camera, maxSide: widget.maxSide, quality: 80);
+      if (b != null) {
+        final id = await Images.put(b, owner: 'content').timeout(const Duration(seconds: 40));
+        widget.onChanged(id);
+      }
+    } catch (e) {
+      err = e.toString().replaceFirst('Exception: ', '');
+    }
+    if (!mounted) return;
+    setState(() => busy = false);
+    widget.onBusy?.call(false);
+    if (err != null) {
+      // نافذة (مو شريط تحت) حتى تبين حتى لو الشاشة نافذة منبثقة
+      await showDialog<void>(
+        context: context,
+        builder: (c) => AlertDialog(
+          title: const Text('ما انرفعت الصورة'),
+          content: Text(err!.contains('Timeout') ? 'النت ضعيف، جرّب مرة ثانية' : err),
+          actions: [FilledButton(style: FilledButton.styleFrom(minimumSize: const Size(0, 44)), onPressed: () => Navigator.pop(c), child: const Text('تمام'))],
+        ),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -139,26 +189,25 @@ class ImagePickField extends StatelessWidget {
         height: 64,
         decoration: BoxDecoration(color: DepoColors.soft, borderRadius: BorderRadius.circular(12)),
         clipBehavior: Clip.antiAlias,
-        child: imageId.isEmpty
-            ? const Icon(Icons.image_outlined, color: DepoColors.muted)
-            : AppImage(imageId: imageId, height: 64, width: 64, fallback: const Icon(Icons.broken_image_outlined)),
+        child: busy
+            ? const Center(child: SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2.5)))
+            : widget.imageId.isEmpty
+                ? const Icon(Icons.image_outlined, color: DepoColors.muted)
+                : AppImage(imageId: widget.imageId, height: 64, width: 64, fallback: const Icon(Icons.broken_image_outlined)),
       ),
       const SizedBox(width: 10),
       Expanded(
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(label, style: const TextStyle(fontWeight: FontWeight.w800)),
-          if (hint.isNotEmpty) Text(hint, style: const TextStyle(fontSize: 11, color: DepoColors.muted, height: 1.5)),
+          Text(busy ? 'جاري ضغط الصورة ورفعها…' : widget.label, style: const TextStyle(fontWeight: FontWeight.w800)),
+          if (widget.hint.isNotEmpty) Text(widget.hint, style: const TextStyle(fontSize: 11, color: DepoColors.muted, height: 1.5)),
         ]),
       ),
       TextButton.icon(
-        onPressed: () async {
-          final id = await pickAndUpload(context, owner: 'content', maxSide: maxSide, quality: 80);
-          if (id != null) onChanged(id);
-        },
+        onPressed: busy ? null : _pick,
         icon: const Icon(Icons.upload),
-        label: Text(imageId.isEmpty ? 'رفع' : 'تغيير'),
+        label: Text(widget.imageId.isEmpty ? 'رفع' : 'تغيير'),
       ),
-      if (imageId.isNotEmpty) IconButton(tooltip: 'شيل الصورة', onPressed: () => onChanged(''), icon: const Icon(Icons.close)),
+      if (widget.imageId.isNotEmpty && !busy) IconButton(tooltip: 'شيل الصورة', onPressed: () => widget.onChanged(''), icon: const Icon(Icons.close)),
     ]);
   }
 }
@@ -413,6 +462,7 @@ class _CatsEditorState extends State<CatsEditor> {
     final old = c.name;
     final name = TextEditingController(text: c.name);
     final words = TextEditingController(text: c.words.join('، '));
+    var uploading = false;
     final ok = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
@@ -436,7 +486,17 @@ class _CatsEditorState extends State<CatsEditor> {
                 Expanded(child: TextField(controller: name, decoration: const InputDecoration(labelText: 'اسم القسم'))),
               ]),
               const SizedBox(height: 12),
-              ImagePickField(imageId: c.imageId, onChanged: (v) => set(() => c.imageId = v), label: 'صورة القسم (تطلع بالدائرة بدل الأيقونة)',
+              ImagePickField(
+                  imageId: c.imageId,
+                  onChanged: (v) {
+                    c.imageId = v; // تنحفظ حتى لو انسدت النافذة
+                    if (ctx.mounted) set(() {});
+                  },
+                  onBusy: (v) {
+                    uploading = v;
+                    if (ctx.mounted) set(() {});
+                  },
+                  label: 'صورة القسم (تطلع بالدائرة بدل الأيقونة)',
                   maxSide: 600,
                   hint: '📐 القياس: 500 × 500 بكسل (مربعة)\n• تنقص دائرة: خلي الأكلة/المنتج بالنص ويه فراغ حواليه\n• خلفية بيضاء أو لون سادة'),
               const SizedBox(height: 10),
@@ -450,7 +510,9 @@ class _CatsEditorState extends State<CatsEditor> {
               const SizedBox(height: 12),
               TextField(controller: words, decoration: const InputDecoration(labelText: 'كلمات تدل عليه (اختياري)', helperText: 'مفصولة بفاصلة — حتى العروض القديمة تنعرف لهذا القسم')),
               const SizedBox(height: 14),
-              FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('تم')),
+              FilledButton(onPressed: uploading ? null : () => Navigator.pop(ctx, true), child: Text(uploading ? 'انتظر الصورة…' : 'تم')),
+              const SizedBox(height: 6),
+              const Text('بعد «تم» لا تنسى «حفظ ونشر» تحت', textAlign: TextAlign.center, style: TextStyle(fontSize: 12, color: DepoColors.muted)),
             ]),
           ),
         ),
