@@ -18,6 +18,31 @@ if os.path.exists(man):
         s = s.replace("<application", '<uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>\n    <application', 1)
     open(man, "w", encoding="utf-8").write(s)
 
+# شاشة النظام قبل ما يفتح التطبيق: فيروزي ويه الأيقونة (بدل الأبيض)
+res = os.path.join(ROOT, "android/app/src/main/res")
+if os.path.isdir(res):
+    os.makedirs(os.path.join(res, "values"), exist_ok=True)
+    open(os.path.join(res, "values/depo_colors.xml"), "w", encoding="utf-8").write(
+        '<?xml version="1.0" encoding="utf-8"?>\n<resources>\n    <color name="depo_brand">#4BCDDB</color>\n</resources>\n')
+    lb = ('<?xml version="1.0" encoding="utf-8"?>\n<layer-list xmlns:android="http://schemas.android.com/apk/res/android">\n'
+          '    <item android:drawable="@color/depo_brand" />\n'
+          '    <item><bitmap android:gravity="center" android:src="@mipmap/ic_launcher" /></item>\n</layer-list>\n')
+    for dname in ("drawable", "drawable-v21"):
+        dp = os.path.join(res, dname)
+        if os.path.isdir(dp):
+            open(os.path.join(dp, "launch_background.xml"), "w", encoding="utf-8").write(lb)
+    v31 = os.path.join(res, "values-v31")
+    os.makedirs(v31, exist_ok=True)
+    open(os.path.join(v31, "styles.xml"), "w", encoding="utf-8").write(
+        '<?xml version="1.0" encoding="utf-8"?>\n<resources>\n'
+        '    <style name="LaunchTheme" parent="@android:style/Theme.Light.NoTitleBar">\n'
+        '        <item name="android:windowSplashScreenBackground">@color/depo_brand</item>\n'
+        '        <item name="android:windowSplashScreenAnimatedIcon">@mipmap/ic_launcher</item>\n'
+        '    </style>\n'
+        '    <style name="NormalTheme" parent="@android:style/Theme.Light.NoTitleBar">\n'
+        '        <item name="android:windowBackground">@color/depo_brand</item>\n'
+        '    </style>\n</resources>\n')
+
 # Firebase يحتاج أندرويد 7 فما فوق (minSdk 24)
 for g in ("android/app/build.gradle.kts", "android/app/build.gradle"):
     gp = os.path.join(ROOT, g)
@@ -72,6 +97,8 @@ if os.path.isdir(web):
         s = s.replace('content="depo"', 'content="ديبو"').replace('content="Depo"', 'content="ديبو"')
         s = re.sub(r'<meta name="description" content="[^"]*">',
                    '<meta name="description" content="رواجع المطاعم والماركت بأرخص سعر — الموصل">', s)
+        if "depo-bg" not in s:
+            s = s.replace("<body>", '<body style="background:#4BCDDB" class="depo-bg">', 1)
         if 'name="theme-color"' not in s:
             s = s.replace("</head>", f'  <meta name="theme-color" content="{BRAND}">\n</head>')
         open(ix, "w", encoding="utf-8").write(s)

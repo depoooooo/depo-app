@@ -2,8 +2,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:depo/main.dart';
 
 void main() {
-  testWidgets('شاشة البداية تظهر زر ابدأ التصفح', (tester) async {
+  testWidgets('التطبيق يفتح بشاشة البداية', (tester) async {
     await tester.pumpWidget(const DepoApp());
-    expect(find.text('ابدأ التصفح'), findsOneWidget);
+    expect(find.text('أكل طيب.. بسعر أطيب'), findsOneWidget);
   });
 }
