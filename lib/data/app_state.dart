@@ -7,6 +7,7 @@ import 'package:crypto/crypto.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'cloud.dart';
 import 'content.dart';
+import 'geo.dart';
 import 'models.dart';
 
 /// حالة التطبيق: البيانات تنحفظ بـ Firebase (Firestore) وتتزامن بين كل الأجهزة.
@@ -711,7 +712,7 @@ class AppState extends ChangeNotifier {
 
   /// يأكد الطلب. بالسيرفر: الكميات تنقص بعملية وحدة (transaction) حتى ما ينباع نفس الشي لزبونين.
   /// يرمي [OrderError] إذا ما ينفع.
-  Future<Order> placeOrder({required bool pickup, required String address}) async {
+  Future<Order> placeOrder({required bool pickup, required String address, GeoFix? location}) async {
     final err = checkCart();
     if (err != null) throw OrderError(err);
     final u = me!;
@@ -733,6 +734,8 @@ class AppState extends ChangeNotifier {
       commission: commissionWithRule(s, items).$1,
       commissionRule: commissionWithRule(s, items).$2,
       distanceKm: pickup ? 0 : s.distanceKm,
+      custLat: pickup || location == null ? 0 : location.lat,
+      custLng: pickup || location == null ? 0 : location.lng,
     );
     final want = {for (final l in cart.lines) l.offer.id: l.qty};
 
@@ -1809,7 +1812,11 @@ extension Finance on AppState {
     if (o.courierPhone != null && paymentsOf('courier', o.courierPhone!, o.settleMonth).isNotEmpty) return 'انسوّت أجور هذا الشهر، ما تنعدل المسافة';
     final cp = CourierPay.of(o.payRule, settings);
     final old = o.courierPay;
+    final oldKm = o.distanceKm;
     o.distanceKm = cp.kmOf(km);
+    o.kmSource = 'edited';
+    o.kmReviewed = true;
+    if (!o.kmFlags.contains('edited:${oldKm.toStringAsFixed(1)}')) o.kmFlags.add('edited:${oldKm.toStringAsFixed(1)}');
     if (o.status == OrderStatus.delivered && paidCourier(o)) {
       if (o.payRule.length != 4) o.payRule = cp.rule;
       o.courierPay = cp.pay(o.distanceKm);
@@ -1819,10 +1826,120 @@ extension Finance on AppState {
     return null;
   }
 
-  /// المندوب يثبّت المسافة الفعلية عند التسليم
-  void setDeliveryKm(Order o, double km) {
-    if (o.courierPhone != currentPhone || o.status == OrderStatus.delivered) return;
-    o.distanceKm = CourierPay.of(const [], settings).kmOf(km);
+  /// صاحب المحل (أو الشراكات/العمليات) يثبّت موقع المحل بالـ GPS وهو بالمحل
+  String? setStoreLocation(Store s, GeoFix f) {
+    if (!(ownsStore(s.id) || me?.storeId == s.id || canAny([Perm.partnerships, Perm.operations]))) return 'ما عندك صلاحية';
+    if (f.mocked) return 'الموقع مزيّف (تطبيق تغيير موقع). طفّيه وجرّب';
+    if (f.accuracy > settings.gpsMaxAccuracy) return 'دقة الـ GPS ضعيفة (${f.accuracy.round()} م). اطلع لباب المحل وجرّب';
+    final had = s.hasLocation;
+    s
+      ..lat = f.lat
+      ..lng = f.lng;
+    _log('${had ? 'تغيير' : 'تثبيت'} موقع ${s.name} بالـ GPS (دقة ${f.accuracy.round()} م)');
+    _changed();
+    return null;
+  }
+
+  /// المندوب استلم من المحل: نسجل موقعه (يفيد إذا المحل بعده ما مثبّت موقعه)
+  void courierPickedUp(Order o, GeoFix? f) {
+    if (o.courierPhone != currentPhone || o.status != OrderStatus.ready) return;
+    if (f != null) {
+      o.pickLat = f.lat;
+      o.pickLng = f.lng;
+      if (f.mocked && !o.kmFlags.contains('mock')) o.kmFlags.add('mock');
+      final s = storeById(o.storeId);
+      if (s != null && s.hasLocation && Geo.straightKm(s.lat, s.lng, f.lat, f.lng) > 0.5) o.kmFlags.add('pickfar');
+    }
+    setStatus(o, OrderStatus.onTheWay);
+  }
+
+  /// المندوب سلّم: المسافة تنحسب من الـ GPS (المحل ← مكان التسليم) × معامل الطرق.
+  /// [manualKm] بس إذا الـ GPS ما اشتغل — وتنعلّم «تحتاج مراجعة».
+  void courierDelivered(Order o, GeoFix? drop, {double? manualKm}) {
+    if (o.courierPhone != currentPhone || o.status != OrderStatus.onTheWay) return;
+    final s = storeById(o.storeId);
+    final flags = <String>{...o.kmFlags};
+    double? sLat, sLng, eLat, eLng;
+    if (s != null && s.hasLocation) {
+      sLat = s.lat;
+      sLng = s.lng;
+    } else if (o.pickLat != 0) {
+      sLat = o.pickLat;
+      sLng = o.pickLng;
+      flags.add('nostore');
+    }
+    var source = '';
+    if (drop != null) {
+      o.dropLat = drop.lat;
+      o.dropLng = drop.lng;
+      if (drop.mocked) flags.add('mock');
+      if (drop.accuracy > settings.gpsMaxAccuracy) flags.add('weak');
+      if (o.custLat != 0 && Geo.straightKm(o.custLat, o.custLng, drop.lat, drop.lng) > 1) flags.add('far');
+      eLat = drop.lat;
+      eLng = drop.lng;
+      source = 'gps';
+    } else if (o.custLat != 0) {
+      eLat = o.custLat;
+      eLng = o.custLng;
+      source = 'customer';
+    }
+    if (sLat != null && eLat != null) {
+      final straight = Geo.straightKm(sLat, sLng!, eLat, eLng!);
+      o
+        ..startLat = sLat
+        ..startLng = sLng
+        ..endLat = eLat
+        ..endLng = eLng
+        ..straightKm = (straight * 100).round() / 100
+        ..roadFactor = settings.roadFactor
+        ..distanceKm = straight * settings.roadFactor / 100
+        ..kmSource = source;
+    } else if (manualKm != null) {
+      o
+        ..distanceKm = manualKm
+        ..kmSource = 'manual';
+    } else {
+      o.kmSource = 'estimate'; // تقدير المحل
+    }
+    o.kmFlags = flags.toList();
+    setStatus(o, OrderStatus.delivered);
+  }
+
+  /// المالية/العمليات تأكد إن المسافة صحيحة
+  void approveKm(Order o) {
+    if (!(canFinance || canAny([Perm.operations]))) return;
+    o.kmReviewed = true;
+    _log('مراجعة واعتماد مسافة الطلب #${o.id}: ${o.distanceKm.toStringAsFixed(1)} كم = ${iqd(o.courierPay)}');
+    _changed();
+  }
+
+  /// شرح مصدر المسافة
+  String kmSourceText(Order o) {
+    final parts = <String>[];
+    switch (o.kmSource) {
+      case 'gps':
+        parts.add('GPS: من ${o.kmFlags.contains('nostore') ? 'مكان الاستلام' : 'موقع المحل'} إلى مكان التسليم');
+      case 'customer':
+        parts.add('GPS: من ${o.kmFlags.contains('nostore') ? 'مكان الاستلام' : 'موقع المحل'} إلى موقع الزبون (GPS المندوب ما اشتغل)');
+      case 'manual':
+        parts.add('كتبها المندوب يدوياً (الـ GPS ما اشتغل)');
+      case 'estimate':
+        parts.add('تقدير المحل (ماكو GPS)');
+      case 'edited':
+        parts.add('عدّلتها المالية');
+      default:
+        parts.add('بدون GPS (طلب قديم)');
+    }
+    if (o.straightKm > 0) parts.add('خط مستقيم ${o.straightKm.toStringAsFixed(2)} كم × ${(o.roadFactor / 100).toStringAsFixed(2)} معامل الطرق');
+    for (final f in o.kmFlags) {
+      if (f == 'mock') parts.add('⚠️ موقع مزيّف');
+      if (f == 'weak') parts.add('⚠️ دقة GPS ضعيفة');
+      if (f == 'far') parts.add('⚠️ التسليم أبعد من كيلو عن موقع الزبون');
+      if (f == 'pickfar') parts.add('⚠️ الاستلام أبعد من نص كيلو عن المحل');
+      if (f.startsWith('edited:')) parts.add('كانت ${f.substring(7)} كم قبل التعديل');
+    }
+    if (o.kmReviewed) parts.add('✓ مراجَعة');
+    return parts.join(' • ');
   }
 
   String _who() => me == null ? '' : (me!.name.isEmpty ? me!.phone : me!.name);
@@ -1835,6 +1952,10 @@ extension Finance on AppState {
     if (remaining == 0) return 'الحساب مسدّد';
     if (amount.sign != remaining.sign) return 'اتجاه المبلغ غلط';
     if (amount.abs() > remaining.abs()) return 'المبلغ أكثر من الباقي (${iqd(remaining.abs())})';
+    if (kind == 'courier') {
+      final n = courierStatement(target, month).orders.where((o) => o.kmNeedsReview).length;
+      if (n > 0) return 'راجع مسافة $n ${n == 1 ? 'توصيلة' : 'توصيلات'} أول (معلّمة «تحتاج مراجعة»)';
+    }
     settlements.insert(0, Settlement(id: '${kind}_${DateTime.now().millisecondsSinceEpoch}', kind: kind, target: target, month: month, amount: amount, at: DateTime.now().millisecondsSinceEpoch, by: _who(), note: note.trim()));
     final left = remaining - amount;
     if (kind == 'store') {
@@ -1909,7 +2030,7 @@ extension Finance on AppState {
     b.writeln('الحالة: ${st.balance.status}');
     b.writeln('— التفاصيل —');
     for (final o in st.orders.reversed) {
-      b.writeln('#${o.id} ${dateTimeLabel(o.deliveredAt)} • ${o.distanceKm.toStringAsFixed(1)} كم • ${iqd(o.courierPay)}');
+      b.writeln('#${o.id} ${dateTimeLabel(o.deliveredAt)} • ${o.distanceKm.toStringAsFixed(1)} كم • ${iqd(o.courierPay)} • ${kmSourceText(o)}');
     }
     return b.toString();
   }

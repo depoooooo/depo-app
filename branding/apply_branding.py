@@ -16,6 +16,9 @@ if os.path.exists(man):
     s = re.sub(r'android:label="[^"]*"', 'android:label="ديبو"', s, count=1)
     if "POST_NOTIFICATIONS" not in s:
         s = s.replace("<application", '<uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>\n    <application', 1)
+    for perm in ("ACCESS_FINE_LOCATION", "ACCESS_COARSE_LOCATION"):
+        if perm not in s:
+            s = s.replace("<application", f'<uses-permission android:name="android.permission.{perm}"/>\n    <application', 1)
     open(man, "w", encoding="utf-8").write(s)
 
 # شاشة النظام قبل ما يفتح التطبيق: فيروزي ويه الأيقونة (بدل الأبيض)

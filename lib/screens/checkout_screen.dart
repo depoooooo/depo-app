@@ -5,6 +5,8 @@ import '../theme.dart';
 import '../widgets/common.dart';
 import 'auth.dart';
 import 'orders.dart';
+import '../data/geo.dart';
+import '../widgets/geo_ui.dart';
 
 class CheckoutScreen extends StatefulWidget {
   const CheckoutScreen({super.key});
@@ -17,6 +19,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   bool pickup = false;
   String? address;
   bool placing = false;
+  GeoFix? here;
 
   int get fee {
     if (pickup) return 0;
@@ -35,7 +38,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     setState(() => placing = true);
     final Order order;
     try {
-      order = await app.placeOrder(pickup: pickup, address: addr);
+      order = await app.placeOrder(pickup: pickup, address: addr, location: here);
     } on OrderError catch (e) {
       if (mounted) {
         setState(() => placing = false);
@@ -105,6 +108,26 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               onPressed: _addAddress,
               icon: const Icon(Icons.add_location_alt_outlined),
               label: Text(addresses.isEmpty ? 'أضف عنوان التوصيل' : 'عنوان جديد'),
+            ),
+            const SizedBox(height: 8),
+            AppCard(
+              borderColor: here != null ? DepoColors.success : null,
+              onTap: () async {
+                final r = await locateWithProgress(context);
+                if (!context.mounted) return;
+                if (r.fix == null) return toast(context, r.error);
+                setState(() => here = r.fix);
+              },
+              child: Row(children: [
+                Icon(here != null ? Icons.check_circle : Icons.my_location, color: here != null ? DepoColors.success : DepoColors.dark),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(here != null ? 'انرسل موقعك ✓' : 'أرسل موقعي الحالي (اختياري)', style: const TextStyle(fontWeight: FontWeight.w800)),
+                    const Text('إذا انت هسه بمكان التوصيل، المندوب يوصلك أسرع', style: TextStyle(fontSize: 12, color: DepoColors.muted)),
+                  ]),
+                ),
+              ]),
             ),
             const SizedBox(height: 10),
           ],

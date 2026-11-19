@@ -88,6 +88,18 @@ class _FinanceTabState extends State<FinanceTab> {
             StatTile('رسوم توصيل ديبو', iqd(r.deliveryFees)),
             StatTile('أجور المندوبين', iqd(r.courierPay)),
           ]),
+          if (r.orders.any((o) => o.kmNeedsReview))
+            AppCard(
+              color: const Color(0xFFFFF6E5),
+              child: Row(children: [
+                const Icon(Icons.rule, color: Color(0xFF8A5A00)),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text('${r.orders.where((o) => o.kmNeedsReview).length} توصيلة مسافتها تحتاج مراجعة (بدون GPS أو GPS مشكوك). افتح كشف المندوب وراجعها قبل التسوية.',
+                      style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12)),
+                ),
+              ]),
+            ),
           // ---------- بانتظار التسوية ----------
           SectionTitle('بانتظار التسوية · ${monthLabel(m)}'),
           AppCard(
@@ -132,6 +144,8 @@ class _FinanceTabState extends State<FinanceTab> {
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     Text(app.userByPhone(c.phone)?.name ?? c.phone, style: const TextStyle(fontWeight: FontWeight.w900)),
                     Text('${c.orders.length} توصيلة • ${c.km.toStringAsFixed(1)} كم', style: const TextStyle(fontSize: 12, color: DepoColors.muted)),
+                    if (c.orders.any((o) => o.kmNeedsReview))
+                      Text('${c.orders.where((o) => o.kmNeedsReview).length} تحتاج مراجعة', style: const TextStyle(fontSize: 11, color: Color(0xFF8A5A00), fontWeight: FontWeight.w800)),
                   ]),
                 ),
                 Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
@@ -513,7 +527,13 @@ class CourierStatementScreen extends StatelessWidget {
                 label: Text(app.isCurrentMonth(month) ? 'التسوية بعد نهاية الشهر' : 'تسجيل دفع أجور (${iqd(b.remaining)})'),
               ),
             SectionTitle('التوصيلات (${st.orders.length})'),
-            if (canEdit) const Note('إذا المسافة غلط اضغط عليها وعدّلها — تنعدل قبل تسوية الشهر بس، وينسجل التعديل باسمك.'),
+            if (canEdit) const Note('المسافة تنحسب بالـ GPS. إذا وحدة غلط اضغط عليها وعدّلها، أو اعتمدها بـ «المسافة صحيحة». التعديل قبل تسوية الشهر بس، وينسجل باسمك.'),
+            if (st.orders.any((o) => o.kmNeedsReview))
+              AppCard(
+                color: const Color(0xFFFFF6E5),
+                child: Text('${st.orders.where((o) => o.kmNeedsReview).length} توصيلة تحتاج مراجعة — التسوية تنقفل لحد ما تنراجع كلها.',
+                    style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12)),
+              ),
             for (final o in st.orders)
               AppCard(
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -523,12 +543,28 @@ class CourierStatementScreen extends StatelessWidget {
                     ),
                     InkWell(
                       onTap: canEdit ? () => _editKm(context, o) : null,
-                      child: Badge2('${o.distanceKm.toStringAsFixed(1)} كم${canEdit ? ' ✎' : ''}', bg: DepoColors.soft, fg: DepoColors.dark),
+                      child: Badge2('${o.distanceKm.toStringAsFixed(1)} كم${canEdit ? ' ✎' : ''}',
+                          bg: o.kmNeedsReview ? const Color(0xFFFFF6E5) : DepoColors.soft, fg: o.kmNeedsReview ? const Color(0xFF8A5A00) : DepoColors.dark),
                     ),
                   ]),
-                  Note(CourierPay.of(o.payRule, app.settings).explain(o.distanceKm)),
+                  Note('المسافة: ${app.kmSourceText(o)}', color: o.kmNeedsReview ? const Color(0xFF8A5A00) : null),
+                  Note('الأجرة: ${CourierPay.of(o.payRule, app.settings).explain(o.distanceKm)}'),
                   MoneyRow('الأجرة', o.courierPay, bold: true),
                   MoneyRow('حصّل من الزبون (يسلّمه لديبو)', o.total),
+                  Wrap(spacing: 8, children: [
+                    if (o.endLat != 0)
+                      TextButton.icon(
+                        onPressed: () => openLink(context, 'https://www.google.com/maps/dir/?api=1&origin=${o.startLat},${o.startLng}&destination=${o.endLat},${o.endLng}&travelmode=driving'),
+                        icon: const Icon(Icons.map_outlined, size: 18),
+                        label: const Text('شوف المسار'),
+                      ),
+                    if (o.kmNeedsReview && (app.canFinance || app.canAny([Perm.operations])) && b.payments.isEmpty)
+                      FilledButton.tonalIcon(
+                        onPressed: () => app.approveKm(o),
+                        icon: const Icon(Icons.check, size: 18),
+                        label: const Text('المسافة صحيحة'),
+                      ),
+                  ]),
                 ]),
               ),
           ]),

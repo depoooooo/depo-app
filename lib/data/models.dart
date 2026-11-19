@@ -158,6 +158,7 @@ class Store {
   bool listed; // يظهر بالأسواق للجميع
   String promoImageId; // بنر العرض الخاص بصفحة المحل
   String promoText;
+  double lat, lng; // موقع المحل (0 = ما محدد)
 
   Store({
     required this.id,
@@ -180,6 +181,8 @@ class Store {
     this.listed = true,
     this.promoImageId = '',
     this.promoText = '',
+    this.lat = 0,
+    this.lng = 0,
   }) : approvedAt = approvedAt ?? _now();
 
   String get fullName => '$name — $area';
@@ -205,6 +208,8 @@ class Store {
         'listed': listed,
         'promoImageId': promoImageId,
         'promoText': promoText,
+        'lat': lat,
+        'lng': lng,
       };
 
   factory Store.fromJson(Map<String, dynamic> j) => Store(
@@ -228,7 +233,10 @@ class Store {
         listed: (j['listed'] ?? true) as bool,
         promoImageId: (j['promoImageId'] ?? '') as String,
         promoText: (j['promoText'] ?? '') as String,
+        lat: ((j['lat'] ?? 0) as num).toDouble(),
+        lng: ((j['lng'] ?? 0) as num).toDouble(),
       );
+  bool get hasLocation => lat != 0 && lng != 0;
 }
 
 class Offer {
@@ -372,6 +380,17 @@ class Order {
   int deliveredAt; // وقت التسليم (للتسوية الشهرية)
   String commissionRule; // كيف انحسبت العمولة (15% / الحد الأدنى / الشهر المجاني)
   List<int> payRule; // تسعيرة المندوب وقت التسليم: [ثابت، لكل كم، حد أدنى، أقصى كم]
+  // ---- المسافة بالـ GPS ----
+  double custLat, custLng; // موقع الزبون اللي أرسله وقت الطلب
+  double pickLat, pickLng; // موقع المندوب لما استلم من المحل
+  double dropLat, dropLng; // موقع المندوب لما سلّم للزبون
+  double startLat, startLng; // نقطة البداية اللي انحسبت منها المسافة
+  double endLat, endLng; // نقطة النهاية
+  double straightKm; // خط مستقيم
+  int roadFactor; // معامل الطرق % وقت التسليم
+  String kmSource; // gps / customer / manual / estimate / edited
+  List<String> kmFlags; // mock / weak / far / nostore ...
+  bool kmReviewed; // المالية راجعت المسافة
 
   Order({
     required this.id,
@@ -395,7 +414,23 @@ class Order {
     this.deliveredAt = 0,
     this.commissionRule = '',
     List<int>? payRule,
+    this.custLat = 0,
+    this.custLng = 0,
+    this.pickLat = 0,
+    this.pickLng = 0,
+    this.dropLat = 0,
+    this.dropLng = 0,
+    this.startLat = 0,
+    this.startLng = 0,
+    this.endLat = 0,
+    this.endLng = 0,
+    this.straightKm = 0,
+    this.roadFactor = 0,
+    this.kmSource = '',
+    List<String>? kmFlags,
+    this.kmReviewed = false,
   })  : payRule = payRule ?? const [],
+        kmFlags = kmFlags ?? [],
         createdAt = createdAt ?? _now();
 
   /// شهر التسوية (حسب وقت التسليم)
@@ -428,6 +463,21 @@ class Order {
         'deliveredAt': deliveredAt,
         'commissionRule': commissionRule,
         'payRule': payRule,
+        'custLat': custLat,
+        'custLng': custLng,
+        'pickLat': pickLat,
+        'pickLng': pickLng,
+        'dropLat': dropLat,
+        'dropLng': dropLng,
+        'startLat': startLat,
+        'startLng': startLng,
+        'endLat': endLat,
+        'endLng': endLng,
+        'straightKm': straightKm,
+        'roadFactor': roadFactor,
+        'kmSource': kmSource,
+        'kmFlags': kmFlags,
+        'kmReviewed': kmReviewed,
       };
 
   factory Order.fromJson(Map<String, dynamic> j) => Order(
@@ -452,7 +502,25 @@ class Order {
         deliveredAt: (j['deliveredAt'] ?? 0) as int,
         commissionRule: (j['commissionRule'] ?? '') as String,
         payRule: [for (final x in (j['payRule'] as List? ?? const [])) (x as num).toInt()],
+        custLat: _d(j['custLat']),
+        custLng: _d(j['custLng']),
+        pickLat: _d(j['pickLat']),
+        pickLng: _d(j['pickLng']),
+        dropLat: _d(j['dropLat']),
+        dropLng: _d(j['dropLng']),
+        startLat: _d(j['startLat']),
+        startLng: _d(j['startLng']),
+        endLat: _d(j['endLat']),
+        endLng: _d(j['endLng']),
+        straightKm: _d(j['straightKm']),
+        roadFactor: (j['roadFactor'] ?? 0) as int,
+        kmSource: (j['kmSource'] ?? '') as String,
+        kmFlags: List<String>.from(j['kmFlags'] ?? const []),
+        kmReviewed: (j['kmReviewed'] ?? false) as bool,
       );
+
+  /// المسافة تحتاج مراجعة قبل تسوية أجور المندوب
+  bool get kmNeedsReview => !kmReviewed && (kmSource == 'manual' || kmSource == 'estimate' || kmFlags.contains('mock') || kmFlags.contains('weak'));
 }
 
 /// تسوية شهرية مسجّلة (محل أو مندوب)
@@ -507,6 +575,8 @@ class CourierPay {
     return b.toString();
   }
 }
+
+double _d(Object? v) => ((v ?? 0) as num).toDouble();
 
 class JoinRequest {
   String id;
@@ -633,6 +703,8 @@ class AppSettings {
   int courierMinPay; // الحد الأدنى للأجرة
   int courierMaxKm; // أقصى مسافة تنحسب (حماية من الأخطاء)
   int courierCashCap; // سقف النقد بيد المندوب
+  int roadFactor; // معامل الطرق %: الطريق الفعلي أطول من الخط المستقيم
+  int gpsMaxAccuracy; // أسوأ دقة GPS مقبولة (متر)
 
   AppSettings({
     this.restaurantCommission = 15,
@@ -654,6 +726,8 @@ class AppSettings {
     this.courierMinPay = 1500,
     this.courierMaxKm = 30,
     this.courierCashCap = 100000,
+    this.roadFactor = 130,
+    this.gpsMaxAccuracy = 150,
   });
 
   /// أجرة المندوب حسب المسافة: ثابت + لكل كم، وما تنزل عن الحد الأدنى (مقرّبة لـ 250)
@@ -679,6 +753,8 @@ class AppSettings {
         'courierMinPay': courierMinPay,
         'courierMaxKm': courierMaxKm,
         'courierCashCap': courierCashCap,
+        'roadFactor': roadFactor,
+        'gpsMaxAccuracy': gpsMaxAccuracy,
       };
 
   factory AppSettings.fromJson(Map<String, dynamic> j) {
@@ -704,6 +780,8 @@ class AppSettings {
       courierMinPay: g('courierMinPay', d.courierMinPay),
       courierMaxKm: g('courierMaxKm', d.courierMaxKm),
       courierCashCap: g('courierCashCap', d.courierCashCap),
+      roadFactor: g('roadFactor', d.roadFactor),
+      gpsMaxAccuracy: g('gpsMaxAccuracy', d.gpsMaxAccuracy),
     );
   }
 }

@@ -6,6 +6,7 @@ import '../../widgets/common.dart';
 import '../orders.dart';
 import '../../widgets/debt_ui.dart';
 import 'finance_tab.dart';
+import '../../widgets/geo_ui.dart';
 
 /// واجهة المندوب
 class CourierHome extends StatelessWidget {
@@ -92,7 +93,11 @@ class CourierHome extends StatelessWidget {
     }
     if (o.status == OrderStatus.ready) {
       return FilledButton.icon(
-        onPressed: () => app.setStatus(o, OrderStatus.onTheWay),
+        onPressed: () async {
+          final r = await locateWithProgress(context);
+          app.courierPickedUp(o, r.fix);
+          if (r.fix == null && context.mounted) toast(context, '${r.error}\nكمّل عادي، بس شغّل الموقع قبل التسليم حتى تنحسب أجرتك صح');
+        },
         icon: const Icon(Icons.check),
         label: const Text('استلمت من المحل — بالطريق'),
       );
@@ -101,6 +106,12 @@ class CourierHome extends StatelessWidget {
       return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         Text('العنوان: ${o.address}'),
         Text('حصّل: ${iqd(o.total)} نقداً', style: const TextStyle(fontWeight: FontWeight.w900)),
+        if (o.custLat != 0)
+          TextButton.icon(
+            onPressed: () => openLink(context, 'https://www.google.com/maps/dir/?api=1&destination=${o.custLat},${o.custLng}&travelmode=driving'),
+            icon: const Icon(Icons.navigation_outlined),
+            label: const Text('موقع الزبون على الخريطة'),
+          ),
         const SizedBox(height: 6),
         FilledButton.icon(onPressed: () => _deliver(context, o), icon: const Icon(Icons.password), label: const Text('تأكيد التسليم برمز الزبون')),
         TextButton(onPressed: () => _fail(context, o), child: const Text('تعذّر التسليم')),
@@ -138,26 +149,55 @@ class CourierHome extends StatelessWidget {
       context: context,
       builder: (c) => AlertDialog(
         title: const Text('رمز الزبون (4 أرقام)'),
-        content: TextField(controller: ctl, keyboardType: TextInputType.number, textDirection: TextDirection.ltr, maxLength: 4),
+        content: Column(mainAxisSize: MainAxisSize.min, children: [
+          TextField(controller: ctl, keyboardType: TextInputType.number, textDirection: TextDirection.ltr, maxLength: 4),
+          const Text('بعد الرمز نحدد موقعك حتى تنحسب المسافة وأجرتك تلقائياً', style: TextStyle(fontSize: 12, color: DepoColors.muted)),
+        ]),
         actions: [
           TextButton(onPressed: () => Navigator.pop(c), child: const Text('إلغاء')),
           FilledButton(
             onPressed: () async {
-              if (ctl.text.trim() == o.pickupCode) {
-                Navigator.pop(c);
-                final km = await askKm(context, o.distanceKm, title: 'كم كيلومتر كانت التوصيلة؟');
-                if (km != null) app.setDeliveryKm(o, km);
-                app.setStatus(o, OrderStatus.delivered);
-                if (context.mounted) toast(context, 'تم التسليم واستلمت ${iqd(o.total)} • أجرتك ${iqd(o.courierPay)}');
-              } else {
-                toast(context, 'الرمز غلط');
-              }
+              if (ctl.text.trim() != o.pickupCode) return toast(context, 'الرمز غلط');
+              Navigator.pop(c);
+              await _finishDelivery(context, o);
             },
             child: const Text('تأكيد'),
           ),
         ],
       ),
     );
+  }
+
+  /// يحدد الموقع ويسلّم. إذا الـ GPS ما اشتغل: إعادة المحاولة أو كتابة المسافة (تنعلّم للمراجعة)
+  Future<void> _finishDelivery(BuildContext context, Order o) async {
+    while (context.mounted) {
+      final r = await locateWithProgress(context, text: 'جاري تحديد مكان التسليم…');
+      if (!context.mounted) return;
+      if (r.fix != null) {
+        app.courierDelivered(o, r.fix);
+        toast(context, 'تم التسليم واستلمت ${iqd(o.total)} • المسافة ${o.distanceKm.toStringAsFixed(1)} كم • أجرتك ${iqd(o.courierPay)}');
+        return;
+      }
+      final choice = await showDialog<String>(
+        context: context,
+        builder: (c) => AlertDialog(
+          title: const Text('ما گدرنا نحدد موقعك'),
+          content: Text('${r.error}\n\nإذا كتبت المسافة بنفسك، الأجرة تتأخر لحد ما المالية تراجعها.'),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(c, 'manual'), child: const Text('أكتب المسافة')),
+            FilledButton(style: FilledButton.styleFrom(minimumSize: const Size(0, 44)), onPressed: () => Navigator.pop(c, 'retry'), child: const Text('جرّب مرة ثانية')),
+          ],
+        ),
+      );
+      if (!context.mounted || choice == null) return;
+      if (choice == 'manual') {
+        final km = await askKm(context, o.distanceKm, title: 'كم كيلومتر كانت التوصيلة؟');
+        if (km == null || !context.mounted) return;
+        app.courierDelivered(o, null, manualKm: km);
+        toast(context, 'تم التسليم واستلمت ${iqd(o.total)} • المسافة تنتظر مراجعة المالية');
+        return;
+      }
+    }
   }
 }
 

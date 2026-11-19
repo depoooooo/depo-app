@@ -11,6 +11,7 @@ import '../categories_screen.dart';
 import '../../data/categories.dart';
 import '../../widgets/debt_ui.dart';
 import 'finance_tab.dart';
+import '../../widgets/geo_ui.dart';
 
 /// واجهة المطعم والتاجر
 class PartnerHome extends StatelessWidget {
@@ -94,6 +95,31 @@ class _DashboardState extends State<_Dashboard> {
                     style: const TextStyle(fontWeight: FontWeight.w800)),
               ),
               const Icon(Icons.edit_outlined, size: 18),
+            ]),
+          ),
+        if (s.type != StoreType.shop)
+          AppCard(
+            borderColor: s.hasLocation ? null : DepoColors.accent,
+            onTap: () async {
+              final r = await locateWithProgress(context, text: 'جاري تحديد موقع المحل…');
+              if (!context.mounted) return;
+              if (r.fix == null) return toast(context, r.error);
+              final err = app.setStoreLocation(s, r.fix!);
+              toast(context, err ?? 'انحفظ موقع المحل ✓');
+            },
+            child: Row(children: [
+              Icon(s.hasLocation ? Icons.location_on : Icons.location_off_outlined, color: s.hasLocation ? DepoColors.success : DepoColors.accent),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(s.hasLocation ? 'موقع المحل محدد ✓' : 'ثبّت موقع محلك', style: const TextStyle(fontWeight: FontWeight.w800)),
+                  Text(
+                    s.hasLocation ? 'إذا انتقلت أو جان غلط، اضغط وانت بالمحل حتى تحدّثه' : 'اضغط وانت داخل المحل. منه تنحسب مسافة التوصيل بدقة',
+                    style: const TextStyle(fontSize: 12, color: DepoColors.muted),
+                  ),
+                ]),
+              ),
+              const Icon(Icons.my_location, size: 18),
             ]),
           ),
         StatGrid([

@@ -173,6 +173,8 @@ class _SettingsTabState extends State<_SettingsTab> {
       'courierMinPay': TextEditingController(text: '${s.courierMinPay}'),
       'courierMaxKm': TextEditingController(text: '${s.courierMaxKm}'),
       'courierCashCap': TextEditingController(text: '${s.courierCashCap}'),
+      'roadFactor': TextEditingController(text: '${s.roadFactor}'),
+      'gpsMaxAccuracy': TextEditingController(text: '${s.gpsMaxAccuracy}'),
     };
     campaign = TextEditingController(text: s.campaignName);
     firstFree = s.firstOrderFree;
@@ -211,6 +213,8 @@ class _SettingsTabState extends State<_SettingsTab> {
     s.courierMinPay = v('courierMinPay', s.courierMinPay);
     s.courierMaxKm = v('courierMaxKm', s.courierMaxKm).clamp(1, 200);
     s.courierCashCap = v('courierCashCap', s.courierCashCap);
+    s.roadFactor = v('roadFactor', s.roadFactor).clamp(100, 250);
+    s.gpsMaxAccuracy = v('gpsMaxAccuracy', s.gpsMaxAccuracy).clamp(20, 1000);
     s.campaignName = campaign.text.trim().isEmpty ? s.campaignName : campaign.text.trim();
     s.firstOrderFree = firstFree;
     app.saveSettings();
@@ -231,6 +235,8 @@ class _SettingsTabState extends State<_SettingsTab> {
         Row(children: [Expanded(child: f('courierBasePay', 'ثابت لكل طلب')), const SizedBox(width: 10), Expanded(child: f('courierPerKm', 'لكل كيلومتر'))]),
         Row(children: [Expanded(child: f('courierMinPay', 'الحد الأدنى للأجرة')), const SizedBox(width: 10), Expanded(child: f('courierMaxKm', 'أقصى مسافة تنحسب (كم)'))]),
         f('courierCashCap', 'سقف النقد بيد المندوب'),
+        Row(children: [Expanded(child: f('roadFactor', 'معامل الطرق % (130 = الطريق أطول 30%)')), const SizedBox(width: 10), Expanded(child: f('gpsMaxAccuracy', 'أسوأ دقة GPS مقبولة (متر)'))]),
+        const Text('المسافة = الخط المستقيم بين المحل ومكان التسليم (GPS) × معامل الطرق.', style: TextStyle(fontSize: 12, color: DepoColors.muted)),
         Builder(builder: (context) {
           final t = AppSettings(
             courierBasePay: parseInt(c['courierBasePay']!.text) ?? 0,
