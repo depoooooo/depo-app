@@ -191,12 +191,12 @@ class CatStrip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 112,
+      height: 88,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
         itemCount: cats.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 14),
+        separatorBuilder: (_, __) => const SizedBox(width: 8),
         itemBuilder: (context, i) {
           final c = cats[i];
           final n = countIn(c, market: market);
@@ -204,35 +204,35 @@ class CatStrip extends StatelessWidget {
             borderRadius: BorderRadius.circular(40),
             onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => CategoryResults(cat: c, market: market))),
             child: SizedBox(
-              width: 74,
+              width: 60,
               child: Column(children: [
                 Stack(clipBehavior: Clip.none, children: [
                   Container(
-                    width: 70,
-                    height: 70,
+                    width: 52,
+                    height: 52,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       color: Colors.white,
-                      boxShadow: const [BoxShadow(color: Color(0x1F06363C), blurRadius: 8, offset: Offset(0, 3))],
+                      boxShadow: const [BoxShadow(color: Color(0x1F06363C), blurRadius: 6, offset: Offset(0, 2))],
                       gradient: RadialGradient(colors: [Colors.white, c.color.withValues(alpha: 0.22)], radius: 0.9),
                     ),
                     child: c.imageId.isEmpty
-                        ? Icon(c.icon, size: 34, color: c.color)
-                        : ClipOval(child: AppImage(imageId: c.imageId, height: 70, width: 70, fallback: Icon(c.icon, size: 34, color: c.color))),
+                        ? Icon(c.icon, size: 26, color: c.color)
+                        : ClipOval(child: AppImage(imageId: c.imageId, height: 52, width: 52, fallback: Icon(c.icon, size: 26, color: c.color))),
                   ),
                   if (n > 0)
                     Positioned(
                       top: -2,
                       left: -2,
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 0),
                         decoration: BoxDecoration(color: DepoColors.accent, borderRadius: BorderRadius.circular(10), border: Border.all(color: Colors.white, width: 1.5)),
-                        child: Text('$n', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w900)),
+                        child: Text('$n', style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w900)),
                       ),
                     ),
                 ]),
-                const SizedBox(height: 6),
-                Text(c.name, maxLines: 1, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800)),
+                const SizedBox(height: 5),
+                Text(c.name, maxLines: 1, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700)),
               ]),
             ),
           );
