@@ -1,7 +1,7 @@
 name: depo
 description: "Depo — رواجع المطاعم وعروض التجار بأسعار مخفّضة (الموصل)."
 publish_to: "none"
-version: 0.10.0+10
+version: 0.11.0+11
 
 environment:
   sdk: ">=3.6.0 <4.0.0"

@@ -1,7 +1,9 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../data/app_state.dart';
+import '../data/categories.dart';
 import '../data/models.dart';
+import 'categories_screen.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
 import '../widgets/offer_cards.dart';
@@ -262,6 +264,11 @@ class _RawajiTabState extends State<_RawajiTab> {
             ),
           ]),
           const _MyStores(),
+          _Section(
+            title: 'الأقسام',
+            onAll: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const CategoriesScreen(embedded: false))),
+          ),
+          Padding(padding: const EdgeInsets.symmetric(horizontal: 16), child: CatGrid(cats: restaurantCats, market: false, limit: 8, shrink: true)),
           _Section(title: 'رواجع قريبة عليك هسه', subtitle: 'توصل خلال 20–40 دقيقة'),
           if (offers.isEmpty)
             const EmptyState(icon: Icons.restaurant_outlined, text: 'ماكو رواجع هسه. تابع مطاعمك المفضلة حتى يوصلك إشعار أول ما ينشرون.')
@@ -576,6 +583,11 @@ class _MarketTab extends StatelessWidget {
             icon: Icons.sell_rounded,
           ),
         ]),
+        _Section(
+          title: 'الأقسام',
+          onAll: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const CategoriesScreen(initialTab: 1, embedded: false))),
+        ),
+        Padding(padding: const EdgeInsets.symmetric(horizontal: 16), child: CatGrid(cats: marketCats, market: true, limit: 8, shrink: true)),
         if (cheap.isNotEmpty) ...[
           _Section(title: 'كلشي بـ 1,000 دينار'),
           OfferStrip(offers: cheap),

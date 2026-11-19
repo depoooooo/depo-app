@@ -514,9 +514,11 @@ class AppState extends ChangeNotifier {
     String description = '',
     String imageId = '',
     int expiresAt = 0,
+    String category = '',
   }) =>
       Offer(
         expiresAt: expiresAt,
+        category: category,
         id: _id('o'),
         storeId: storeId,
         title: title,
@@ -545,6 +547,7 @@ class AppState extends ChangeNotifier {
       storage: old.storage,
       description: old.description,
       imageId: old.imageId,
+      category: old.category,
       expiresAt: old.expiresAt > 0 ? DateTime.now().millisecondsSinceEpoch + (old.expiresAt - old.createdAt) : 0,
     ));
   }
@@ -558,6 +561,13 @@ class AppState extends ChangeNotifier {
       if (out.length >= 4) break;
     }
     return out;
+  }
+
+  /// نوع المطعم (للأقسام): صاحبه أو الشراكات/الجودة
+  void setStoreCuisine(Store s, String cuisine) {
+    if (!(me?.storeId == s.id || canAny([Perm.partnerships, Perm.quality]))) return;
+    s.cuisine = cuisine;
+    _changed();
   }
 
   void setStoreImage(Store s, String imageId) {
@@ -892,12 +902,12 @@ class AppState extends ChangeNotifier {
     return null;
   }
 
-  void submitJoin({required Role type, required String storeName, required String area, String details = '', Map<String, String> docs = const {}}) {
+  void submitJoin({required Role type, required String storeName, required String area, String details = '', Map<String, String> docs = const {}, String cuisine = ''}) {
     if (joinBlocker() != null) return;
     final u = me!;
     joinRequests.insert(
       0,
-      JoinRequest(id: _id('j'), phone: u.phone, name: u.name, type: type, storeName: storeName, area: area, details: details, docs: Map.of(docs)),
+      JoinRequest(id: _id('j'), phone: u.phone, name: u.name, type: type, storeName: storeName, area: area, details: details, docs: Map.of(docs), cuisine: cuisine),
     );
     for (final s in users.where((x) => x.role == Role.supervisor || x.role == Role.admin)) {
       notify(s.phone, 'طلب انضمام جديد: ${roleNames[type]} — ${storeName.isEmpty ? u.name : storeName}');
@@ -923,6 +933,7 @@ class AppState extends ChangeNotifier {
         type: r.type == Role.restaurant ? StoreType.restaurant : StoreType.merchant,
         ownerPhone: u.phone,
         eta: r.type == Role.restaurant ? '20–40 د' : 'اليوم',
+        cuisine: r.type == Role.restaurant ? r.cuisine : '',
       );
       stores.add(s);
       u.storeId = s.id;
@@ -1088,9 +1099,9 @@ class AppState extends ChangeNotifier {
   void _seed() {
     final owners = ['07000000001', '07000000002', '07000000003', '07000000004', '07000000005'];
     stores = [
-      Store(id: 's1', name: 'مطعم الشواء', area: 'الزهور', type: StoreType.restaurant, ownerPhone: owners[0], rating: 4.7, ratingCount: 312, distanceKm: 1.2, usuallyPublishes: 'عادةً ينشر رواجع الساعة 10 بالليل', sponsored: true, approvedAt: DateTime.now().subtract(const Duration(days: 12)).millisecondsSinceEpoch),
-      Store(id: 's2', name: 'فرن المعجنات', area: 'المجموعة الثقافية', type: StoreType.restaurant, ownerPhone: owners[1], rating: 4.8, ratingCount: 540, distanceKm: 2.0, eta: '25–40 د', usuallyPublishes: 'عادةً ينشر رواجع الساعة 9 بالليل', approvedAt: DateTime.now().subtract(const Duration(days: 60)).millisecondsSinceEpoch),
-      Store(id: 's3', name: 'محل الحلويات', area: 'النور', type: StoreType.restaurant, ownerPhone: owners[2], rating: 4.6, ratingCount: 198, distanceKm: 3.0, eta: '30–40 د', usuallyPublishes: 'عادةً ينشر رواجع الساعة 11 بالليل', approvedAt: DateTime.now().subtract(const Duration(days: 45)).millisecondsSinceEpoch),
+      Store(id: 's1', name: 'مطعم الشواء', area: 'الزهور', type: StoreType.restaurant, ownerPhone: owners[0], rating: 4.7, ratingCount: 312, distanceKm: 1.2, usuallyPublishes: 'عادةً ينشر رواجع الساعة 10 بالليل', cuisine: 'مشاوي', sponsored: true, approvedAt: DateTime.now().subtract(const Duration(days: 12)).millisecondsSinceEpoch),
+      Store(id: 's2', name: 'فرن المعجنات', area: 'المجموعة الثقافية', type: StoreType.restaurant, ownerPhone: owners[1], rating: 4.8, ratingCount: 540, distanceKm: 2.0, eta: '25–40 د', usuallyPublishes: 'عادةً ينشر رواجع الساعة 9 بالليل', cuisine: 'معجنات وأفران', approvedAt: DateTime.now().subtract(const Duration(days: 60)).millisecondsSinceEpoch),
+      Store(id: 's3', name: 'محل الحلويات', area: 'النور', type: StoreType.restaurant, ownerPhone: owners[2], rating: 4.6, ratingCount: 198, distanceKm: 3.0, eta: '30–40 د', usuallyPublishes: 'عادةً ينشر رواجع الساعة 11 بالليل', cuisine: 'حلويات', approvedAt: DateTime.now().subtract(const Duration(days: 45)).millisecondsSinceEpoch),
       Store(id: 'm1', name: 'سوق النور', area: 'النور', type: StoreType.merchant, ownerPhone: owners[3], rating: 4.5, ratingCount: 120, distanceKm: 2.4, eta: 'اليوم'),
       Store(id: 'm2', name: 'هايبر الساحل', area: 'الساحل الأيسر', type: StoreType.merchant, ownerPhone: owners[4], rating: 4.4, ratingCount: 88, distanceKm: 4.0, eta: 'اليوم'),
     ];
@@ -1102,8 +1113,8 @@ class AppState extends ChangeNotifier {
       AppUser(phone: owners[4], name: 'صاحب هايبر الساحل', role: Role.merchant, storeId: 'm2'),
       AppUser(phone: '07000000009', name: 'مندوب تجريبي', role: Role.courier),
     ];
-    Offer of(String id, String sid, String t, int o, int p, int q, String e, {bool box = false, String pw = '', int w = 0, Storage st = Storage.normal, String d = ''}) =>
-        Offer(id: id, storeId: sid, title: t, originalPrice: o, price: p, quantityLeft: q, expiresLabel: e, surpriseBox: box, pickupWindow: pw, orderedThisWeek: w, storage: st, description: d);
+    Offer of(String id, String sid, String t, int o, int p, int q, String e, {bool box = false, String pw = '', int w = 0, Storage st = Storage.normal, String d = '', String c = ''}) =>
+        Offer(id: id, storeId: sid, title: t, originalPrice: o, price: p, quantityLeft: q, expiresLabel: e, surpriseBox: box, pickupWindow: pw, orderedThisWeek: w, storage: st, description: d, category: c);
     offers = [
       of('o1', 's1', 'صندوق مشاوي', 15000, 5000, 2, 'باقي 45 د', box: true, pw: '10–11 م', w: 48, d: 'وجبات مشاوي انلغى طلبها أو زادت آخر اليوم. المحتوى ممكن يتغير حسب الموجود، بس قيمته الأصلية ما تقل عن 15,000 دينار.'),
       of('o2', 's1', 'نص فروج', 10000, 4000, 3, 'باقي 45 د', pw: '10–11 م', w: 30),
@@ -1112,10 +1123,10 @@ class AppState extends ChangeNotifier {
       of('o5', 's2', 'صمون حار ×10', 2500, 1000, 8, 'باقي ساعة', pw: '9–10 م', w: 120),
       of('o6', 's3', 'كنافة', 10000, 4000, 3, 'باقي ساعتين', pw: '11–12 م', w: 40),
       of('o7', 's3', 'صندوق حلويات', 16000, 5000, 2, 'باقي ساعتين', box: true, pw: '11–12 م', w: 35),
-      of('p1', 'm1', 'لبن 1 لتر — كرتونة 6', 9000, 4500, 40, 'ينتهي بعد 4 أيام', w: 320, st: Storage.chilled),
-      of('p2', 'm1', 'بسكت شوكولاتة ×6', 2500, 1000, 60, 'ينتهي بعد 5 أيام', w: 210),
-      of('p3', 'm2', 'صدور دجاج 1 كغم', 12000, 7000, 25, 'ينتهي بعد 9 أيام', w: 95, st: Storage.frozen),
-      of('p4', 'm2', 'مسحوق غسيل 3 كغم', 14000, 8500, 30, 'ينتهي بعد 3 أسابيع', w: 41),
+      of('p1', 'm1', 'لبن 1 لتر — كرتونة 6', 9000, 4500, 40, 'ينتهي بعد 4 أيام', w: 320, st: Storage.chilled, c: 'ألبان وأجبان'),
+      of('p2', 'm1', 'بسكت شوكولاتة ×6', 2500, 1000, 60, 'ينتهي بعد 5 أيام', w: 210, c: 'سناكات وحلويات'),
+      of('p3', 'm2', 'صدور دجاج 1 كغم', 12000, 7000, 25, 'ينتهي بعد 9 أيام', w: 95, st: Storage.frozen, c: 'لحوم ومجمدات'),
+      of('p4', 'm2', 'مسحوق غسيل 3 كغم', 14000, 8500, 30, 'ينتهي بعد 3 أسابيع', w: 41, c: 'منظفات'),
     ];
   }
 }
@@ -1262,7 +1273,8 @@ extension DebtBook on AppState {
         originalPrice: (oldPrice != null && oldPrice > price) ? oldPrice : price,
         price: price,
         quantityLeft: 9999,
-        expiresLabel: category.trim(),
+        expiresLabel: '',
+        category: category.trim(),
         imageId: imageId,
         description: description.trim(),
       ),

@@ -4,6 +4,8 @@ import '../data/models.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
 import 'auth.dart';
+import 'categories_screen.dart';
+import '../data/categories.dart';
 
 /// طلب الانضمام كمطعم أو تاجر أو مندوب — المشرف يراجعه ويوافق
 class JoinScreen extends StatefulWidget {
@@ -17,6 +19,7 @@ class _JoinScreenState extends State<JoinScreen> {
   Role type = Role.restaurant;
   final storeName = TextEditingController();
   final kind = TextEditingController();
+  String cuisine = '';
   final area = TextEditingController();
   final vehicle = TextEditingController();
   final docs = <String, String>{}; // اسم الورقة -> رقم الصورة
@@ -47,6 +50,10 @@ class _JoinScreenState extends State<JoinScreen> {
       toast(context, 'اكتب اسم المحل والحي');
       return;
     }
+    if (type == Role.restaurant && cuisine.isEmpty) {
+      toast(context, 'اختار نوع المطعم');
+      return;
+    }
     if (docs.length < requiredDocs.length) {
       toast(context, 'ارفع كل الأوراق المطلوبة');
       return;
@@ -55,8 +62,9 @@ class _JoinScreenState extends State<JoinScreen> {
       type: type,
       storeName: type == Role.courier ? '' : storeName.text.trim(),
       area: type == Role.courier ? '' : area.text.trim(),
-      details: type == Role.courier ? 'المركبة: ${vehicle.text.trim()}' : 'النوع: ${kind.text.trim()}',
+      details: type == Role.courier ? 'المركبة: ${vehicle.text.trim()}' : 'النوع: ${type == Role.restaurant ? cuisine : kind.text.trim()}',
       docs: docs,
+      cuisine: type == Role.restaurant ? cuisine : '',
     );
     toast(context, 'وصل طلبك! المشرف يراجعه ويرتب زيارة تفتيش خلال 72 ساعة');
     Navigator.pop(context);
@@ -88,7 +96,12 @@ class _JoinScreenState extends State<JoinScreen> {
           if (type != Role.courier) ...[
             TextField(controller: storeName, decoration: InputDecoration(labelText: type == Role.restaurant ? 'اسم المطعم' : 'اسم المتجر')),
             const SizedBox(height: 10),
-            TextField(controller: kind, decoration: InputDecoration(labelText: type == Role.restaurant ? 'نوع المطعم (مشاوي، فرن، حلويات...)' : 'نوع المتجر (سوق، جملة، موزع...)')),
+            if (type == Role.restaurant) ...[
+              const Text('نوع المطعم', style: TextStyle(fontWeight: FontWeight.w800)),
+              const SizedBox(height: 6),
+              CatPicker(cats: restaurantCats, value: cuisine, onChanged: (v) => setState(() => cuisine = v)),
+            ] else
+              TextField(controller: kind, decoration: const InputDecoration(labelText: 'نوع المتجر (سوق، جملة، موزع...)')),
             const SizedBox(height: 10),
             TextField(controller: area, decoration: const InputDecoration(labelText: 'الحي', hintText: 'مثلاً: الزهور، النور، المجموعة الثقافية')),
           ] else

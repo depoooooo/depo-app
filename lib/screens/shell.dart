@@ -3,10 +3,11 @@ import '../data/app_state.dart';
 import '../data/models.dart';
 import 'account.dart';
 import 'cart_screen.dart';
+import 'categories_screen.dart';
 import 'home.dart';
 import 'orders.dart';
 
-/// واجهة الزبون: الشريط السفلي بأربع أقسام
+/// واجهة الزبون: الشريط السفلي بخمس أقسام
 class Shell extends StatefulWidget {
   const Shell({super.key});
 
@@ -29,13 +30,14 @@ class _ShellState extends State<Shell> {
       builder: (context, _) => Scaffold(
         body: IndexedStack(
           index: index,
-          children: [HomeScreen(), CartScreen(embedded: true), OrdersScreen(), AccountScreen()], // ignore: prefer_const_constructors
+          children: [HomeScreen(), CategoriesScreen(), CartScreen(embedded: true), OrdersScreen(), AccountScreen()], // ignore: prefer_const_constructors
         ),
         bottomNavigationBar: NavigationBar(
           selectedIndex: index,
           onDestinationSelected: setIndex,
           destinations: [
             const NavigationDestination(icon: Icon(Icons.home_outlined), selectedIcon: Icon(Icons.home_rounded), label: 'الرئيسية'),
+            const NavigationDestination(icon: Icon(Icons.grid_view_outlined), selectedIcon: Icon(Icons.grid_view_rounded), label: 'الأقسام'),
             NavigationDestination(
               icon: Badge(isLabelVisible: cart.count > 0, label: Text('${cart.count}'), child: const Icon(Icons.shopping_bag_outlined)),
               selectedIcon: Badge(isLabelVisible: cart.count > 0, label: Text('${cart.count}'), child: const Icon(Icons.shopping_bag)),

@@ -7,6 +7,8 @@ import '../../data/models.dart';
 import '../../theme.dart';
 import '../../widgets/common.dart';
 import '../orders.dart';
+import '../categories_screen.dart';
+import '../../data/categories.dart';
 
 /// واجهة المطعم والتاجر
 class PartnerHome extends StatelessWidget {
@@ -83,6 +85,20 @@ class _DashboardState extends State<_Dashboard> {
           AppCard(color: const Color(0xFFFFF6E5), child: Text('الشهر المجاني: باقي $free يوم بدون عمولة', style: const TextStyle(fontWeight: FontWeight.w800))),
         _PublishHero(store: s),
         const SizedBox(height: 12),
+        if (s.type == StoreType.restaurant)
+          AppCard(
+            borderColor: s.cuisine.isEmpty ? DepoColors.accent : null,
+            onTap: () => _pickCuisine(context, s),
+            child: Row(children: [
+              Icon(catByName(restaurantCats, cuisineOf(s))?.icon ?? Icons.restaurant_menu, color: DepoColors.dark),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(s.cuisine.isEmpty ? 'حدد نوع مطعمك حتى يطلع بقسمه' : 'القسم: ${s.cuisine}',
+                    style: const TextStyle(fontWeight: FontWeight.w800)),
+              ),
+              const Icon(Icons.edit_outlined, size: 18),
+            ]),
+          ),
         StatGrid([
           StatTile('طلبات اليوم', '${today.length}'),
           StatTile('المتابعين', '${app.followersOf(s.id)}'),
@@ -112,6 +128,30 @@ class _DashboardState extends State<_Dashboard> {
           ]),
         ),
       ],
+    );
+  }
+
+  void _pickCuisine(BuildContext context, Store s) {
+    showModalBottomSheet(
+      context: context,
+      showDragHandle: true,
+      builder: (c) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            const Text('نوع المطعم', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900)),
+            const SizedBox(height: 10),
+            CatPicker(
+              cats: restaurantCats,
+              value: s.cuisine,
+              onChanged: (v) {
+                app.setStoreCuisine(s, v);
+                Navigator.pop(c);
+              },
+            ),
+          ]),
+        ),
+      ),
     );
   }
 
@@ -310,6 +350,7 @@ class _PublishOfferScreenState extends State<PublishOfferScreen> {
   final qty = TextEditingController(text: '3');
   final expires = TextEditingController(); // التاجر: كم يوم باقي على انتهاء المنتج
   int hours = 3; // المطعم: العرض يبقى كم ساعة
+  String category = ''; // صنف المنتج (التاجر)
   final pickupWindow = TextEditingController(text: '10–11 م');
   final desc = TextEditingController();
   bool surprise = true;
@@ -374,6 +415,10 @@ class _PublishOfferScreenState extends State<PublishOfferScreen> {
       toast(context, 'الكمية كبيرة، تأكد منها');
       return;
     }
+    if (!isRest && category.isEmpty) {
+      toast(context, 'اختار صنف المنتج');
+      return;
+    }
     if (!isRest) {
       final d = parseInt(expires.text) ?? 0;
       if (d < 2) {
@@ -402,6 +447,7 @@ class _PublishOfferScreenState extends State<PublishOfferScreen> {
     if (!mounted) return;
     app.publishOffer(app.newOffer(
       imageId: imageId,
+      category: isRest ? '' : category,
       storeId: widget.store.id,
       title: title.text.trim(),
       originalPrice: o,
@@ -478,6 +524,10 @@ class _PublishOfferScreenState extends State<PublishOfferScreen> {
           if (isRest)
             TextField(controller: pickupWindow, decoration: const InputDecoration(labelText: 'وقت الاستلام'))
           else ...[
+            const Text('الصنف', style: TextStyle(fontWeight: FontWeight.w800)),
+            const SizedBox(height: 6),
+            CatPicker(cats: marketCats, value: category, onChanged: (v) => setState(() => category = v)),
+            const SizedBox(height: 12),
             const Text('طريقة الحفظ', style: TextStyle(fontWeight: FontWeight.w800)),
             const SizedBox(height: 6),
             SegmentedButton<Storage>(

@@ -150,6 +150,7 @@ class Store {
   bool suspended;
   int approvedAt; // بداية الشهر المجاني
   String imageId; // صورة/شعار المحل ('' = ماكو)
+  String cuisine; // نوع المطعم (مشاوي، بيتزا...) — للأقسام
 
   Store({
     required this.id,
@@ -166,6 +167,7 @@ class Store {
     this.suspended = false,
     int? approvedAt,
     this.imageId = '',
+    this.cuisine = '',
   }) : approvedAt = approvedAt ?? _now();
 
   String get fullName => '$name — $area';
@@ -185,6 +187,7 @@ class Store {
         'suspended': suspended,
         'approvedAt': approvedAt,
         'imageId': imageId,
+        'cuisine': cuisine,
       };
 
   factory Store.fromJson(Map<String, dynamic> j) => Store(
@@ -202,6 +205,7 @@ class Store {
         suspended: (j['suspended'] ?? false) as bool,
         approvedAt: j['approvedAt'] as int?,
         imageId: (j['imageId'] ?? '') as String,
+        cuisine: (j['cuisine'] ?? '') as String,
       );
 }
 
@@ -223,6 +227,7 @@ class Offer {
   int createdAt;
   String imageId; // صورة العرض ('' = ماكو)
   int expiresAt; // وقت انتهاء العرض (0 = بدون)
+  String category; // صنف المنتج بالماركت (زيوت، سناكات...)
 
   Offer({
     required this.id,
@@ -242,6 +247,7 @@ class Offer {
     int? createdAt,
     this.imageId = '',
     this.expiresAt = 0,
+    this.category = '',
   }) : createdAt = createdAt ?? _now();
 
   int get discountPercent =>
@@ -278,6 +284,7 @@ class Offer {
         'createdAt': createdAt,
         'imageId': imageId,
         'expiresAt': expiresAt,
+        'category': category,
       };
 
   factory Offer.fromJson(Map<String, dynamic> j) => Offer(
@@ -298,6 +305,7 @@ class Offer {
         createdAt: j['createdAt'] as int?,
         imageId: (j['imageId'] ?? '') as String,
         expiresAt: (j['expiresAt'] ?? 0) as int,
+        category: (j['category'] ?? '') as String,
       );
 }
 
@@ -413,6 +421,7 @@ class JoinRequest {
   String note;
   int createdAt;
   Map<String, String> docs; // اسم الورقة -> رقم الصورة
+  String cuisine; // نوع المطعم المختار
 
   JoinRequest({
     required this.id,
@@ -426,6 +435,7 @@ class JoinRequest {
     this.note = '',
     int? createdAt,
     Map<String, String>? docs,
+    this.cuisine = '',
   })  : createdAt = createdAt ?? _now(),
         docs = docs ?? {};
 
@@ -433,6 +443,7 @@ class JoinRequest {
         'id': id,
         'phone': phone,
         'docs': docs,
+        'cuisine': cuisine,
         'name': name,
         'type': type.name,
         'storeName': storeName,
@@ -455,6 +466,7 @@ class JoinRequest {
         note: (j['note'] ?? '') as String,
         createdAt: j['createdAt'] as int?,
         docs: Map<String, String>.from((j['docs'] ?? const {}) as Map),
+        cuisine: (j['cuisine'] ?? '') as String,
       );
 }
 

@@ -7,6 +7,8 @@ import '../../widgets/debt_ui.dart';
 import '../../widgets/offer_cards.dart';
 import '../roles/partner.dart';
 import 'debtor_screen.dart';
+import '../categories_screen.dart';
+import '../../data/categories.dart';
 import '../chat_screen.dart';
 
 /// «محلي»: يفتح المتجر المجاني، أو يدخل عليه إذا موجود
@@ -338,7 +340,7 @@ class _ProductsTab extends StatelessWidget {
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text(o.title, style: const TextStyle(fontWeight: FontWeight.w900)),
                 PriceTag(price: o.price, original: o.originalPrice, size: 14),
-                if (o.expiresLabel.isNotEmpty) Text(o.expiresLabel, style: const TextStyle(fontSize: 11, color: DepoColors.muted)),
+                if (categoryOf(o).isNotEmpty) Text(categoryOf(o), style: const TextStyle(fontSize: 11, color: DepoColors.muted)),
               ]),
             ),
             Switch(value: o.active, onChanged: (v) => app.setOfferActive(o, v)),
@@ -359,7 +361,7 @@ Future<void> productDialog(BuildContext context, Store store, {Offer? edit}) asy
   final name = TextEditingController(text: edit?.title ?? '');
   final price = TextEditingController(text: edit == null ? '' : '${edit.price}');
   final old = TextEditingController(text: edit == null || edit.originalPrice <= edit.price ? '' : '${edit.originalPrice}');
-  final cat = TextEditingController(text: edit?.expiresLabel ?? '');
+  var cat = edit?.category ?? '';
   final ok = await showDialog<bool>(
     context: context,
     builder: (c) => AlertDialog(
@@ -372,8 +374,10 @@ Future<void> productDialog(BuildContext context, Store store, {Offer? edit}) asy
           const SizedBox(height: 10),
           TextField(controller: old, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'السعر قبل العرض (اختياري)')),
           if (edit == null) ...[
-            const SizedBox(height: 10),
-            TextField(controller: cat, decoration: const InputDecoration(labelText: 'الصنف (اختياري)', hintText: 'مثلاً: مشروبات، ألبان')),
+            const SizedBox(height: 12),
+            const Align(alignment: AlignmentDirectional.centerStart, child: Text('الصنف (اختياري)', style: TextStyle(fontWeight: FontWeight.w800))),
+            const SizedBox(height: 6),
+            StatefulBuilder(builder: (c2, set) => CatPicker(cats: marketCats, value: cat, onChanged: (v) => set(() => cat = v))),
           ],
         ]),
       ),
@@ -387,7 +391,7 @@ Future<void> productDialog(BuildContext context, Store store, {Offer? edit}) asy
   final op = parseInt(old.text);
   if (ok == true && name.text.trim().isNotEmpty && p > 0) {
     if (edit == null) {
-      app.addShopProduct(store, name: name.text, price: p, oldPrice: op, category: cat.text);
+      app.addShopProduct(store, name: name.text, price: p, oldPrice: op, category: cat);
     } else {
       app.updateShopProduct(edit, name: name.text, price: p, oldPrice: op);
     }
