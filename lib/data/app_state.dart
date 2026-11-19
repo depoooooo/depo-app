@@ -19,6 +19,8 @@ class AppState extends ChangeNotifier {
   List<Offer> offers = [];
   List<Order> orders = [];
   List<JoinRequest> joinRequests = [];
+  List<Debtor> debtors = [];
+  List<DebtEntry> debts = [];
   List<Complaint> complaints = [];
   List<String> audit = [];
   AppSettings settings = AppSettings();
@@ -28,7 +30,7 @@ class AppState extends ChangeNotifier {
 
   // ---------------- التخزين ----------------
   /// الأقسام اللي تنحفظ بالسيرفر (كل قسم = collection بـ Firestore)
-  static const _cols = ['users', 'stores', 'offers', 'orders', 'joinRequests', 'complaints', 'meta'];
+  static const _cols = ['users', 'stores', 'offers', 'orders', 'joinRequests', 'complaints', 'meta', 'debtors', 'debts'];
 
   /// آخر نسخة نعرفها من كل مستند بالسيرفر (للمقارنة وكتابة الي تغيّر بس)
   final Map<String, Map<String, String>> _synced = {for (final c in _cols) c: {}};
@@ -81,6 +83,8 @@ class AppState extends ChangeNotifier {
       offers = l('offers').map(Offer.fromJson).toList();
       orders = l('orders').map(Order.fromJson).toList();
       joinRequests = l('joinRequests').map(JoinRequest.fromJson).toList();
+      debtors = l('debtors').map(Debtor.fromJson).toList();
+      debts = l('debts').map(DebtEntry.fromJson).toList();
       complaints = l('complaints').map(Complaint.fromJson).toList();
       audit = List<String>.from(j['audit'] ?? const []);
       settings = AppSettings.fromJson(Map<String, dynamic>.from(j['settings'] ?? const {}));
@@ -130,6 +134,10 @@ class AppState extends ChangeNotifier {
         return {for (final x in orders) x.id: x.toJson()};
       case 'joinRequests':
         return {for (final x in joinRequests) x.id: x.toJson()};
+      case 'debtors':
+        return {for (final x in debtors) x.id: x.toJson()};
+      case 'debts':
+        return {for (final x in debts) x.id: x.toJson()};
       case 'complaints':
         return {for (final x in complaints) x.id: x.toJson()};
       case 'meta':
@@ -142,7 +150,7 @@ class AppState extends ChangeNotifier {
   }
 
   /// الأقسام الي الجديد بيها ينضاف بالأول (الأحدث فوق)
-  static const _newestFirst = {'offers', 'orders', 'joinRequests', 'complaints'};
+  static const _newestFirst = {'offers', 'orders', 'joinRequests', 'complaints', 'debts'};
 
   void _applyDocs(String c, List<fs.QueryDocumentSnapshot<Map<String, dynamic>>> docs) {
     final list = docs.toList()
@@ -178,6 +186,12 @@ class AppState extends ChangeNotifier {
       case 'joinRequests':
         final old = {for (final x in joinRequests) x.id: x};
         joinRequests = [for (final d in list) keep(d.id, d.data(), JoinRequest.fromJson, old[d.id])];
+      case 'debtors':
+        final old = {for (final x in debtors) x.id: x};
+        debtors = [for (final d in list) keep(d.id, d.data(), Debtor.fromJson, old[d.id])];
+      case 'debts':
+        final old = {for (final x in debts) x.id: x};
+        debts = [for (final d in list) keep(d.id, d.data(), DebtEntry.fromJson, old[d.id])];
       case 'complaints':
         final old = {for (final x in complaints) x.id: x};
         complaints = [for (final d in list) keep(d.id, d.data(), Complaint.fromJson, old[d.id])];
@@ -279,6 +293,8 @@ class AppState extends ChangeNotifier {
         'offers': offers.map((e) => e.toJson()).toList(),
         'orders': orders.map((e) => e.toJson()).toList(),
         'joinRequests': joinRequests.map((e) => e.toJson()).toList(),
+        'debtors': debtors.map((e) => e.toJson()).toList(),
+        'debts': debts.map((e) => e.toJson()).toList(),
         'complaints': complaints.map((e) => e.toJson()).toList(),
         'audit': audit,
         'settings': settings.toJson(),
@@ -290,6 +306,9 @@ class AppState extends ChangeNotifier {
     notifyListeners();
     _save();
   }
+
+  void _changedPublic() => _changed();
+  void _logPublic(String t) => _log(t);
 
   /// يشيل البيانات التجريبية بس (المحلات والحسابات 0700000…) ويخلي الحقيقية — قبل الإطلاق
   bool get hasDemoData => stores.any((s) => s.ownerPhone.startsWith('0700000'));
@@ -316,6 +335,8 @@ class AppState extends ChangeNotifier {
     offers = [];
     orders = [];
     joinRequests = [];
+    debtors = [];
+    debts = [];
     complaints = [];
     audit = [];
     settings = AppSettings();
@@ -449,6 +470,7 @@ class AppState extends ChangeNotifier {
 
   /// العمولة: المطاعم 15% بحد أدنى 750 (وأول شهر مجاني)، والتجار 15%
   int commissionFor(Store s, int itemsTotal) {
+    if (s.type == StoreType.shop) return 0; // المتجر المجاني بدون عمولة
     if (s.type == StoreType.restaurant) {
       if (freeDaysLeft(s) > 0) return 0;
       return max((itemsTotal * settings.restaurantCommission / 100).round(), settings.minCommission);
@@ -670,8 +692,9 @@ class AppState extends ChangeNotifier {
           }
           for (final id in want.keys) {
             final d = fresh[id]!;
+            final unlimited = (d['quantityLeft'] as int) >= 9000;
             tx.update(db.collection('offers').doc(id), {
-              'quantityLeft': (d['quantityLeft'] as int) - want[id]!,
+              'quantityLeft': unlimited ? d['quantityLeft'] : (d['quantityLeft'] as int) - want[id]!,
               'orderedThisWeek': ((d['orderedThisWeek'] ?? 0) as int) + want[id]!,
             });
           }
@@ -685,7 +708,8 @@ class AppState extends ChangeNotifier {
       for (final id in want.keys) {
         final of = offerById(id);
         if (of != null) {
-          of.quantityLeft = (fresh[id]!['quantityLeft'] as int) - want[id]!;
+          final q = fresh[id]!['quantityLeft'] as int;
+          of.quantityLeft = q >= 9000 ? q : q - want[id]!;
           of.orderedThisWeek = ((fresh[id]!['orderedThisWeek'] ?? 0) as int) + want[id]!;
           _markSynced('offers', id);
         }
@@ -696,7 +720,7 @@ class AppState extends ChangeNotifier {
     } else {
       for (final l in cart.lines) {
         final of = offerById(l.offer.id) ?? l.offer;
-        of.quantityLeft = max(0, of.quantityLeft - l.qty);
+        if (!of.unlimited) of.quantityLeft = max(0, of.quantityLeft - l.qty);
         of.orderedThisWeek += l.qty;
       }
       orders.insert(0, o);
@@ -777,6 +801,7 @@ class AppState extends ChangeNotifier {
   // ---------------- المندوب ----------------
   List<Order> get availableTasks => orders
       .where((o) => !o.pickup && o.courierPhone == null && (o.status == OrderStatus.ready || o.status == OrderStatus.preparing))
+      .where((o) => storeById(o.storeId)?.type != StoreType.shop) // الأسواق توصّل بمندوبها
       .toList();
   List<Order> get myTasks => orders.where((o) => o.courierPhone == currentPhone && o.isOpen).toList();
 
@@ -1087,6 +1112,232 @@ class AppState extends ChangeNotifier {
 }
 
 final app = AppState();
+
+/// ملخص دين زبون
+class DebtSummary {
+  final int ordered, paid, remaining, overdue;
+  final int nextDue; // أقرب موعد جاي (0 = ماكو)
+  final int oldestOverdue; // أقدم موعد فات (0 = ماكو)
+  const DebtSummary(this.ordered, this.paid, this.remaining, this.overdue, this.nextDue, this.oldestOverdue);
+  int get paidPercent => ordered == 0 ? 0 : (paid * 100 / ordered).round().clamp(0, 100);
+}
+
+extension DebtBook on AppState {
+  // ---------- المتجر المجاني ----------
+  Store? get myShop {
+    for (final s in stores) {
+      if (s.type == StoreType.shop && s.ownerPhone == currentPhone) return s;
+    }
+    return null;
+  }
+
+  List<Store> get shops => stores.where((s) => s.type == StoreType.shop && !s.suspended).toList();
+
+  bool ownsStore(String storeId) => storeById(storeId)?.ownerPhone == currentPhone && currentPhone != null;
+
+  Store? openShop({required String name, required String area, String about = ''}) {
+    final u = me;
+    if (u == null || u.suspended || myShop != null) return null;
+    final s = Store(
+      id: 'shop${DateTime.now().millisecondsSinceEpoch}',
+      name: name.trim(),
+      area: area.trim(),
+      type: StoreType.shop,
+      ownerPhone: u.phone,
+      eta: 'استلام أو توصيل من المحل',
+      usuallyPublishes: about.trim(),
+    );
+    stores.add(s);
+    _logPublic('فتح متجر مجاني: ${s.name} — ${u.phone}');
+    _changedPublic();
+    return s;
+  }
+
+  /// منتج بالمتجر المجاني (سعر عادي، بدون كمية محددة)
+  void addShopProduct(Store s, {required String name, required int price, int? oldPrice, String imageId = '', String description = '', String category = ''}) {
+    if (!ownsStore(s.id) || s.type != StoreType.shop || s.suspended || name.trim().isEmpty || price <= 0) return;
+    offers.insert(
+      0,
+      Offer(
+        id: 'sp${DateTime.now().millisecondsSinceEpoch}',
+        storeId: s.id,
+        title: name.trim(),
+        originalPrice: (oldPrice != null && oldPrice > price) ? oldPrice : price,
+        price: price,
+        quantityLeft: 9999,
+        expiresLabel: category.trim(),
+        imageId: imageId,
+        description: description.trim(),
+      ),
+    );
+    _changedPublic();
+  }
+
+  void updateShopProduct(Offer o, {required String name, required int price, int? oldPrice}) {
+    if (!ownsStore(o.storeId) || name.trim().isEmpty || price <= 0) return;
+    o.title = name.trim();
+    o.price = price;
+    o.originalPrice = (oldPrice != null && oldPrice > price) ? oldPrice : price;
+    _changedPublic();
+  }
+
+  void deleteShopProduct(Offer o) {
+    if (!ownsStore(o.storeId) || storeById(o.storeId)?.type != StoreType.shop) return;
+    offers.remove(o);
+    _changedPublic();
+  }
+
+  // ---------- الزبائن والديون ----------
+  List<Debtor> debtorsOf(String storeId) => debtors.where((d) => d.storeId == storeId).toList();
+  Debtor? debtorById(String id) {
+    for (final d in debtors) {
+      if (d.id == id) return d;
+    }
+    return null;
+  }
+
+  List<DebtEntry> entriesOf(String debtorId) =>
+      debts.where((e) => e.debtorId == debtorId).toList()..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+
+  /// التسديد يتوزع على الطلبات من الأقدم للأحدث
+  DebtSummary summaryOf(String debtorId) {
+    final all = debts.where((e) => e.debtorId == debtorId && !e.voided).toList()..sort((a, b) => a.createdAt.compareTo(b.createdAt));
+    final orders = all.where((e) => !e.payment).toList();
+    final ordered = orders.fold(0, (s, e) => s + e.amount);
+    final paid = all.where((e) => e.payment).fold(0, (s, e) => s + e.amount);
+    var left = paid;
+    var overdue = 0, nextDue = 0, oldest = 0;
+    final now = DateTime.now().millisecondsSinceEpoch;
+    for (final o in orders) {
+      final cover = left >= o.amount ? o.amount : left;
+      left -= cover;
+      final unpaid = o.amount - cover;
+      if (unpaid <= 0 || o.dueAt <= 0) continue;
+      if (o.dueAt < now) {
+        overdue += unpaid;
+        if (oldest == 0 || o.dueAt < oldest) oldest = o.dueAt;
+      } else if (nextDue == 0 || o.dueAt < nextDue) {
+        nextDue = o.dueAt;
+      }
+    }
+    final remaining = ordered - paid;
+    return DebtSummary(ordered, paid, remaining < 0 ? 0 : remaining, overdue, nextDue, oldest);
+  }
+
+  /// مجموع دفتر المحل
+  DebtSummary shopSummary(String storeId) {
+    var o = 0, p = 0, r = 0, od = 0;
+    for (final d in debtorsOf(storeId)) {
+      final s = summaryOf(d.id);
+      o += s.ordered;
+      p += s.paid;
+      r += s.remaining;
+      od += s.overdue;
+    }
+    return DebtSummary(o, p, r, od, 0, 0);
+  }
+
+  String _newCode() {
+    const chars = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+    final r = Random.secure();
+    while (true) {
+      String part() => List.generate(4, (_) => chars[r.nextInt(chars.length)]).join();
+      final c = '${part()}-${part()}';
+      if (!debtors.any((d) => d.code == c)) return c;
+    }
+  }
+
+  Debtor? addDebtor(String storeId, {required String name, String phone = ''}) {
+    if (!ownsStore(storeId) || name.trim().length < 2) return null;
+    final d = Debtor(id: 'dr${DateTime.now().millisecondsSinceEpoch}${Random().nextInt(99)}', storeId: storeId, name: name.trim(), phone: phone.trim(), code: _newCode());
+    debtors.insert(0, d);
+    _changedPublic();
+    return d;
+  }
+
+  void _tellDebtor(Debtor d, String text) {
+    for (final u in users.where((u) => u.debtCodes.contains(d.code))) {
+      notify(u.phone, text);
+    }
+  }
+
+  void addDebtOrder(Debtor d, {required List<DebtItem> items, required String month, int dueAt = 0, String note = ''}) {
+    if (!ownsStore(d.storeId)) return;
+    final clean = items.where((i) => i.name.trim().isNotEmpty && i.price > 0 && i.qty > 0).toList();
+    if (clean.isEmpty) return;
+    final amount = clean.fold(0, (s, i) => s + i.total);
+    debts.insert(0, DebtEntry(id: 'de${DateTime.now().millisecondsSinceEpoch}${Random().nextInt(99)}', debtorId: d.id, storeId: d.storeId, payment: false, items: clean, amount: amount, month: month, dueAt: dueAt, note: note.trim()));
+    _tellDebtor(d, '${storeById(d.storeId)?.name ?? 'المحل'}: انضاف عليك ${iqd(amount)}');
+    _changedPublic();
+  }
+
+  /// يرجّع المبلغ المسجّل فعلاً (ما يزيد على الباقي)
+  int addDebtPayment(Debtor d, int amount, {String note = ''}) {
+    if (!ownsStore(d.storeId) || amount <= 0) return 0;
+    final rem = summaryOf(d.id).remaining;
+    final a = amount > rem ? rem : amount;
+    if (a <= 0) return 0;
+    debts.insert(0, DebtEntry(id: 'dp${DateTime.now().millisecondsSinceEpoch}${Random().nextInt(99)}', debtorId: d.id, storeId: d.storeId, payment: true, amount: a, month: monthKey(DateTime.now()), note: note.trim()));
+    _tellDebtor(d, '${storeById(d.storeId)?.name ?? 'المحل'}: انسجّلت دفعة ${iqd(a)}. الباقي ${iqd(rem - a)}');
+    _changedPublic();
+    return a;
+  }
+
+  void voidDebtEntry(DebtEntry e) {
+    if (!ownsStore(e.storeId) || e.voided) return;
+    e.voided = true;
+    _changedPublic();
+  }
+
+  void regenerateDebtCode(Debtor d) {
+    if (!ownsStore(d.storeId)) return;
+    final old = d.code;
+    d.code = _newCode();
+    for (final u in users) {
+      u.debtCodes.remove(old);
+    }
+    _changedPublic();
+  }
+
+  void updateDebtor(Debtor d, {required String name, required String phone}) {
+    if (!ownsStore(d.storeId) || name.trim().length < 2) return;
+    d.name = name.trim();
+    d.phone = phone.trim();
+    _changedPublic();
+  }
+
+  // ---------- جهة الزبون ----------
+  Debtor? debtorByCode(String code) {
+    final c = code.trim().toUpperCase().replaceAll(' ', '');
+    final norm = c.length == 8 ? '${c.substring(0, 4)}-${c.substring(4)}' : c;
+    for (final d in debtors) {
+      if (d.code == norm && d.active) return d;
+    }
+    return null;
+  }
+
+  /// يربط رمز بحساب الزبون. يرجّع سبب المنع أو null
+  String? linkDebtCode(String code) {
+    final u = me;
+    if (u == null) return 'سجّل دخول أول';
+    final d = debtorByCode(code);
+    if (d == null) return 'الرمز غلط أو انلغى. اطلب رمز جديد من صاحب المحل.';
+    if (u.debtCodes.contains(d.code)) return 'هذا الرمز مضاف من قبل';
+    u.debtCodes.add(d.code);
+    _changedPublic();
+    return null;
+  }
+
+  void unlinkDebtCode(String code) {
+    me?.debtCodes.remove(code);
+    _changedPublic();
+  }
+
+  List<Debtor> get myDebtAccounts {
+    final codes = me?.debtCodes ?? const <String>[];
+    return debtors.where((d) => d.active && codes.contains(d.code)).toList();
+  }
+}
 
 class OrderError implements Exception {
   final String message;

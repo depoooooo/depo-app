@@ -55,9 +55,10 @@ class _OfferDetailScreenState extends State<OfferDetailScreen> {
           OfferImage(offer: o, height: 230, radius: 18),
           const SizedBox(height: 12),
           Wrap(spacing: 6, runSpacing: 6, children: [
-            Badge2(o.surpriseBox ? 'صندوق مفاجأة' : 'خصم ${o.discountPercent}%',
-                bg: o.surpriseBox ? DepoColors.brand : DepoColors.accent),
-            const Badge2('موثوق من Depo', bg: DepoColors.soft, fg: DepoColors.dark),
+            if (o.surpriseBox || o.discountPercent > 0)
+              Badge2(o.surpriseBox ? 'صندوق مفاجأة' : 'خصم ${o.discountPercent}%',
+                  bg: o.surpriseBox ? DepoColors.brand : DepoColors.accent),
+            if (s.type != StoreType.shop) const Badge2('موثوق من Depo', bg: DepoColors.soft, fg: DepoColors.dark),
             StorageChip(o.storage),
           ]),
           const SizedBox(height: 8),
@@ -66,7 +67,7 @@ class _OfferDetailScreenState extends State<OfferDetailScreen> {
           const SizedBox(height: 8),
           PriceTag(price: o.price, original: o.originalPrice, size: 22),
           const SizedBox(height: 12),
-          Row(children: [
+          if (!o.unlimited) Row(children: [
             _Info(label: 'باقي', value: o.quantityLeft <= 2 ? '${o.quantityLeft} بس' : '${o.quantityLeft}', danger: o.quantityLeft <= 2),
             const SizedBox(width: 8),
             _Info(label: isRawaji ? 'ينتهي العرض' : 'الصلاحية', value: o.expiryText),
@@ -76,7 +77,7 @@ class _OfferDetailScreenState extends State<OfferDetailScreen> {
             ],
           ]),
           const SizedBox(height: 12),
-          Text('انطلب ${o.orderedThisWeek} مرة هالأسبوع',
+          if (!o.unlimited) Text('انطلب ${o.orderedThisWeek} مرة هالأسبوع',
               style: const TextStyle(color: DepoColors.success, fontWeight: FontWeight.w800)),
           if (o.description.isNotEmpty) ...[
             const SizedBox(height: 8),

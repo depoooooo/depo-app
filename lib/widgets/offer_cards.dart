@@ -17,7 +17,7 @@ Future<void> quickAdd(BuildContext context, Offer o) async {
     toast(context, 'المحل مو متوفر هسه');
     return;
   }
-  if (qtyInCart(live) >= live.quantityLeft) {
+  if (!live.unlimited && qtyInCart(live) >= live.quantityLeft) {
     toast(context, 'وصلت لآخر كمية متوفرة');
     return;
   }
@@ -133,13 +133,14 @@ class OfferCard extends StatelessWidget {
           child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             Stack(children: [
               OfferImage(offer: offer, height: 112),
-              Positioned(
-                top: 8,
-                right: 8,
-                child: Badge2(offer.surpriseBox ? 'صندوق مفاجأة' : '-${offer.discountPercent}%',
-                    bg: offer.surpriseBox ? DepoColors.brand : DepoColors.accent),
-              ),
-              if (offer.quantityLeft > 0)
+              if (offer.surpriseBox || offer.discountPercent > 0)
+                Positioned(
+                  top: 8,
+                  right: 8,
+                  child: Badge2(offer.surpriseBox ? 'صندوق مفاجأة' : '-${offer.discountPercent}%',
+                      bg: offer.surpriseBox ? DepoColors.brand : DepoColors.accent),
+                ),
+              if (offer.quantityLeft > 0 && !offer.unlimited)
                 Positioned(
                   bottom: 8,
                   right: 8,
@@ -159,8 +160,9 @@ class OfferCard extends StatelessWidget {
                 Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
                   Expanded(
                     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Text(iqd(offer.originalPrice),
-                          style: const TextStyle(fontSize: 11, color: DepoColors.muted, decoration: TextDecoration.lineThrough)),
+                      if (offer.originalPrice > offer.price)
+                        Text(iqd(offer.originalPrice),
+                            style: const TextStyle(fontSize: 11, color: DepoColors.muted, decoration: TextDecoration.lineThrough)),
                       Text(iqd(offer.price), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: DepoColors.dark)),
                     ]),
                   ),
@@ -243,7 +245,7 @@ class ProductCard extends StatelessWidget {
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           Stack(children: [
             OfferImage(offer: offer, height: 110),
-            Positioned(top: 8, right: 8, child: Badge2('-${offer.discountPercent}%')),
+            if (offer.discountPercent > 0) Positioned(top: 8, right: 8, child: Badge2('-${offer.discountPercent}%')),
             if (offer.storage != Storage.normal) Positioned(top: 8, left: 8, child: StorageChip(offer.storage)),
           ]),
           Expanded(
@@ -254,13 +256,15 @@ class ProductCard extends StatelessWidget {
                     style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w900, height: 1.3)),
                 const SizedBox(height: 2),
                 Text(store?.name ?? '', maxLines: 1, style: const TextStyle(fontSize: 11, color: DepoColors.muted)),
-                Text(offer.expiryText, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF8A5A00))),
+                if (offer.expiryText.isNotEmpty)
+                  Text(offer.expiryText, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: offer.expiresAt > 0 || !offer.unlimited ? const Color(0xFF8A5A00) : DepoColors.muted)),
                 const Spacer(),
                 Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
                   Expanded(
                     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Text(iqd(offer.originalPrice),
-                          style: const TextStyle(fontSize: 11, color: DepoColors.muted, decoration: TextDecoration.lineThrough)),
+                      if (offer.originalPrice > offer.price)
+                        Text(iqd(offer.originalPrice),
+                            style: const TextStyle(fontSize: 11, color: DepoColors.muted, decoration: TextDecoration.lineThrough)),
                       Text(iqd(offer.price), style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: DepoColors.dark)),
                     ]),
                   ),
@@ -284,6 +288,7 @@ class StoreTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final list = app.offersOf(store.id);
     final maxDisc = list.isEmpty ? 0 : list.map((o) => o.discountPercent).reduce((a, b) => a > b ? a : b);
+    final isShop = store.type == StoreType.shop;
     final withImg = list.where((o) => o.imageId.isNotEmpty).toList();
     final cover = store.imageId.isNotEmpty
         ? AppImage(imageId: store.imageId, height: 112, width: 120, fallback: _ph())
@@ -342,7 +347,7 @@ class StoreTile extends StatelessWidget {
                       Text(' ${store.eta}', style: const TextStyle(fontSize: 12, color: DepoColors.muted)),
                     ]),
                     const SizedBox(height: 4),
-                    Text(list.isEmpty ? 'ماكو عروض هسه' : '${list.length} عروض متوفرة هسه',
+                    Text(list.isEmpty ? (isShop ? 'ماكو منتجات بعد' : 'ماكو عروض هسه') : (isShop ? '${list.length} منتج بأسعارها' : '${list.length} عروض متوفرة هسه'),
                         style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: list.isEmpty ? DepoColors.muted : DepoColors.success)),
                   ]),
                 ),

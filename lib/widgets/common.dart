@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../data/images.dart';
 import '../data/models.dart';
 import '../theme.dart';
@@ -17,6 +18,7 @@ class PriceTag extends StatelessWidget {
       spacing: 6,
       children: [
         Text(iqd(price), style: TextStyle(fontSize: size, fontWeight: FontWeight.w900)),
+        if (original > price)
         Text(
           iqd(original),
           style: const TextStyle(
@@ -358,3 +360,8 @@ Future<String?> pickAndUpload(BuildContext context, {String owner = ''}) async {
   }
 }
 
+
+Future<String?> clipboardText() async {
+  final d = await Clipboard.getData(Clipboard.kTextPlain);
+  return d?.text;
+}

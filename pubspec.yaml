@@ -1,7 +1,7 @@
 name: depo
 description: "Depo — رواجع المطاعم وعروض التجار بأسعار مخفّضة (الموصل)."
 publish_to: "none"
-version: 0.9.0+9
+version: 0.10.0+10
 
 environment:
   sdk: ">=3.6.0 <4.0.0"
@@ -17,6 +17,7 @@ dependencies:
   cloud_firestore: ">=6.0.0 <9.0.0"
   image_picker: ">=1.0.0 <3.0.0"
   crypto: ^3.0.3
+  url_launcher: ">=6.2.0 <7.0.0"
   flutter_local_notifications: ">=17.2.0 <20.0.0"
 
 dev_dependencies:

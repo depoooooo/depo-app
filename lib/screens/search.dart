@@ -64,7 +64,7 @@ class _SearchScreenState extends State<SearchScreen> {
   List<Offer> get results {
     var list = app.offers.where((o) {
       final s = app.storeById(o.storeId);
-      return o.visible && s != null && !s.suspended;
+      return o.visible && s != null && !s.suspended && s.type != StoreType.shop;
     }).toList();
     final text = q.text.trim();
     if (text.isNotEmpty) {
@@ -93,7 +93,7 @@ class _SearchScreenState extends State<SearchScreen> {
   @override
   Widget build(BuildContext context) {
     final res = searching ? results : <Offer>[];
-    final stores = q.text.trim().isEmpty ? <Store>[] : app.stores.where((s) => !s.suspended && (s.name.contains(q.text.trim()) || s.area.contains(q.text.trim()))).toList();
+    final stores = q.text.trim().isEmpty ? <Store>[] : app.stores.where((s) => !s.suspended && s.type != StoreType.shop && (s.name.contains(q.text.trim()) || s.area.contains(q.text.trim()))).toList();
     return Scaffold(
       appBar: AppBar(
         title: TextField(

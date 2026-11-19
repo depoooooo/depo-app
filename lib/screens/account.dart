@@ -3,6 +3,9 @@ import '../data/app_state.dart';
 import '../data/models.dart';
 import '../theme.dart';
 import 'following.dart';
+import 'shop/markets.dart';
+import 'shop/my_debts.dart';
+import 'shop/my_shop.dart';
 import '../widgets/common.dart';
 import 'auth.dart';
 import 'join.dart';
@@ -100,6 +103,9 @@ class AccountScreen extends StatelessWidget {
                 Icon(Icons.chevron_left),
               ]),
             ),
+          _MenuItem(Icons.account_balance_wallet_outlined, 'ديوني عند المحلات', () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const MyDebtsScreen()))),
+          _MenuItem(Icons.local_grocery_store_outlined, 'الأسواق القريبة', () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const MarketsScreen()))),
+          _MenuItem(Icons.storefront_outlined, app.myShop == null ? 'افتح محلك مجاناً' : 'محلي: ${app.myShop!.name}', () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const MyShopScreen()))),
           _MenuItem(Icons.favorite_border, 'محلاتي (${u.follows.length})', () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const FollowingScreen()))),
           _MenuItem(Icons.notifications_none, 'الإشعارات (${u.notifications.length})', () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const NotificationsScreen()))),
           _MenuItem(Icons.location_on_outlined, 'عناويني', () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const AddressesScreen()))),

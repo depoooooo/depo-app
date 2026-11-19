@@ -38,7 +38,8 @@ const permDesc = {
 };
 
 /// نوع المحل: مطعم (رواجع) أو تاجر (الماركت)
-enum StoreType { restaurant, merchant }
+/// shop = سوق/محل بمتجر مجاني (أسعار عادية + دفتر ديون) — ما يطلع بالرئيسية
+enum StoreType { restaurant, merchant, shop }
 
 /// طريقة الحفظ لمنتجات التجار
 enum Storage { normal, chilled, frozen }
@@ -78,6 +79,7 @@ class AppUser {
   int createdAt;
   String pinHash; // رمز سري للحسابات الخاصة (مطعم/تاجر/مندوب/مشرف/مدير)
   List<String> perms; // أقسام المشرف
+  List<String> debtCodes; // رموز الديون اللي ضافها الزبون
 
   AppUser({
     required this.phone,
@@ -92,7 +94,9 @@ class AppUser {
     int? createdAt,
     this.pinHash = '',
     List<String>? perms,
+    List<String>? debtCodes,
   })  : perms = perms ?? [],
+        debtCodes = debtCodes ?? [],
         addresses = addresses ?? [],
         follows = follows ?? [],
         notifications = notifications ?? [],
@@ -111,6 +115,7 @@ class AppUser {
         'createdAt': createdAt,
         'pinHash': pinHash,
         'perms': perms,
+        'debtCodes': debtCodes,
       };
 
   factory AppUser.fromJson(Map<String, dynamic> j) => AppUser(
@@ -126,6 +131,7 @@ class AppUser {
         createdAt: j['createdAt'] as int?,
         pinHash: (j['pinHash'] ?? '') as String,
         perms: List<String>.from(j['perms'] ?? const []),
+        debtCodes: List<String>.from(j['debtCodes'] ?? const []),
       );
 }
 
@@ -241,6 +247,7 @@ class Offer {
   int get discountPercent =>
       originalPrice == 0 ? 0 : ((1 - price / originalPrice) * 100).round();
   bool get expired => expiresAt > 0 && _now() >= expiresAt;
+  bool get unlimited => quantityLeft >= 9000; // منتجات المتجر المجاني (بدون كمية محددة)
   bool get visible => active && !hidden && quantityLeft > 0 && !expired;
 
   /// نص الانتهاء: يتحسب من الوقت إذا موجود
@@ -636,3 +643,104 @@ String timeAgo(int ms) {
   if (d.inHours < 24) return 'قبل ${d.inHours} ساعة';
   return 'قبل ${d.inDays} يوم';
 }
+
+
+// ======================= دفتر الديون =======================
+
+/// زبون بدفتر ديون محل
+class Debtor {
+  String id;
+  String storeId;
+  String name;
+  String phone;
+  String code; // XXXX-XXXX — الزبون يكتبه حتى يشوف ديونه
+  bool active;
+  int createdAt;
+
+  Debtor({required this.id, required this.storeId, required this.name, this.phone = '', required this.code, this.active = true, int? createdAt})
+      : createdAt = createdAt ?? _now();
+
+  Map<String, dynamic> toJson() =>
+      {'id': id, 'storeId': storeId, 'name': name, 'phone': phone, 'code': code, 'active': active, 'createdAt': createdAt};
+
+  factory Debtor.fromJson(Map<String, dynamic> j) => Debtor(
+        id: j['id'] as String,
+        storeId: j['storeId'] as String,
+        name: (j['name'] ?? '') as String,
+        phone: (j['phone'] ?? '') as String,
+        code: (j['code'] ?? '') as String,
+        active: (j['active'] ?? true) as bool,
+        createdAt: j['createdAt'] as int?,
+      );
+}
+
+class DebtItem {
+  String name;
+  int price;
+  int qty;
+  DebtItem({required this.name, required this.price, this.qty = 1});
+  int get total => price * qty;
+  Map<String, dynamic> toJson() => {'name': name, 'price': price, 'qty': qty};
+  factory DebtItem.fromJson(Map<String, dynamic> j) =>
+      DebtItem(name: (j['name'] ?? '') as String, price: (j['price'] ?? 0) as int, qty: (j['qty'] ?? 1) as int);
+}
+
+/// حركة بالدفتر: طلب (دين) أو دفعة (تسديد). ما تنمسح — تنلغى بس.
+class DebtEntry {
+  String id;
+  String debtorId;
+  String storeId;
+  bool payment; // false = طلب، true = دفعة
+  List<DebtItem> items; // للطلب
+  int amount; // مبلغ الطلب (مجموع الأصناف) أو الدفعة
+  String month; // شهر الدين YYYY/MM — كل شهر بلون
+  int dueAt; // موعد التسديد (0 = بدون)
+  String note;
+  bool voided; // ملغية (تبقى ظاهرة بشطب)
+  int createdAt;
+
+  DebtEntry({
+    required this.id,
+    required this.debtorId,
+    required this.storeId,
+    required this.payment,
+    List<DebtItem>? items,
+    required this.amount,
+    required this.month,
+    this.dueAt = 0,
+    this.note = '',
+    this.voided = false,
+    int? createdAt,
+  })  : items = items ?? [],
+        createdAt = createdAt ?? _now();
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'debtorId': debtorId,
+        'storeId': storeId,
+        'payment': payment,
+        'items': items.map((e) => e.toJson()).toList(),
+        'amount': amount,
+        'month': month,
+        'dueAt': dueAt,
+        'note': note,
+        'voided': voided,
+        'createdAt': createdAt,
+      };
+
+  factory DebtEntry.fromJson(Map<String, dynamic> j) => DebtEntry(
+        id: j['id'] as String,
+        debtorId: j['debtorId'] as String,
+        storeId: j['storeId'] as String,
+        payment: (j['payment'] ?? false) as bool,
+        items: (j['items'] as List? ?? const []).map((e) => DebtItem.fromJson(Map<String, dynamic>.from(e as Map))).toList(),
+        amount: (j['amount'] ?? 0) as int,
+        month: (j['month'] ?? '') as String,
+        dueAt: (j['dueAt'] ?? 0) as int,
+        note: (j['note'] ?? '') as String,
+        voided: (j['voided'] ?? false) as bool,
+        createdAt: j['createdAt'] as int?,
+      );
+}
+
+String monthKey(DateTime d) => '${d.year}/${d.month.toString().padLeft(2, '0')}';

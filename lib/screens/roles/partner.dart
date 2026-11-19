@@ -40,7 +40,7 @@ class PartnerHome extends StatelessWidget {
             ],
           ),
         ),
-        body: TabBarView(children: [_Dashboard(store: s), _MyOffers(store: s), _StoreOrders(store: s)]),
+        body: TabBarView(children: [_Dashboard(store: s), _MyOffers(store: s), StoreOrdersTab(store: s)]),
         floatingActionButton: FloatingActionButton.extended(
           backgroundColor: DepoColors.dark,
           foregroundColor: Colors.white,
@@ -178,9 +178,9 @@ class _MyOffers extends StatelessWidget {
   }
 }
 
-class _StoreOrders extends StatelessWidget {
+class StoreOrdersTab extends StatelessWidget {
   final Store store;
-  const _StoreOrders({required this.store});
+  const StoreOrdersTab({super.key, required this.store});
 
   @override
   Widget build(BuildContext context) {
