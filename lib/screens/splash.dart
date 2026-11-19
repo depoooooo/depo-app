@@ -61,63 +61,57 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
     final h = size.height, w = size.width;
-    final minaretH = h * 0.66;
-    final mosqueW = w * 0.5;
+    // نفس توزيع كيو: المعالم على الحافتين تأطّر الشعار بالنص
+    final minaretH = h * 0.70;
+    final minaretW = minaretH * 0.24;
+    final mosqueW = w * 0.74;
     return Scaffold(
       backgroundColor: DepoColors.brand,
       body: AnimatedBuilder(
         animation: c,
         builder: (context, _) => Stack(clipBehavior: Clip.hardEdge, children: [
-          // ظل بيوت الموصل
+          // ظل بيوت الموصل (واطي وخفيف)
           Positioned(
-            left: -w * 0.06,
-            right: -w * 0.06,
-            bottom: -10,
-            child: Opacity(opacity: skyline.value, child: Image.asset('assets/splash/skyline.png', fit: BoxFit.fitWidth)),
+            left: -w * 0.09,
+            width: w * 1.18,
+            bottom: -w * 1.18 * 0.495 * 0.38,
+            child: Opacity(opacity: 0.75 * skyline.value, child: Image.asset('assets/splash/skyline.png', fit: BoxFit.fitWidth)),
           ),
           // منارة الحدباء تدخل من حافة الشاشة اليسار
           Positioned(
-            left: -w * 0.03 - (minaretH * 0.26) * (1 - minaret.value),
-            bottom: -6,
+            left: -w * 0.10 - (minaretW + w * 0.1) * (1 - minaret.value),
+            bottom: -4,
             height: minaretH,
             child: Image.asset('assets/splash/minaret.png', fit: BoxFit.fitHeight),
           ),
           // الجامع يدخل من حافة الشاشة اليمين
           Positioned(
-            right: -w * 0.04 - mosqueW * (1 - mosque.value),
-            bottom: -6,
+            right: -w * 0.06 - mosqueW * (1 - mosque.value),
+            bottom: -4,
             width: mosqueW,
             child: Image.asset('assets/splash/mosque.png', fit: BoxFit.fitWidth),
           ),
           // الشعار والجملة
           Positioned(
-            top: h * 0.2,
+            top: h * 0.34,
             left: 0,
             right: 0,
             child: Column(children: [
               Opacity(
                 opacity: logo.value.clamp(0.0, 1.0),
-                child: Image.asset('assets/logo/depo-ar-white.png', width: w * 0.5, semanticLabel: 'ديبو'),
+                child: Image.asset('assets/logo/depo-ar-white.png', width: w * 0.44, semanticLabel: 'ديبو'),
               ),
-              const SizedBox(height: 14),
+              const SizedBox(height: 10),
               Opacity(
                 opacity: line1.value,
-                child: const Text('أكل طيب', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: Colors.white)),
+                child: const Text('أكل طيب', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w500, color: Colors.white)),
               ),
               Opacity(
                 opacity: line2.value,
-                child: const Text('بسعر أطيب', style: TextStyle(fontSize: 21, fontWeight: FontWeight.w900, color: DepoColors.ink)),
+                child: const Text('بسعر أطيب', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: DepoColors.ink)),
               ),
             ]),
           ),
-          // إذا التحميل تأخر (نت ضعيف)
-          if (_animDone && !app.loaded)
-            const Positioned(
-              bottom: 40,
-              left: 0,
-              right: 0,
-              child: Center(child: SizedBox(width: 26, height: 26, child: CircularProgressIndicator(strokeWidth: 3, color: Colors.white))),
-            ),
         ]),
       ),
     );
