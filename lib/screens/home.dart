@@ -5,6 +5,7 @@ import '../data/categories.dart';
 import '../data/models.dart';
 import 'categories_screen.dart';
 import '../widgets/depo_refresh.dart';
+import '../widgets/typewriter_hint.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
 import '../widgets/offer_cards.dart';
@@ -102,7 +103,7 @@ class _Header extends StatelessWidget {
               child: Row(children: [
                 Icon(Icons.search_rounded, color: DepoColors.dark),
                 SizedBox(width: 8),
-                Text('دوّر على أكلة أو محل...', style: TextStyle(color: DepoColors.muted)),
+                Expanded(child: TypewriterHint(phrases: searchPhrases)),
               ]),
             ),
           ),
