@@ -2217,8 +2217,13 @@ class StoreImpact {
   int? price, original, qty;
   final orig = RegExp(r'(?:بدل|بدال|بدلاً من|من اصل|سعره|الأصلي|الاصلي)\s*(\d+)').firstMatch(t);
   if (orig != null) original = int.parse(orig[1]!);
-  final pr = RegExp(r'(?:بـ|ب\s|بسعر|سعر|ب(?=\d))\s*(\d+)').firstMatch(t);
-  if (pr != null) price = int.parse(pr[1]!);
+  for (final m in RegExp(r'(?:بـ|(?<![\u0600-\u06FF])ب\s|بسعر|سعر|(?<![\u0600-\u06FF])ب(?=\d))\s*(\d+)').allMatches(t)) {
+    final n = int.parse(m[1]!);
+    if (n >= 100 && n != original) {
+      price = n;
+      break;
+    }
+  }
   final nums = [for (final m in RegExp(r'\d+').allMatches(t)) int.parse(m[0]!)];
   for (final n in nums) {
     if (n == price || n == original) continue;
