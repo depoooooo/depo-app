@@ -4,6 +4,7 @@ import '../data/models.dart';
 import '../theme.dart';
 import 'following.dart';
 import 'chat_screen.dart';
+import '../widgets/debt_ui.dart';
 import 'address/address_ui.dart';
 import 'shop/markets.dart';
 import '../widgets/common.dart';
@@ -64,6 +65,7 @@ class AccountScreen extends StatelessWidget {
             ]),
           ),
           const SizedBox(height: 12),
+          const SaverCard(),
           if (u.role != Role.customer)
             AppCard(
               color: DepoColors.ink,
@@ -421,6 +423,60 @@ class MarketsTile extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+
+/// «أنقذ وجبة»: مستوى المنقذ، التقدّم للمستوى الجاي، ومشاركة الإنجاز
+class SaverCard extends StatelessWidget {
+  const SaverCard({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final i = app.impactOf(app.currentPhone);
+    final lvl = saverLevelOf(i.meals);
+    final c = Color(lvl.color);
+    final progress = lvl.next == 0 ? 1.0 : (i.meals - lvl.from) / (lvl.next - lvl.from);
+    final nextName = lvl.next == 0 ? '' : saverLevels.firstWhere((l) => l.from == lvl.next).name;
+    return AppCard(
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: LinearGradient(colors: [Color.lerp(c, Colors.white, 0.35)!, c]),
+              boxShadow: [BoxShadow(color: c.withValues(alpha: 0.4), blurRadius: 10, offset: const Offset(0, 3))],
+            ),
+            child: const Icon(Icons.eco_rounded, color: Colors.white, size: 26),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(lvl.name, style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900, color: Color.lerp(c, DepoColors.ink, 0.35))),
+              Text('أنقذت ${i.meals} ${i.meals == 1 ? 'وجبة' : 'وجبات ومنتجات'} من الرمي', style: const TextStyle(fontSize: 12, color: DepoColors.muted)),
+            ]),
+          ),
+          IconButton(
+            tooltip: 'شارك إنجازك',
+            onPressed: i.meals == 0 ? null : () => shareText(context, app.impactShareText(i)),
+            icon: const Icon(Icons.ios_share_rounded, color: DepoColors.dark),
+          ),
+        ]),
+        const SizedBox(height: 10),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(6),
+          child: LinearProgressIndicator(value: progress.clamp(0.0, 1.0), minHeight: 8, backgroundColor: DepoColors.line, color: c),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          lvl.next == 0 ? 'وصلت لأعلى مستوى — بطل ديبو!' : 'باقي ${lvl.next - i.meals} حتى تصير «$nextName»',
+          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+        ),
+        if (i.saved > 0) Text('ووفّرت ${iqd(i.saved)} من جيبك', style: const TextStyle(fontSize: 12, color: DepoColors.success, fontWeight: FontWeight.w700)),
+      ]),
     );
   }
 }

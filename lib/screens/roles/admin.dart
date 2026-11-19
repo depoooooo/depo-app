@@ -175,6 +175,8 @@ class _SettingsTabState extends State<_SettingsTab> {
       'courierCashCap': TextEditingController(text: '${s.courierCashCap}'),
       'roadFactor': TextEditingController(text: '${s.roadFactor}'),
       'gpsMaxAccuracy': TextEditingController(text: '${s.gpsMaxAccuracy}'),
+      'peakBonus': TextEditingController(text: '${s.peakBonus}'),
+      'peakHours': TextEditingController(text: s.peakHours),
     };
     campaign = TextEditingController(text: s.campaignName);
     firstFree = s.firstOrderFree;
@@ -215,6 +217,9 @@ class _SettingsTabState extends State<_SettingsTab> {
     s.courierCashCap = v('courierCashCap', s.courierCashCap);
     s.roadFactor = v('roadFactor', s.roadFactor).clamp(100, 250);
     s.gpsMaxAccuracy = v('gpsMaxAccuracy', s.gpsMaxAccuracy).clamp(20, 1000);
+    s.peakBonus = v('peakBonus', s.peakBonus);
+    final ph = c['peakHours']!.text.replaceAll(' ', '').replaceAll('،', ',');
+    if (RegExp(r'^(\d{1,2}-\d{1,2})(,\d{1,2}-\d{1,2})*$').hasMatch(ph) || ph.isEmpty) s.peakHours = ph;
     s.campaignName = campaign.text.trim().isEmpty ? s.campaignName : campaign.text.trim();
     s.firstOrderFree = firstFree;
     app.saveSettings();
@@ -237,6 +242,17 @@ class _SettingsTabState extends State<_SettingsTab> {
         f('courierCashCap', 'سقف النقد بيد المندوب'),
         Row(children: [Expanded(child: f('roadFactor', 'معامل الطرق % (130 = الطريق أطول 30%)')), const SizedBox(width: 10), Expanded(child: f('gpsMaxAccuracy', 'أسوأ دقة GPS مقبولة (متر)'))]),
         const Text('المسافة = الخط المستقيم بين المحل ومكان التسليم (GPS) × معامل الطرق.', style: TextStyle(fontSize: 12, color: DepoColors.muted)),
+        const SizedBox(height: 8),
+        Row(children: [
+          Expanded(child: f('peakBonus', 'مكافأة الذروة لكل توصيلة')),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: TextField(controller: c['peakHours'], textDirection: TextDirection.ltr, decoration: const InputDecoration(labelText: 'ساعات الذروة', helperText: 'مثل: 12-15,19-23')),
+            ),
+          ),
+        ]),
         Builder(builder: (context) {
           final t = AppSettings(
             courierBasePay: parseInt(c['courierBasePay']!.text) ?? 0,

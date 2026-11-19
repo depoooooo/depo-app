@@ -337,7 +337,7 @@ class StoreTile extends StatelessWidget {
                         const Badge2('مُموّل', bg: DepoColors.soft, fg: DepoColors.muted),
                       ],
                     ]),
-                    Text('${store.area} • ${store.distanceKm} كم', style: const TextStyle(fontSize: 12, color: DepoColors.muted)),
+                    Text('${store.area} • ${app.distanceText(store)}', style: const TextStyle(fontSize: 12, color: DepoColors.muted)),
                     const SizedBox(height: 6),
                     Row(children: [
                       const Icon(Icons.star_rounded, size: 17, color: DepoColors.brand),

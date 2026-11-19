@@ -220,6 +220,10 @@ class _Earnings extends StatelessWidget {
           Text(iqd(now.earned), style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: DepoColors.dark)),
         ]),
         Text('${now.orders.length} توصيلة • ${now.km.toStringAsFixed(1)} كم • التسوية آخر الشهر', style: const TextStyle(fontSize: 12, color: DepoColors.muted)),
+        if (app.courierRatingOf(app.currentPhone!).$2 > 0)
+          Text('تقييمك من الزبائن: ${app.courierRatingOf(app.currentPhone!).$1.toStringAsFixed(1)} ★ (${app.courierRatingOf(app.currentPhone!).$2} تقييم)',
+              style: const TextStyle(fontSize: 12, color: DepoColors.dark, fontWeight: FontWeight.w700)),
+        if (s.peakBonus > 0) Text('وقت الذروة (${s.peakHours}): + ${iqd(s.peakBonus)} لكل توصيلة', style: const TextStyle(fontSize: 11, color: Color(0xFF8A5A00), fontWeight: FontWeight.w700)),
         Text('الأجرة = ${iqd(s.courierBasePay)} + ${iqd(s.courierPerKm)} لكل كم، تقريب لأقرب 250، وأقل شي ${iqd(s.courierMinPay)}', style: const TextStyle(fontSize: 11, color: DepoColors.muted)),
         const Text('اضغط حتى تشوف كل توصيلة وشلون انحسبت أجرتها', style: TextStyle(fontSize: 11, color: DepoColors.dark, fontWeight: FontWeight.w700)),
         for (final x in list.skip(1).take(3))

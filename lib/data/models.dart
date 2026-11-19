@@ -399,6 +399,10 @@ class Order {
   String kmSource; // gps / customer / manual / estimate / edited
   List<String> kmFlags; // mock / weak / far / nostore ...
   bool kmReviewed; // المالية راجعت المسافة
+  int courierRating; // تقييم الزبون للمندوب (0 = ما مقيّم)
+  double courierLat, courierLng; // آخر موقع للمندوب وهو بالطريق (للتتبّع)
+  int courierLocAt;
+  int peakBonus; // مكافأة وقت الذروة (ضمن أجرة المندوب)
 
   Order({
     required this.id,
@@ -437,6 +441,11 @@ class Order {
     this.kmSource = '',
     List<String>? kmFlags,
     this.kmReviewed = false,
+    this.courierRating = 0,
+    this.courierLat = 0,
+    this.courierLng = 0,
+    this.courierLocAt = 0,
+    this.peakBonus = 0,
   })  : payRule = payRule ?? const [],
         kmFlags = kmFlags ?? [],
         createdAt = createdAt ?? _now();
@@ -486,6 +495,11 @@ class Order {
         'kmSource': kmSource,
         'kmFlags': kmFlags,
         'kmReviewed': kmReviewed,
+        'courierRating': courierRating,
+        'courierLat': courierLat,
+        'courierLng': courierLng,
+        'courierLocAt': courierLocAt,
+        'peakBonus': peakBonus,
       };
 
   factory Order.fromJson(Map<String, dynamic> j) => Order(
@@ -525,6 +539,11 @@ class Order {
         kmSource: (j['kmSource'] ?? '') as String,
         kmFlags: List<String>.from(j['kmFlags'] ?? const []),
         kmReviewed: (j['kmReviewed'] ?? false) as bool,
+        courierRating: (j['courierRating'] ?? 0) as int,
+        courierLat: _d(j['courierLat']),
+        courierLng: _d(j['courierLng']),
+        courierLocAt: (j['courierLocAt'] ?? 0) as int,
+        peakBonus: (j['peakBonus'] ?? 0) as int,
       );
 
   /// المسافة تحتاج مراجعة قبل تسوية أجور المندوب
@@ -773,6 +792,8 @@ class AppSettings {
   int courierCashCap; // سقف النقد بيد المندوب
   int roadFactor; // معامل الطرق %: الطريق الفعلي أطول من الخط المستقيم
   int gpsMaxAccuracy; // أسوأ دقة GPS مقبولة (متر)
+  int peakBonus; // مكافأة المندوب بوقت الذروة (د.ع لكل توصيلة)
+  String peakHours; // ساعات الذروة، مثل: 12-15,19-23
 
   AppSettings({
     this.restaurantCommission = 15,
@@ -796,7 +817,22 @@ class AppSettings {
     this.courierCashCap = 100000,
     this.roadFactor = 130,
     this.gpsMaxAccuracy = 150,
+    this.peakBonus = 500,
+    this.peakHours = '12-15,19-23',
   });
+
+  /// هل الساعة [h] ضمن الذروة؟
+  bool isPeak(DateTime t) {
+    for (final part in peakHours.split(',')) {
+      final p = part.trim().split('-');
+      if (p.length != 2) continue;
+      final a = int.tryParse(p[0].trim()), b = int.tryParse(p[1].trim());
+      if (a == null || b == null) continue;
+      final h = t.hour;
+      if (a <= b ? (h >= a && h < b) : (h >= a || h < b)) return true;
+    }
+    return false;
+  }
 
   /// أجرة المندوب حسب المسافة: ثابت + لكل كم، وما تنزل عن الحد الأدنى (مقرّبة لـ 250)
   int courierPayFor(double km) => CourierPay(courierBasePay, courierPerKm, courierMinPay, courierMaxKm).pay(km);
@@ -823,6 +859,8 @@ class AppSettings {
         'courierCashCap': courierCashCap,
         'roadFactor': roadFactor,
         'gpsMaxAccuracy': gpsMaxAccuracy,
+        'peakBonus': peakBonus,
+        'peakHours': peakHours,
       };
 
   factory AppSettings.fromJson(Map<String, dynamic> j) {
@@ -850,6 +888,8 @@ class AppSettings {
       courierCashCap: g('courierCashCap', d.courierCashCap),
       roadFactor: g('roadFactor', d.roadFactor),
       gpsMaxAccuracy: g('gpsMaxAccuracy', d.gpsMaxAccuracy),
+      peakBonus: g('peakBonus', d.peakBonus),
+      peakHours: (j['peakHours'] ?? d.peakHours) as String,
     );
   }
 }

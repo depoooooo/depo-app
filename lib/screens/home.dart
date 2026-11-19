@@ -8,6 +8,7 @@ import 'categories_screen.dart';
 import 'address/address_ui.dart';
 import '../widgets/mode_switch.dart';
 import '../widgets/depo_glyph.dart';
+import 'shop/my_shop.dart';
 import '../widgets/depo_refresh.dart';
 import '../widgets/typewriter_hint.dart';
 import '../theme.dart';
@@ -159,8 +160,8 @@ class _RawajiTabState extends State<_RawajiTab> {
       case _Filter.discount:
         l = [...l]..sort((a, b) => b.discountPercent - a.discountPercent);
       case _Filter.near:
-        l = l.where((o) => (app.storeById(o.storeId)?.distanceKm ?? 99) <= app.settings.stage1Km).toList()
-          ..sort((a, b) => app.storeById(a.storeId)!.distanceKm.compareTo(app.storeById(b.storeId)!.distanceKm));
+        l = l.where((o) => app.storeById(o.storeId) != null && app.distanceTo(app.storeById(o.storeId)!) <= app.settings.stage1Km).toList()
+          ..sort((a, b) => app.distanceTo(app.storeById(a.storeId)!).compareTo(app.distanceTo(app.storeById(b.storeId)!)));
       case _Filter.boxes:
         l = l.where((o) => o.surpriseBox).toList();
       case _Filter.rated:
@@ -425,6 +426,43 @@ void runBannerAction(BuildContext context, BannerItem b) {
       if (c != null) nav.push(MaterialPageRoute(builder: (_) => CategoryResults(cat: c, market: catByName(marketCats, b.target) != null)));
     case 'search':
       nav.push(MaterialPageRoute(builder: (_) => const SearchScreen()));
+    case 'shop':
+      nav.push(MaterialPageRoute(builder: (_) => const MyShopScreen()));
+  }
+}
+
+/// ترويج المتجر المجاني ودفتر الديون لأصحاب المحلات
+class _ShopPromo extends StatelessWidget {
+  const _ShopPromo();
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+      child: Material(
+        borderRadius: BorderRadius.circular(20),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const MyShopScreen())),
+          child: Ink(
+            padding: const EdgeInsets.all(16),
+            decoration: const BoxDecoration(gradient: LinearGradient(colors: [Color(0xFF0E4A44), Color(0xFF061F1C)])),
+            child: const Row(children: [
+              DepoGlyph('💰', size: 44),
+              SizedBox(width: 12),
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text('عندك محل؟ دفتر ديون مجاني', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w900)),
+                  SizedBox(height: 2),
+                  Text('سجّل ديون زبائنك، كل زبون يشوف حسابه برمز، ومنتجاتك تظهر بالأسواق — مجاناً', style: TextStyle(color: Colors.white70, fontSize: 12, height: 1.4)),
+                ]),
+              ),
+              Icon(Icons.chevron_left, color: Colors.white70),
+            ]),
+          ),
+        ),
+      ),
+    );
   }
 }
 class _Slide {
@@ -570,6 +608,7 @@ class _MarketTab extends StatelessWidget {
           else
             Padding(padding: const EdgeInsets.symmetric(horizontal: 16), child: ProductGrid(products: products)),
         ],
+        if (app.myShop == null) const _ShopPromo(),
         if (app.content.show('marketStores')) ...[
           _Section(title: 'المحلات'),
           Padding(

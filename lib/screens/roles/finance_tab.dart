@@ -510,7 +510,7 @@ class CourierStatementScreen extends StatelessWidget {
           body: ListView(padding: const EdgeInsets.all(16), children: [
             AppCard(
               child: Column(children: [
-                Note('${st.orders.length} توصيلة • ${st.km.toStringAsFixed(1)} كم'),
+                Note('${st.orders.length} توصيلة • ${st.km.toStringAsFixed(1)} كم${app.courierRatingOf(phone).$2 == 0 ? '' : ' • التقييم ${app.courierRatingOf(phone).$1.toStringAsFixed(1)} ★ (${app.courierRatingOf(phone).$2})'}'),
                 MoneyRow('الأجور المستحقة', st.earned, bold: true, color: DepoColors.dark),
                 for (final p in b.payments.reversed) MoneyRow('استلم ${dateTimeLabel(p.at)}${p.note.isEmpty ? '' : ' • ${p.note}'}', p.amount, sign: '−'),
                 if (b.payments.isNotEmpty) MoneyRow('الباقي', b.remaining, bold: true, color: b.remaining == 0 ? DepoColors.success : DepoColors.danger),
@@ -548,7 +548,7 @@ class CourierStatementScreen extends StatelessWidget {
                     ),
                   ]),
                   Note('المسافة: ${app.kmSourceText(o)}', color: o.kmNeedsReview ? const Color(0xFF8A5A00) : null),
-                  Note('الأجرة: ${CourierPay.of(o.payRule, app.settings).explain(o.distanceKm)}'),
+                  Note('الأجرة: ${CourierPay.of(o.payRule, app.settings).explain(o.distanceKm)}${o.peakBonus > 0 ? ' + مكافأة الذروة ${iqd(o.peakBonus)}' : ''}'),
                   MoneyRow('الأجرة', o.courierPay, bold: true),
                   MoneyRow('حصّل من الزبون (يسلّمه لديبو)', o.total),
                   Wrap(spacing: 8, children: [

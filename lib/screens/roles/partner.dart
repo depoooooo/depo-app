@@ -12,6 +12,7 @@ import '../../data/categories.dart';
 import '../../widgets/debt_ui.dart';
 import 'finance_tab.dart';
 import '../../widgets/geo_ui.dart';
+import '../../widgets/depo_glyph.dart';
 
 /// واجهة المطعم والتاجر
 class PartnerHome extends StatelessWidget {
@@ -138,6 +139,7 @@ class _DashboardState extends State<_Dashboard> {
               subtitle: Text('تنشر وحدها كل يوم بوقت تختاره وأنت تأكد الكمية بس. هسه استخدم «انشر بضغطة وحدة» فوق.'),
             ),
           ),
+        _ImpactReport(store: s),
         const SectionTitle('الأرباح والتسوية الشهرية'),
         for (final st in app.myStoreStatements(s).take(4))
           InkWell(
@@ -496,6 +498,13 @@ class _PublishOfferScreenState extends State<PublishOfferScreen> {
           else
             OutlinedButton.icon(onPressed: () => toast(context, 'مسح الباركود يتفعل بالتطبيق على التلفون'), icon: const Icon(Icons.qr_code_scanner), label: const Text('امسح الباركود')),
           const SizedBox(height: 10),
+          _QuickFill(onParsed: (r) => setState(() {
+            if (r.title.isNotEmpty) title.text = r.title;
+            if (r.qty != null) qty.text = '${r.qty}';
+            if (r.price != null) price.text = '${r.price}';
+            if (r.original != null) original.text = '${r.original}';
+          })),
+          const SizedBox(height: 10),
           _PhotoBox(photo: photo, onPick: _pickPhoto, onClear: () => setState(() => photo = null)),
           const SizedBox(height: 12),
           if (isRest) ...[
@@ -746,6 +755,136 @@ class _PublishHero extends StatelessWidget {
               ),
           ]),
         ],
+      ]),
+    );
+  }
+}
+
+
+/// تقرير الشهر للمحل: شكد بعت بدل ما ترمي — حتى يحس بالفايدة
+class _ImpactReport extends StatefulWidget {
+  final Store store;
+  const _ImpactReport({required this.store});
+
+  @override
+  State<_ImpactReport> createState() => _ImpactReportState();
+}
+
+class _ImpactReportState extends State<_ImpactReport> {
+  int back = 0; // 0 = هذا الشهر، 1 = الشهر الماضي
+
+  @override
+  Widget build(BuildContext context) {
+    final now = DateTime.now();
+    final month = monthKey(DateTime(now.year, now.month - back));
+    final s = widget.store;
+    final i = app.storeImpact(s, month);
+    final unit = s.type == StoreType.restaurant ? 'وجبة' : 'منتج';
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      Row(children: [
+        const Expanded(child: SectionTitle('تقرير الشهر')),
+        ChoiceChip(label: const Text('هذا الشهر'), selected: back == 0, onSelected: (_) => setState(() => back = 0)),
+        const SizedBox(width: 6),
+        ChoiceChip(label: const Text('الماضي'), selected: back == 1, onSelected: (_) => setState(() => back = 1)),
+      ]),
+      Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(gradient: const LinearGradient(colors: [DepoColors.dark, DepoColors.ink]), borderRadius: BorderRadius.circular(20)),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [
+            const DepoGlyph('🌱', size: 34),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(i.meals == 0 ? 'بعد ما بعت رواجع ${monthLabel(month)}' : 'بدل ما ينرمى، بعت ${i.meals} $unit',
+                  style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w900)),
+            ),
+          ]),
+          const SizedBox(height: 10),
+          Wrap(spacing: 8, runSpacing: 8, children: [
+            _chip('المبيعات', iqd(i.sales)),
+            _chip('صافي لك', iqd(i.earnings)),
+            _chip('زبائن', '${i.customers}'),
+            _chip('طلبات', '${i.orders}'),
+          ]),
+          if (i.topItem.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text('الأكثر طلباً: ${i.topItem}', style: const TextStyle(color: Colors.white70, fontSize: 12)),
+          ],
+          if (i.meals > 0)
+            Align(
+              alignment: AlignmentDirectional.centerEnd,
+              child: TextButton.icon(
+                style: TextButton.styleFrom(foregroundColor: Colors.white),
+                onPressed: () => shareText(context, app.storeImpactText(s, month, i)),
+                icon: const Icon(Icons.ios_share_rounded, size: 18),
+                label: const Text('شارك التقرير'),
+              ),
+            ),
+        ]),
+      ),
+      const SizedBox(height: 12),
+    ]);
+  }
+
+  Widget _chip(String a, String b) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(12)),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(a, style: const TextStyle(color: Colors.white70, fontSize: 11)),
+          Text(b, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900)),
+        ]),
+      );
+}
+
+
+/// نشر سريع: يكتب (أو يحچي بمايك الكيبورد) جملة وحدة والتطبيق يعبّي الحقول
+class _QuickFill extends StatefulWidget {
+  final void Function(({String title, int? qty, int? price, int? original}) r) onParsed;
+  const _QuickFill({required this.onParsed});
+
+  @override
+  State<_QuickFill> createState() => _QuickFillState();
+}
+
+class _QuickFillState extends State<_QuickFill> {
+  final ctl = TextEditingController();
+
+  @override
+  void dispose() {
+    ctl.dispose();
+    super.dispose();
+  }
+
+  void _go() {
+    final r = parseQuickOffer(ctl.text);
+    if (r.price == null && r.qty == null && r.title.isEmpty) return toast(context, 'ما فهمت، جرّب مثلاً: 5 صناديق بـ 3000 بدل 9000');
+    widget.onParsed(r);
+    toast(context, 'تعبّت الحقول، راجعها وانشر');
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AppCard(
+      color: DepoColors.soft,
+      borderColor: DepoColors.soft,
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        const Row(children: [
+          DepoGlyph('⚡', size: 22),
+          SizedBox(width: 8),
+          Expanded(child: Text('نشر سريع', style: TextStyle(fontWeight: FontWeight.w900))),
+        ]),
+        const SizedBox(height: 4),
+        const Text('اكتب جملة وحدة، أو اضغط مايك الكيبورد واحچي', style: TextStyle(fontSize: 12, color: DepoColors.muted)),
+        const SizedBox(height: 8),
+        TextField(
+          controller: ctl,
+          textInputAction: TextInputAction.done,
+          onSubmitted: (_) => _go(),
+          decoration: InputDecoration(
+            hintText: 'مثلاً: 5 صناديق بـ 3000 بدل 9000',
+            suffixIcon: IconButton(onPressed: _go, icon: const Icon(Icons.auto_fix_high_rounded, color: DepoColors.dark)),
+          ),
+        ),
       ]),
     );
   }

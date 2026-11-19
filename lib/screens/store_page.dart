@@ -37,7 +37,7 @@ class StorePage extends StatelessWidget {
                     Expanded(
                       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                         Text(s.fullName, style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w900)),
-                        Text('★ ${s.rating.toStringAsFixed(1)} (${s.ratingCount}) • ${app.followersOf(s.id)} متابع • ${s.distanceKm} كم',
+                        Text('★ ${s.rating.toStringAsFixed(1)} (${s.ratingCount}) • ${app.followersOf(s.id)} متابع • ${app.distanceText(s)}',
                             style: const TextStyle(fontSize: 12)),
                       ]),
                     ),

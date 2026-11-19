@@ -87,9 +87,9 @@ class Notifier {
       } else if (s.type != StoreType.restaurant) {
         _done.add(o.id); // الماركت: للمتابعين بس
         continue;
-      } else if (s.distanceKm <= st.stage1Km) {
+      } else if (app.distanceTo(s) <= st.stage1Km) {
         delayMin = 0;
-      } else if (s.distanceKm <= st.stage2Km) {
+      } else if (app.distanceTo(s) <= st.stage2Km) {
         delayMin = st.stage2Minutes;
       } else {
         delayMin = st.stage3Minutes;

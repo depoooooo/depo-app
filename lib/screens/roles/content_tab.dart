@@ -327,7 +327,7 @@ class _BannerEditState extends State<BannerEdit> {
   @override
   Widget build(BuildContext context) {
     const tabs = {'rawaji': 'رواجع المطاعم', 'market': 'الماركت', 'all': 'الاثنين'};
-    const actions = {'none': 'بدون', 'store': 'يفتح محل', 'category': 'يفتح قسم', 'search': 'يفتح البحث', 'join': 'انضمام كمحل', 'login': 'تسجيل الدخول'};
+    const actions = {'none': 'بدون', 'store': 'يفتح محل', 'category': 'يفتح قسم', 'search': 'يفتح البحث', 'join': 'انضمام كمحل', 'shop': 'يفتح «محلي» (دفتر الديون)', 'login': 'تسجيل الدخول'};
     final fg = b.darkText ? DepoColors.ink : Colors.white;
     return Scaffold(
       appBar: AppBar(

@@ -45,9 +45,16 @@ class AppState extends ChangeNotifier {
   String get cloudStatus => Cloud.status;
 
   Timer? _tick;
+  Timer? _track;
 
   Future<void> load() async {
     // كل دقيقة نحدّث الشاشات (العروض اللي خلص وقتها تختفي، والعدّاد ينقص)
+    // تتبّع المندوب: كل 30 ثانية وهو بالطريق نحدّث موقعه للزبون
+    _track ??= Timer.periodic(const Duration(seconds: 30), (_) async {
+      if (!hasActiveDelivery) return;
+      final r = await Geo.current();
+      if (r.fix != null) updateCourierLocation(r.fix!);
+    });
     _tick ??= Timer.periodic(const Duration(minutes: 1), (_) {
       if (Cloud.enabled && Cloud.status.startsWith('تعذر الحفظ')) _save(); // نعيد المحاولة
       notifyListeners();
@@ -889,7 +896,8 @@ class AppState extends ChangeNotifier {
         final cp = CourierPay.of(const [], settings);
         o.payRule = cp.rule;
         o.distanceKm = cp.kmOf(o.distanceKm);
-        o.courierPay = cp.pay(o.distanceKm);
+        o.peakBonus = settings.isPeak(DateTime.now()) ? settings.peakBonus : 0;
+        o.courierPay = cp.pay(o.distanceKm) + o.peakBonus;
       } else {
         o.courierPay = 0;
       }
@@ -1940,7 +1948,7 @@ extension Finance on AppState {
     if (!o.kmFlags.contains('edited:${oldKm.toStringAsFixed(1)}')) o.kmFlags.add('edited:${oldKm.toStringAsFixed(1)}');
     if (o.status == OrderStatus.delivered && paidCourier(o)) {
       if (o.payRule.length != 4) o.payRule = cp.rule;
-      o.courierPay = cp.pay(o.distanceKm);
+      o.courierPay = cp.pay(o.distanceKm) + o.peakBonus;
     }
     _log('تعديل مسافة الطلب #${o.id} إلى ${o.distanceKm.toStringAsFixed(1)} كم (الأجرة ${iqd(old)} ← ${iqd(o.courierPay)})');
     _changed();
@@ -2160,4 +2168,179 @@ extension Finance on AppState {
 String dateTimeLabel(int ms) {
   final d = DateTime.fromMillisecondsSinceEpoch(ms);
   return '${d.year}/${d.month}/${d.day} ${d.hour}:${d.minute.toString().padLeft(2, '0')}';
+}
+
+// ======================= النمو: القرب، الأثر، الشارات، تقييم المندوب، التتبّع =======================
+class Impact {
+  final int meals; // وجبات/منتجات انقذت من الرمي
+  final int saved; // الفلوس اللي وفّرها
+  final int orders;
+  const Impact(this.meals, this.saved, this.orders);
+}
+
+/// مستوى «المنقذ»
+class SaverLevel {
+  final String name;
+  final int from; // يبدي من كم وجبة
+  final int next; // المستوى الجاي (0 = آخر مستوى)
+  final int color;
+  const SaverLevel(this.name, this.from, this.next, this.color);
+}
+
+const saverLevels = [
+  SaverLevel('منقذ جديد', 0, 5, 0xFF4BCDDB),
+  SaverLevel('منقذ برونزي', 5, 20, 0xFFCD7F32),
+  SaverLevel('منقذ فضي', 20, 50, 0xFF9AA5AE),
+  SaverLevel('منقذ ذهبي', 50, 0, 0xFFF5A524),
+];
+
+SaverLevel saverLevelOf(int meals) => saverLevels.lastWhere((l) => meals >= l.from);
+
+/// تقرير المحل لشهر
+class StoreImpact {
+  final int orders, meals, sales, commission, customers, originalValue;
+  final String topItem;
+  const StoreImpact(this.orders, this.meals, this.sales, this.commission, this.customers, this.originalValue, this.topItem);
+  int get earnings => sales - commission;
+}
+
+/// يفهم جملة نشر سريعة: «5 صناديق بـ 3000 بدل 9000» أو «برياني لحم 3 بـ 4000»
+({String title, int? qty, int? price, int? original}) parseQuickOffer(String input) {
+  const ar = '٠١٢٣٤٥٦٧٨٩';
+  var t = input;
+  for (var i = 0; i < 10; i++) {
+    t = t.replaceAll(ar[i], '$i');
+  }
+  t = t.replaceAll('٬', '').replaceAll(',', '').replaceAll('،', ' ');
+  // "3 آلاف" / "3 الاف" / "3 الف"
+  t = t.replaceAllMapped(RegExp(r'(\d+(?:\.\d+)?)\s*(?:آلاف|الاف|ألف|الف|آلف)'), (m) => '${(double.parse(m[1]!) * 1000).round()}');
+  int? price, original, qty;
+  final orig = RegExp(r'(?:بدل|بدال|بدلاً من|من اصل|سعره|الأصلي|الاصلي)\s*(\d+)').firstMatch(t);
+  if (orig != null) original = int.parse(orig[1]!);
+  final pr = RegExp(r'(?:بـ|ب\s|بسعر|سعر|ب(?=\d))\s*(\d+)').firstMatch(t);
+  if (pr != null) price = int.parse(pr[1]!);
+  final nums = [for (final m in RegExp(r'\d+').allMatches(t)) int.parse(m[0]!)];
+  for (final n in nums) {
+    if (n == price || n == original) continue;
+    if (n > 0 && n < 100) {
+      qty = n;
+      break;
+    }
+  }
+  final big = nums.where((n) => n >= 250).toList()..sort();
+  if (price == null && big.isNotEmpty) price = big.first;
+  if (original == null && big.length > 1) original = big.last;
+  // العنوان: الكلام بدون الأرقام وكلمات السعر
+  var title = t
+      .replaceAll(RegExp(r'(?:بدل|بدال|بدلاً من|من اصل|بسعر|سعره|سعر|الأصلي|الاصلي|بـ|دينار|د\.ع|الف|ألف)'), ' ')
+      .replaceAll(RegExp(r'\d+'), ' ')
+      .replaceAll(RegExp(r'\s(?:ب|و)\s'), ' ')
+      .replaceAll(RegExp(r'\s+'), ' ')
+      .trim();
+  if (title.endsWith(' ب')) title = title.substring(0, title.length - 2);
+  return (title: title, qty: qty, price: price, original: original);
+}
+
+extension Growth on AppState {
+  /// نقطة الزبون: العنوان المختار (إذا عليه خريطة) أو الموقع الحالي
+  (double, double)? get userPoint {
+    if (!usingCurrentLocation) {
+      final p = selectedPlace;
+      if (p != null && p.hasMap) return (p.lat, p.lng);
+    }
+    if (currentFix != null) return (currentFix!.lat, currentFix!.lng);
+    return null;
+  }
+
+  /// المسافة للمحل: حقيقية إذا عدنا موقعك وموقع المحل، وإلا التقدير
+  double distanceTo(Store s) {
+    final u = userPoint;
+    if (u == null || !s.hasLocation) return s.distanceKm;
+    final km = Geo.straightKm(u.$1, u.$2, s.lat, s.lng) * settings.roadFactor / 100;
+    return (km * 10).round() / 10;
+  }
+
+  String distanceText(Store s) {
+    final d = distanceTo(s);
+    return d < 1 ? '${(d * 1000).round()} م' : '${d.toStringAsFixed(1)} كم';
+  }
+
+  /// أثري: الوجبات اللي انقذتها والفلوس اللي وفّرتها
+  Impact impactOf(String? phone) {
+    if (phone == null) return const Impact(0, 0, 0);
+    var meals = 0, saved = 0, n = 0;
+    for (final o in orders.where((o) => o.customerPhone == phone && o.status == OrderStatus.delivered)) {
+      n++;
+      for (final l in o.lines) {
+        meals += l.qty;
+        saved += (l.originalPrice - l.price).clamp(0, 1 << 30) * l.qty;
+      }
+    }
+    return Impact(meals, saved, n);
+  }
+
+  /// نص للمشاركة
+  String impactShareText(Impact i) {
+    final lvl = saverLevelOf(i.meals);
+    return 'أنقذت ${i.meals} ${i.meals == 1 ? 'وجبة' : 'وجبات'} من الرمي ووفّرت ${iqd(i.saved)} ويه ديبو\n'
+        'صرت «${lvl.name}». جرّب ديبو: أكل المطاعم ومنتجات الماركت بنص السعر.';
+  }
+
+  StoreImpact storeImpact(Store s, String month) {
+    final list = deliveredIn(month).where((o) => o.storeId == s.id).toList();
+    var meals = 0, orig = 0;
+    final items = <String, int>{};
+    for (final o in list) {
+      for (final l in o.lines) {
+        meals += l.qty;
+        orig += l.originalPrice * l.qty;
+        items[l.title] = (items[l.title] ?? 0) + l.qty;
+      }
+    }
+    final top = items.entries.isEmpty ? '' : (items.entries.toList()..sort((a, b) => b.value.compareTo(a.value))).first.key;
+    return StoreImpact(
+      list.length,
+      meals,
+      list.fold(0, (a, o) => a + o.itemsTotal),
+      list.fold(0, (a, o) => a + o.commission),
+      {for (final o in list) o.customerPhone}.length,
+      orig,
+      top,
+    );
+  }
+
+  String storeImpactText(Store s, String month, StoreImpact i) =>
+      'تقرير ${s.name} — $month ويه ديبو\n'
+      'بدل ما ينرمى: بعنا ${i.meals} ${s.type == StoreType.restaurant ? 'وجبة' : 'منتج'} لـ ${i.customers} زبون\n'
+      'المبيعات: ${iqd(i.sales)} • العمولة: ${iqd(i.commission)} • صافي لك: ${iqd(i.earnings)}'
+      '${i.topItem.isEmpty ? '' : '\nالأكثر طلباً: ${i.topItem}'}';
+
+  /// تقييم المندوب من الزبون
+  void rateCourier(Order o, int stars) {
+    if (o.courierRating > 0 || o.status != OrderStatus.delivered || o.customerPhone != currentPhone || o.courierPhone == null) return;
+    o.courierRating = stars.clamp(1, 5);
+    _changed();
+  }
+
+  (double, int) courierRatingOf(String phone) {
+    final l = orders.where((o) => o.courierPhone == phone && o.courierRating > 0).toList();
+    if (l.isEmpty) return (0, 0);
+    return (l.fold(0, (a, o) => a + o.courierRating) / l.length, l.length);
+  }
+
+  /// موقع المندوب وهو بالطريق (للتتبّع)
+  void updateCourierLocation(GeoFix f) {
+    if (currentPhone == null) return;
+    var any = false;
+    for (final o in orders.where((o) => o.courierPhone == currentPhone && o.status == OrderStatus.onTheWay)) {
+      o
+        ..courierLat = f.lat
+        ..courierLng = f.lng
+        ..courierLocAt = DateTime.now().millisecondsSinceEpoch;
+      any = true;
+    }
+    if (any) _changed();
+  }
+
+  bool get hasActiveDelivery => currentPhone != null && orders.any((o) => o.courierPhone == currentPhone && o.status == OrderStatus.onTheWay);
 }

@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
+import '../data/geo.dart';
+import 'address/address_ui.dart';
 import '../data/app_state.dart';
 import '../data/models.dart';
 import '../theme.dart';
@@ -138,6 +142,7 @@ class OrderDetailScreen extends StatelessWidget {
                     ),
                   ]),
                 ),
+              if (o.status == OrderStatus.onTheWay && o.courierLat != 0) TrackMap(order: o),
               if (o.courierPhone != null && o.status == OrderStatus.onTheWay)
                 AppCard(
                   child: Row(children: [
@@ -201,6 +206,22 @@ class OrderDetailScreen extends StatelessWidget {
                 ]),
               ],
               if (o.rating > 0) Center(child: Text('قيّمت الطلب ${'★' * o.rating}', style: const TextStyle(color: DepoColors.accent, fontSize: 18))),
+              if (o.status == OrderStatus.delivered && !o.pickup && o.courierPhone != null && o.courierRating == 0 && o.customerPhone == app.currentPhone && o.courierPhone != app.storeById(o.storeId)?.ownerPhone) ...[
+                const SizedBox(height: 8),
+                const Center(child: Text('وشلون كان المندوب؟', style: TextStyle(fontWeight: FontWeight.w900))),
+                Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                  for (var i = 1; i <= 5; i++)
+                    IconButton(
+                      tooltip: '$i نجوم',
+                      onPressed: () {
+                        app.rateCourier(o, i);
+                        toast(context, 'شكراً! تقييمك يساعدنا نختار أحسن المندوبين');
+                      },
+                      icon: const Icon(Icons.star_rounded, color: DepoColors.dark, size: 32),
+                    ),
+                ]),
+              ],
+              if (o.courierRating > 0) Center(child: Text('قيّمت المندوب ${'★' * o.courierRating}', style: const TextStyle(color: DepoColors.dark, fontSize: 15))),
               const SizedBox(height: 8),
               TextButton.icon(
                 onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => ComplaintScreen(order: o))),
@@ -266,6 +287,69 @@ class _ComplaintScreenState extends State<ComplaintScreen> {
           ),
         ],
       ),
+    );
+  }
+}
+
+
+/// تتبّع المندوب على الخريطة (يتحدّث كل 30 ثانية تقريباً)
+class TrackMap extends StatelessWidget {
+  final Order order;
+  const TrackMap({super.key, required this.order});
+
+  @override
+  Widget build(BuildContext context) {
+    final o = order;
+    final courier = LatLng(o.courierLat, o.courierLng);
+    final dest = o.custLat != 0 ? LatLng(o.custLat, o.custLng) : null;
+    final mins = ((DateTime.now().millisecondsSinceEpoch - o.courierLocAt) / 60000).floor();
+    final km = dest == null ? null : Geo.straightKm(courier.latitude, courier.longitude, dest.latitude, dest.longitude) * app.settings.roadFactor / 100;
+    return AppCard(
+      padding: EdgeInsets.zero,
+      child: Column(children: [
+        ClipRRect(
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+          child: SizedBox(
+            height: 190,
+            child: FlutterMap(
+              key: ValueKey('${o.courierLat},${o.courierLng}'),
+              options: MapOptions(
+                initialCenter: dest == null ? courier : LatLng((courier.latitude + dest.latitude) / 2, (courier.longitude + dest.longitude) / 2),
+                initialZoom: 14.5,
+                interactionOptions: const InteractionOptions(flags: InteractiveFlag.pinchZoom | InteractiveFlag.drag),
+              ),
+              children: [
+                osmTiles(),
+                MarkerLayer(markers: [
+                  if (dest != null)
+                    Marker(point: dest, width: 36, height: 36, child: const Icon(Icons.home_rounded, color: DepoColors.ink, size: 32)),
+                  Marker(
+                    point: courier,
+                    width: 40,
+                    height: 40,
+                    child: Container(
+                      decoration: BoxDecoration(color: DepoColors.dark, shape: BoxShape.circle, border: Border.all(color: Colors.white, width: 3)),
+                      child: const Icon(Icons.delivery_dining, color: Colors.white, size: 20),
+                    ),
+                  ),
+                ]),
+              ],
+            ),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.all(12),
+          child: Row(children: [
+            const Icon(Icons.route_rounded, color: DepoColors.dark),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(km == null ? 'المندوب بالطريق' : 'المندوب على بعد ${km < 1 ? '${(km * 1000).round()} م' : '${km.toStringAsFixed(1)} كم'} منك',
+                  style: const TextStyle(fontWeight: FontWeight.w800)),
+            ),
+            Text(mins <= 0 ? 'هسه' : 'قبل $mins د', style: const TextStyle(fontSize: 12, color: DepoColors.muted)),
+          ]),
+        ),
+      ]),
     );
   }
 }
