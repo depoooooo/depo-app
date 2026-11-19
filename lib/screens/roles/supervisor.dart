@@ -72,14 +72,12 @@ class MarketingTab extends StatefulWidget {
 }
 
 class _MarketingTabState extends State<MarketingTab> {
-  late final promo = TextEditingController(text: app.settings.promoText);
   late final campaign = TextEditingController(text: app.settings.campaignName);
   late final minDisc = TextEditingController(text: '${app.settings.campaignMinDiscount}');
   late bool firstFree = app.settings.firstOrderFree;
 
   @override
   void dispose() {
-    promo.dispose();
     campaign.dispose();
     minDisc.dispose();
     super.dispose();
@@ -100,8 +98,6 @@ class _MarketingTabState extends State<MarketingTab> {
             subtitle: const Text('لكل زبون جديد'),
           ),
         ),
-        TextField(controller: promo, decoration: const InputDecoration(labelText: 'نص الشريط البرتقالي فوق (فارغ = مطفي)')),
-        const SizedBox(height: 10),
         Row(children: [
           Expanded(child: TextField(controller: campaign, decoration: const InputDecoration(labelText: 'اسم الحملة'))),
           const SizedBox(width: 10),
@@ -112,7 +108,6 @@ class _MarketingTabState extends State<MarketingTab> {
           onPressed: () {
             app.saveMarketing(
               firstOrderFree: firstFree,
-              promoText: promo.text.trim(),
               campaignName: campaign.text.trim(),
               campaignMinDiscount: parseInt(minDisc.text) ?? app.settings.campaignMinDiscount,
             );

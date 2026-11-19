@@ -1077,11 +1077,10 @@ class AppState extends ChangeNotifier {
   }
 
   /// إعدادات التسويق (الشريط، أول طلب، الحملة) — قسم التسويق
-  void saveMarketing({required bool firstOrderFree, required String promoText, required String campaignName, required int campaignMinDiscount}) {
+  void saveMarketing({required bool firstOrderFree, required String campaignName, required int campaignMinDiscount}) {
     if (!can(Perm.marketing)) return;
     settings
       ..firstOrderFree = firstOrderFree
-      ..promoText = promoText
       ..campaignName = campaignName.isEmpty ? settings.campaignName : campaignName
       ..campaignMinDiscount = campaignMinDiscount.clamp(10, 95);
     _log('تعديل إعدادات التسويق');

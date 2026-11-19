@@ -145,7 +145,6 @@ class _SettingsTab extends StatefulWidget {
 
 class _SettingsTabState extends State<_SettingsTab> {
   late final Map<String, TextEditingController> c;
-  late final TextEditingController promo;
   late final TextEditingController campaign;
   bool firstFree = true;
 
@@ -166,7 +165,6 @@ class _SettingsTabState extends State<_SettingsTab> {
       'stage3Minutes': TextEditingController(text: '${s.stage3Minutes}'),
       'campaignMinDiscount': TextEditingController(text: '${s.campaignMinDiscount}'),
     };
-    promo = TextEditingController(text: s.promoText);
     campaign = TextEditingController(text: s.campaignName);
     firstFree = s.firstOrderFree;
   }
@@ -176,7 +174,6 @@ class _SettingsTabState extends State<_SettingsTab> {
     for (final x in c.values) {
       x.dispose();
     }
-    promo.dispose();
     campaign.dispose();
     super.dispose();
   }
@@ -200,7 +197,6 @@ class _SettingsTabState extends State<_SettingsTab> {
     s.stage2Minutes = v('stage2Minutes', s.stage2Minutes);
     s.stage3Minutes = v('stage3Minutes', s.stage3Minutes);
     s.campaignMinDiscount = v('campaignMinDiscount', s.campaignMinDiscount);
-    s.promoText = promo.text.trim();
     s.campaignName = campaign.text.trim().isEmpty ? s.campaignName : campaign.text.trim();
     s.firstOrderFree = firstFree;
     app.saveSettings();
@@ -226,10 +222,6 @@ class _SettingsTabState extends State<_SettingsTab> {
             title: const Text('توصيل مجاني لأول طلب', style: TextStyle(fontWeight: FontWeight.w800)),
             subtitle: const Text('لكل زبون جديد'),
           ),
-        ),
-        Padding(
-          padding: const EdgeInsets.only(bottom: 10),
-          child: TextField(controller: promo, decoration: const InputDecoration(labelText: 'نص الشريط البرتقالي فوق (فارغ = مطفي)')),
         ),
         Row(children: [
           Expanded(

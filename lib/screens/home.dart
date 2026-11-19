@@ -205,7 +205,6 @@ class _RawajiTabState extends State<_RawajiTab> {
       physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.only(top: 12, bottom: 24),
       children: [
-        if (st.promoText.isNotEmpty && app.eligibleFirstOrder) _PromoStrip(text: st.promoText),
         // أزرار الفلترة
         SizedBox(
           height: 46,
@@ -314,32 +313,6 @@ class _RawajiTabState extends State<_RawajiTab> {
       else
         Padding(padding: const EdgeInsets.symmetric(horizontal: 16), child: ProductGrid(products: res)),
     ];
-  }
-}
-
-/// الشريط البرتقالي الصغير (عرض لمدة محدودة)
-class _PromoStrip extends StatelessWidget {
-  final String text;
-  const _PromoStrip({required this.text});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 0, 16, 4),
-      decoration: BoxDecoration(color: const Color(0xFFFFF1E0), borderRadius: BorderRadius.circular(14)),
-      clipBehavior: Clip.antiAlias,
-      child: Row(children: [
-        const SizedBox(width: 12),
-        const Text('🛵', style: TextStyle(fontSize: 20)),
-        const SizedBox(width: 8),
-        Expanded(child: Text(text, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13))),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-          color: const Color(0xFFF26B1D),
-          child: const Text('لمدة محدودة', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 12)),
-        ),
-      ]),
-    );
   }
 }
 
