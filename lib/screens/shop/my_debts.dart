@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../data/app_state.dart';
+import '../../data/models.dart';
 import '../../theme.dart';
 import '../../widgets/common.dart';
 import '../../widgets/debt_ui.dart';
