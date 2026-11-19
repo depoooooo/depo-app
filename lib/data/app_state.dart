@@ -2053,10 +2053,10 @@ extension Finance on AppState {
     }
     if (o.straightKm > 0) parts.add('خط مستقيم ${o.straightKm.toStringAsFixed(2)} كم × ${(o.roadFactor / 100).toStringAsFixed(2)} معامل الطرق');
     for (final f in o.kmFlags) {
-      if (f == 'mock') parts.add('⚠️ موقع مزيّف');
-      if (f == 'weak') parts.add('⚠️ دقة GPS ضعيفة');
-      if (f == 'far') parts.add('⚠️ التسليم أبعد من كيلو عن موقع الزبون');
-      if (f == 'pickfar') parts.add('⚠️ الاستلام أبعد من نص كيلو عن المحل');
+      if (f == 'mock') parts.add('تنبيه: موقع مزيّف');
+      if (f == 'weak') parts.add('تنبيه: دقة GPS ضعيفة');
+      if (f == 'far') parts.add('تنبيه: التسليم أبعد من كيلو عن موقع الزبون');
+      if (f == 'pickfar') parts.add('تنبيه: الاستلام أبعد من نص كيلو عن المحل');
       if (f.startsWith('edited:')) parts.add('كانت ${f.substring(7)} كم قبل التعديل');
     }
     if (o.kmReviewed) parts.add('✓ مراجَعة');

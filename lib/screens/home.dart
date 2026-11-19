@@ -6,6 +6,7 @@ import '../data/content.dart';
 import '../data/models.dart';
 import 'categories_screen.dart';
 import 'address/address_ui.dart';
+import '../widgets/mode_switch.dart';
 import '../widgets/depo_refresh.dart';
 import '../widgets/typewriter_hint.dart';
 import '../theme.dart';
@@ -115,26 +116,7 @@ class _Header extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 12),
-        Container(
-          height: 46,
-          decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.35), borderRadius: BorderRadius.circular(16)),
-          padding: const EdgeInsets.all(4),
-          child: TabBar(
-            controller: tabs,
-            indicator: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              boxShadow: const [BoxShadow(color: Color(0x2206363C), blurRadius: 6, offset: Offset(0, 2))],
-            ),
-            indicatorSize: TabBarIndicatorSize.tab,
-            dividerColor: Colors.transparent,
-            labelColor: DepoColors.ink,
-            unselectedLabelColor: DepoColors.ink,
-            labelStyle: const TextStyle(fontFamily: 'Tajawal', fontWeight: FontWeight.w900, fontSize: 15),
-            unselectedLabelStyle: const TextStyle(fontFamily: 'Tajawal', fontWeight: FontWeight.w700, fontSize: 14),
-            tabs: const [Tab(text: '🍽️  رواجع المطاعم'), Tab(text: '🛒  الماركت')],
-          ),
-        ),
+        ModeSwitch(controller: tabs),
       ]),
     );
   }
@@ -252,7 +234,7 @@ class _RawajiTabState extends State<_RawajiTab> {
           ],
           if (app.content.show('campaign') && campaign.isNotEmpty) _Campaign(name: st.campaignName, minDiscount: st.campaignMinDiscount, stores: campaign),
           if (app.content.show('boxes') && boxes.isNotEmpty) ...[
-            _Section(title: 'صناديق المفاجأة 🎁', subtitle: 'قيمتها 3 أضعاف سعرها'),
+            _Section(title: 'صناديق المفاجأة', subtitle: 'قيمتها 3 أضعاف سعرها'),
             OfferStrip(offers: boxes),
           ],
           if (app.content.show('stores')) ...[
@@ -309,8 +291,13 @@ class _Campaign extends StatelessWidget {
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         Row(children: [
-          const Text('🔥', style: TextStyle(fontSize: 24)),
-          const SizedBox(width: 6),
+          Container(
+            width: 34,
+            height: 34,
+            decoration: BoxDecoration(color: DepoColors.dark, borderRadius: BorderRadius.circular(11)),
+            child: const Icon(Icons.local_offer_rounded, size: 19, color: Colors.white),
+          ),
+          const SizedBox(width: 8),
           Text(name, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: DepoColors.dark)),
           const Spacer(),
           Badge2('خصم $minDiscount% وأكثر'),

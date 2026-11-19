@@ -140,10 +140,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               _Line('الطلب', iqd(cart.total)),
               _Line('التوصيل', fee == 0 ? 'مجاني' : iqd(fee)),
               if (firstFree)
-                const Align(
-                  alignment: AlignmentDirectional.centerStart,
-                  child: Text('🎉 أول طلب: التوصيل علينا', style: TextStyle(fontSize: 12, color: DepoColors.success, fontWeight: FontWeight.w800)),
-                ),
+                const Row(children: [
+                  Icon(Icons.card_giftcard_rounded, size: 16, color: DepoColors.success),
+                  SizedBox(width: 6),
+                  Text('أول طلب: التوصيل علينا', style: TextStyle(fontSize: 12, color: DepoColors.success, fontWeight: FontWeight.w800)),
+                ]),
               if (!pickup && fee > 0 && remaining > 0)
                 Align(
                   alignment: AlignmentDirectional.centerStart,

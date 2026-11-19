@@ -112,7 +112,7 @@ class Notifier {
     final s = o == null ? null : app.storeById(o.storeId);
     _markDone(id);
     if (o == null || s == null || !o.visible) return; // خلص قبل وقته
-    final title = follower ? '${s.name} نشر رواجع! ❤️' : 'رواجع قريبة: ${s.name} 🔥';
+    final title = follower ? '${s.name} نشر رواجع جديدة' : 'رواجع قريبة: ${s.name}';
     final body = '${o.title} بـ ${iqd(o.price)} بدل ${iqd(o.originalPrice)} — باقي ${o.quantityLeft}';
     _show(title, body, payload: 'offer:${o.id}');
   }
@@ -153,12 +153,12 @@ class Notifier {
   }
 
   static String _titleFor(String t) {
-    if (t.startsWith('طلب جديد')) return 'طلب جديد! 🛎️';
+    if (t.startsWith('طلب جديد')) return 'طلب جديد!';
     if (t.startsWith('طلبك')) return 'تحديث طلبك';
     if (t.contains('انضمام')) return 'طلبات الانضمام';
-    if (t.contains('عاجل')) return 'عاجل ⚠️';
-    if (t.startsWith('تذكير')) return 'تذكير بالدين 🔔';
-    if (t.startsWith('رسالة جديدة')) return 'رسالة جديدة 💬';
+    if (t.contains('عاجل')) return 'عاجل';
+    if (t.startsWith('تذكير')) return 'تذكير بالدين';
+    if (t.startsWith('رسالة جديدة')) return 'رسالة جديدة';
     return 'ديبو';
   }
 

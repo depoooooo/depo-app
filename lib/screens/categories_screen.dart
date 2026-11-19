@@ -23,7 +23,10 @@ class CategoriesScreen extends StatelessWidget {
           automaticallyImplyLeading: !embedded,
           bottom: const TabBar(
             labelStyle: TextStyle(fontFamily: 'Tajawal', fontWeight: FontWeight.w900, fontSize: 15),
-            tabs: [Tab(text: '🍽️  رواجع المطاعم'), Tab(text: '🛒  الماركت')],
+            tabs: [
+              Tab(child: Row(mainAxisSize: MainAxisSize.min, children: [Icon(Icons.restaurant_rounded, size: 18), SizedBox(width: 6), Text('رواجع المطاعم')])),
+              Tab(child: Row(mainAxisSize: MainAxisSize.min, children: [Icon(Icons.shopping_basket_rounded, size: 18), SizedBox(width: 6), Text('الماركت')])),
+            ],
           ),
         ),
         body: ListenableBuilder(
