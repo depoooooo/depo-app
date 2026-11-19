@@ -236,7 +236,7 @@ class _RawajiTabState extends State<_RawajiTab> {
         ),
         if (filtering) ..._results(offers) else ...[
           const SizedBox(height: 6),
-          if (app.content.show('banners')) _Banners(slides: slidesFor(context, 'rawaji')),
+          if (app.content.show('banners')) _Banners(slides: _slidesFor(context, 'rawaji')),
           if (app.content.show('myStores')) const _MyStores(),
           if (app.content.show('nearby')) ...[
             _Section(title: 'رواجع قريبة عليك هسه', subtitle: 'توصل خلال 20–40 دقيقة'),
@@ -396,7 +396,7 @@ class _MyStores extends StatelessWidget {
 
 // ======================= البنرات المتحركة =======================
 /// البنرات من «المحتوى» (تنعدّل من داخل التطبيق)
-List<_Slide> slidesFor(BuildContext context, String tab) {
+List<_Slide> _slidesFor(BuildContext context, String tab) {
   final st = app.settings;
   String fill(String t) => t.replaceAll('{campaign}', st.campaignName).replaceAll('{fee}', iqd(st.deliveryFee));
   final out = <_Slide>[];
@@ -570,7 +570,7 @@ class _MarketTab extends StatelessWidget {
       children: [
         if (app.content.show('cats')) CatStrip(cats: marketCats, market: true),
         const SizedBox(height: 6),
-        if (app.content.show('banners')) _Banners(slides: slidesFor(context, 'market')),
+        if (app.content.show('banners')) _Banners(slides: _slidesFor(context, 'market')),
         if (app.content.show('marketCheap') && cheap.isNotEmpty) ...[
           _Section(title: 'كلشي بـ 1,000 دينار'),
           OfferStrip(offers: cheap),
