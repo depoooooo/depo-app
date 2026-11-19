@@ -808,6 +808,8 @@ class AppState extends ChangeNotifier {
     final s = storeById(cart.storeId!);
     if (s == null || s.suspended) return 'المحل مو متوفر هسه';
     if (s.ownerPhone == u.phone) return 'ما تكدر تطلب من محلك';
+    final repriced = cart.refresh(offerById);
+    if (repriced.isNotEmpty) return 'تغيّر سعر «${repriced.join('، ')}» — شوف المجموع الجديد وأكّد مرة ثانية';
     for (final l in cart.lines) {
       final of = offerById(l.offer.id);
       if (of == null || !of.visible) return '«${l.offer.title}» خلص أو انتهى وقته. شيله من السلة.';
@@ -868,6 +870,11 @@ class AppState extends ChangeNotifier {
             }
             if (of.quantityLeft < want[id]!) {
               fail = 'باقي من «${of.title}» ${of.quantityLeft} بس.';
+              return;
+            }
+            final line = o.lines.firstWhere((l) => l.offerId == id);
+            if (of.price != line.price) {
+              fail = 'سعر «${of.title}» تغيّر (صار ${iqd(of.price)}). ارجع للسلة وأكّد من جديد.';
               return;
             }
             fresh[id] = d;

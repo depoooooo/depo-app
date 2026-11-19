@@ -895,7 +895,7 @@ class AppSettings {
 }
 
 class CartLine {
-  final Offer offer;
+  Offer offer;
   int qty;
   CartLine(this.offer, this.qty);
 }
@@ -910,6 +910,19 @@ class Cart extends ChangeNotifier {
   int get saved => originalTotal - total;
   int get count => lines.fold(0, (s, l) => s + l.qty);
   bool get isEmpty => lines.isEmpty;
+
+  /// يحدّث العروض بالسلة لآخر نسخة (السعر). يرجّع أسماء اللي تغيّر سعرها
+  List<String> refresh(Offer? Function(String id) find) {
+    final changed = <String>[];
+    for (final l in lines) {
+      final f = find(l.offer.id);
+      if (f == null || identical(f, l.offer)) continue;
+      if (f.price != l.offer.price) changed.add(f.title);
+      l.offer = f;
+    }
+    if (changed.isNotEmpty) notifyListeners();
+    return changed;
+  }
 
   bool canAdd(Offer o) => storeId == null || storeId == o.storeId;
 
