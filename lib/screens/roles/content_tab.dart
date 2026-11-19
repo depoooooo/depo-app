@@ -127,7 +127,9 @@ class ImagePickField extends StatelessWidget {
   final String imageId;
   final ValueChanged<String> onChanged;
   final String label;
-  const ImagePickField({super.key, required this.imageId, required this.onChanged, this.label = 'صورة (اختياري)'});
+  final String hint; // ملاحظة للمصمم (القياس)
+  final double maxSide;
+  const ImagePickField({super.key, required this.imageId, required this.onChanged, this.label = 'صورة (اختياري)', this.hint = '', this.maxSide = 1200});
 
   @override
   Widget build(BuildContext context) {
@@ -142,10 +144,15 @@ class ImagePickField extends StatelessWidget {
             : AppImage(imageId: imageId, height: 64, width: 64, fallback: const Icon(Icons.broken_image_outlined)),
       ),
       const SizedBox(width: 10),
-      Expanded(child: Text(label, style: const TextStyle(fontWeight: FontWeight.w800))),
+      Expanded(
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(label, style: const TextStyle(fontWeight: FontWeight.w800)),
+          if (hint.isNotEmpty) Text(hint, style: const TextStyle(fontSize: 11, color: DepoColors.muted, height: 1.5)),
+        ]),
+      ),
       TextButton.icon(
         onPressed: () async {
-          final id = await pickAndUpload(context, owner: 'content', maxSide: 1200, quality: 80);
+          final id = await pickAndUpload(context, owner: 'content', maxSide: maxSide, quality: 80);
           if (id != null) onChanged(id);
         },
         icon: const Icon(Icons.upload),
@@ -319,7 +326,8 @@ class _BannerEditState extends State<BannerEdit> {
         const SizedBox(height: 6),
         ColorPick(value: b.bg, onChanged: (v) => setState(() => b.bg = v)),
         SwitchListTile(contentPadding: EdgeInsets.zero, value: b.darkText, onChanged: (v) => setState(() => b.darkText = v), title: const Text('كتابة غامقة (للألوان الفاتحة)')),
-        ImagePickField(imageId: b.imageId, onChanged: (v) => setState(() => b.imageId = v), label: 'صورة خلفية (اختياري)'),
+        ImagePickField(imageId: b.imageId, onChanged: (v) => setState(() => b.imageId = v), label: 'صورة خلفية (اختياري)',
+            hint: '📐 القياس: 1200 × 400 بكسل (3:1)\n• الكتابة المهمة بالنص، الأطراف ممكن تنقص شوية\n• إذا الكتابة داخل الصورة، اترك العنوان والنص فارغة\n• إذا تريد نص التطبيق فوقها، خلي الجهة اليمنى هادئة\n• JPG أو PNG'),
         const SizedBox(height: 10),
         const Text('الأيقونة', style: TextStyle(fontWeight: FontWeight.w900)),
         const SizedBox(height: 6),
@@ -428,7 +436,9 @@ class _CatsEditorState extends State<CatsEditor> {
                 Expanded(child: TextField(controller: name, decoration: const InputDecoration(labelText: 'اسم القسم'))),
               ]),
               const SizedBox(height: 12),
-              ImagePickField(imageId: c.imageId, onChanged: (v) => set(() => c.imageId = v), label: 'صورة القسم (تطلع بالدائرة بدل الأيقونة)'),
+              ImagePickField(imageId: c.imageId, onChanged: (v) => set(() => c.imageId = v), label: 'صورة القسم (تطلع بالدائرة بدل الأيقونة)',
+                  maxSide: 600,
+                  hint: '📐 القياس: 500 × 500 بكسل (مربعة)\n• تنقص دائرة: خلي الأكلة/المنتج بالنص ويه فراغ حواليه\n• خلفية بيضاء أو لون سادة'),
               const SizedBox(height: 10),
               const Text('الأيقونة', style: TextStyle(fontWeight: FontWeight.w900)),
               const SizedBox(height: 6),
