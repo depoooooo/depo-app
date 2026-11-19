@@ -5,6 +5,7 @@ import '../../theme.dart';
 import '../../widgets/common.dart';
 import 'admin.dart';
 import '../chat_screen.dart';
+import 'content_tab.dart';
 
 AppBar roleAppBar(String title, {PreferredSizeWidget? bottom}) => AppBar(
       backgroundColor: DepoColors.ink,
@@ -40,6 +41,7 @@ class SupervisorHome extends StatelessWidget {
       if (app.canAny([Perm.support, Perm.quality])) ('الشكاوى ($openC)', ComplaintsTab()),
       if (app.canAny([Perm.tech, Perm.support, Perm.operations])) ('المستخدمين', UsersTab()),
       if (app.canAny([Perm.quality, Perm.partnerships, Perm.sales])) ('العروض والمحلات', OffersStoresTab()),
+      if (canSeeContent()) ('المحتوى', ContentTab()),
       if (app.can(Perm.marketing)) ('التسويق', MarketingTab()),
       if (app.canAny([Perm.finance, Perm.sales])) ('التقارير', ReportsTab()),
       if (app.can(Perm.tech)) ('سجل العمليات', AuditTab()),

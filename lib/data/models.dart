@@ -13,7 +13,7 @@ const roleNames = {
 };
 
 /// أقسام الشركة — كل مشرف ينطي أقسام وتنفتحله صلاحياتها بس (الإدارة = المدير العام)
-enum Perm { operations, support, quality, partnerships, sales, marketing, finance, tech }
+enum Perm { operations, support, quality, partnerships, sales, marketing, finance, tech, design }
 
 const permNames = {
   Perm.operations: 'العمليات',
@@ -24,6 +24,7 @@ const permNames = {
   Perm.marketing: 'التسويق',
   Perm.finance: 'المالية',
   Perm.tech: 'التقنية',
+  Perm.design: 'السوشل ميديا والتصميم',
 };
 
 const permDesc = {
@@ -32,9 +33,10 @@ const permDesc = {
   Perm.quality: 'تفتيش المحلات قبل وبعد الانضمام، سحب العروض، إيقاف المحلات، الشكاوى الصحية',
   Perm.partnerships: 'طلبات انضمام المطاعم والتجار: قبول ورفض، ومتابعة المحلات',
   Perm.sales: 'أداء المحلات ومبيعاتها، الإعلانات الممولة (الظهور المميز)',
-  Perm.marketing: 'التوصيل المجاني لأول طلب، الحملات (مثل خصم فوق الخصم)',
+  Perm.marketing: 'البنرات، التوصيل المجاني لأول طلب، الحملات (مثل خصم فوق الخصم)',
   Perm.finance: 'التقارير والعمولات، استلام النقد من المندوبين',
   Perm.tech: 'الحسابات والأدوار (زبون/مندوب)، إيقاف الحسابات، سجل العمليات',
+  Perm.design: 'تصميم التطبيق ومحتواه: البنرات، الأقسام وصورها، جمل البحث، شاشة البداية، أجزاء الرئيسية',
 };
 
 /// نوع المحل: مطعم (رواجع) أو تاجر (الماركت)

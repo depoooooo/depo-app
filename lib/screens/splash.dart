@@ -104,11 +104,11 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
               const SizedBox(height: 10),
               Opacity(
                 opacity: line1.value,
-                child: const Text('أكل طيب', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w500, color: Colors.white)),
+                child: Text(app.content.splash1, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w500, color: Colors.white)),
               ),
               Opacity(
                 opacity: line2.value,
-                child: const Text('بسعر أطيب', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: DepoColors.ink)),
+                child: Text(app.content.splash2, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: DepoColors.ink)),
               ),
             ]),
           ),

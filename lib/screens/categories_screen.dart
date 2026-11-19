@@ -89,7 +89,9 @@ class CatTile extends StatelessWidget {
               gradient: LinearGradient(begin: Alignment.topRight, end: Alignment.bottomLeft, colors: [cat.color.withValues(alpha: 0.18), cat.color.withValues(alpha: 0.35)]),
               borderRadius: BorderRadius.circular(20),
             ),
-            child: Icon(cat.icon, size: 36, color: cat.color),
+            child: cat.imageId.isEmpty
+                ? Icon(cat.icon, size: 36, color: cat.color)
+                : AppImage(imageId: cat.imageId, height: 72, width: 72, radius: 20, fallback: Icon(cat.icon, size: 36, color: cat.color)),
           ),
           if (n > 0)
             Positioned(
@@ -214,7 +216,9 @@ class CatStrip extends StatelessWidget {
                       boxShadow: const [BoxShadow(color: Color(0x1F06363C), blurRadius: 8, offset: Offset(0, 3))],
                       gradient: RadialGradient(colors: [Colors.white, c.color.withValues(alpha: 0.22)], radius: 0.9),
                     ),
-                    child: Icon(c.icon, size: 34, color: c.color),
+                    child: c.imageId.isEmpty
+                        ? Icon(c.icon, size: 34, color: c.color)
+                        : ClipOval(child: AppImage(imageId: c.imageId, height: 70, width: 70, fallback: Icon(c.icon, size: 34, color: c.color))),
                   ),
                   if (n > 0)
                     Positioned(

@@ -4,6 +4,7 @@ import '../../data/models.dart';
 import '../../theme.dart';
 import '../../widgets/common.dart';
 import 'supervisor.dart';
+import 'content_tab.dart';
 
 /// واجهة المدير العام: كل صلاحيات المشرف + التقارير والإعدادات والمشرفين وسجل العمليات
 class AdminHome extends StatelessWidget {
@@ -14,14 +15,15 @@ class AdminHome extends StatelessWidget {
     final pending = app.joinRequests.where((r) => r.status == 'pending').length;
     final openC = app.complaints.where((c) => c.status == 'open').length;
     return DefaultTabController(
-      length: 10,
+      length: 11,
       child: Scaffold(
         appBar: roleAppBar('واجهة المدير العام',
-            bottom: roleTabs(['التقارير', 'الإعدادات', 'المشرفين', 'طلبات الانضمام ($pending)', 'الطلبات', 'محادثات الدعم', 'الشكاوى ($openC)', 'المستخدمين', 'العروض والمحلات', 'سجل العمليات'])),
+            bottom: roleTabs(['التقارير', 'الإعدادات', 'المحتوى', 'المشرفين', 'طلبات الانضمام ($pending)', 'الطلبات', 'محادثات الدعم', 'الشكاوى ($openC)', 'المستخدمين', 'العروض والمحلات', 'سجل العمليات'])),
         // ignore: prefer_const_constructors
         body: TabBarView(children: [
           ReportsTab(),
           _SettingsTab(),
+          ContentTab(),
           _SupervisorsTab(),
           JoinRequestsTab(),
           OrdersMonitorTab(),

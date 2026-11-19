@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import '../data/app_state.dart';
 import '../data/categories.dart';
+import '../data/content.dart';
 import '../data/models.dart';
 import 'categories_screen.dart';
 import '../widgets/depo_refresh.dart';
@@ -98,12 +99,12 @@ class _Header extends StatelessWidget {
           child: InkWell(
             borderRadius: BorderRadius.circular(16),
             onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const SearchScreen())),
-            child: const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
               child: Row(children: [
                 Icon(Icons.search_rounded, color: DepoColors.dark),
                 SizedBox(width: 8),
-                Expanded(child: TypewriterHint(phrases: searchPhrases)),
+                Expanded(child: TypewriterHint(phrases: app.content.searchPhrases)),
               ]),
             ),
           ),
@@ -206,9 +207,9 @@ class _RawajiTabState extends State<_RawajiTab> {
       physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.only(top: 12, bottom: 24),
       children: [
-        CatStrip(cats: restaurantCats, market: false),
+        if (app.content.show('cats')) CatStrip(cats: restaurantCats, market: false),
         // أزرار الفلترة
-        SizedBox(
+        if (app.content.show('filters')) SizedBox(
           height: 46,
           child: ListView(
             scrollDirection: Axis.horizontal,
@@ -235,55 +236,27 @@ class _RawajiTabState extends State<_RawajiTab> {
         ),
         if (filtering) ..._results(offers) else ...[
           const SizedBox(height: 6),
-          _Banners(slides: [
-            _Slide(
-              color: DepoColors.ink,
-              title: '${st.campaignName} 🔥',
-              titleColor: DepoColors.accent,
-              text: 'رواجع المطاعم تبدي من 1,000 دينار',
-            ),
-            _Slide(
-              color: DepoColors.dark,
-              title: 'استلم بنفسك',
-              text: 'ووفّر ${iqd(st.deliveryFee)} رسم التوصيل',
-              icon: Icons.storefront_rounded,
-            ),
-            if (!app.loggedIn)
-              _Slide(
-                color: DepoColors.accent,
-                title: 'سجّل واكسب نقاط',
-                titleColor: DepoColors.ink,
-                textColor: DepoColors.ink,
-                text: 'كل 1,000 دينار = نقطة، بدّلها بصناديق مجانية',
-                icon: Icons.stars_rounded,
-                onTap: () => ensureLoggedIn(context, reason: 'سجّل حتى تجمع نقاط وتتابع مطاعمك'),
-              ),
-            _Slide(
-              color: const Color(0xFF2B5F66),
-              title: 'عندك مطعم أو محل؟',
-              text: 'انضم لديبو — أول شهر مجاني للمطاعم',
-              icon: Icons.handshake_rounded,
-              onTap: () => app.loggedIn
-                  ? Navigator.of(context).push(MaterialPageRoute(builder: (_) => const JoinScreen()))
-                  : ensureLoggedIn(context, reason: 'سجّل أول حتى تقدّم طلب انضمام'),
-            ),
-          ]),
-          const _MyStores(),
-          _Section(title: 'رواجع قريبة عليك هسه', subtitle: 'توصل خلال 20–40 دقيقة'),
-          if (offers.isEmpty)
-            const EmptyState(icon: Icons.restaurant_outlined, text: 'ماكو رواجع هسه. تابع مطاعمك المفضلة حتى يوصلك إشعار أول ما ينشرون.')
-          else
-            OfferStrip(offers: offers),
-          if (campaign.isNotEmpty) _Campaign(name: st.campaignName, minDiscount: st.campaignMinDiscount, stores: campaign),
-          if (boxes.isNotEmpty) ...[
+          if (app.content.show('banners')) _Banners(slides: slidesFor(context, 'rawaji')),
+          if (app.content.show('myStores')) const _MyStores(),
+          if (app.content.show('nearby')) ...[
+            _Section(title: 'رواجع قريبة عليك هسه', subtitle: 'توصل خلال 20–40 دقيقة'),
+            if (offers.isEmpty)
+              const EmptyState(icon: Icons.restaurant_outlined, text: 'ماكو رواجع هسه. تابع مطاعمك المفضلة حتى يوصلك إشعار أول ما ينشرون.')
+            else
+              OfferStrip(offers: offers),
+          ],
+          if (app.content.show('campaign') && campaign.isNotEmpty) _Campaign(name: st.campaignName, minDiscount: st.campaignMinDiscount, stores: campaign),
+          if (app.content.show('boxes') && boxes.isNotEmpty) ...[
             _Section(title: 'صناديق المفاجأة 🎁', subtitle: 'قيمتها 3 أضعاف سعرها'),
             OfferStrip(offers: boxes),
           ],
-          _Section(title: 'المطاعم'),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Column(children: [for (final s in restaurants) StoreTile(store: s)]),
-          ),
+          if (app.content.show('stores')) ...[
+            _Section(title: 'المطاعم'),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Column(children: [for (final s in restaurants) StoreTile(store: s)]),
+            ),
+          ],
         ],
       ],
       ),
@@ -422,6 +395,50 @@ class _MyStores extends StatelessWidget {
 }
 
 // ======================= البنرات المتحركة =======================
+/// البنرات من «المحتوى» (تنعدّل من داخل التطبيق)
+List<_Slide> slidesFor(BuildContext context, String tab) {
+  final st = app.settings;
+  String fill(String t) => t.replaceAll('{campaign}', st.campaignName).replaceAll('{fee}', iqd(st.deliveryFee));
+  final out = <_Slide>[];
+  for (final b in app.content.banners) {
+    if (!b.liveNow || (b.tab != tab && b.tab != 'all')) continue;
+    if (b.guestOnly && app.loggedIn) continue;
+    final dark = b.bg == 0xFF06363C;
+    out.add(_Slide(
+      color: Color(b.bg),
+      title: fill(b.title),
+      text: fill(b.text),
+      titleColor: b.darkText ? DepoColors.ink : (dark ? DepoColors.accent : Colors.white),
+      textColor: b.darkText ? DepoColors.ink : Colors.white,
+      icon: iconOf(b.icon),
+      imageId: b.imageId,
+      onTap: b.action == 'none' ? null : () => runBannerAction(context, b),
+    ));
+  }
+  return out;
+}
+
+void runBannerAction(BuildContext context, BannerItem b) {
+  final nav = Navigator.of(context);
+  switch (b.action) {
+    case 'login':
+      ensureLoggedIn(context, reason: 'سجّل حتى تجمع نقاط وتتابع مطاعمك');
+    case 'join':
+      if (app.loggedIn) {
+        nav.push(MaterialPageRoute(builder: (_) => const JoinScreen()));
+      } else {
+        ensureLoggedIn(context, reason: 'سجّل أول حتى تقدّم طلب انضمام');
+      }
+    case 'store':
+      if (app.storeById(b.target) != null) nav.push(MaterialPageRoute(builder: (_) => StorePage(storeId: b.target)));
+    case 'category':
+      final market = b.tab == 'market';
+      final c = catByName(market ? marketCats : restaurantCats, b.target) ?? catByName(market ? restaurantCats : marketCats, b.target);
+      if (c != null) nav.push(MaterialPageRoute(builder: (_) => CategoryResults(cat: c, market: catByName(marketCats, b.target) != null)));
+    case 'search':
+      nav.push(MaterialPageRoute(builder: (_) => const SearchScreen()));
+  }
+}
 class _Slide {
   final Color color;
   final String title;
@@ -430,7 +447,9 @@ class _Slide {
   final Color textColor;
   final IconData icon;
   final VoidCallback? onTap;
+  final String imageId;
   const _Slide({
+    this.imageId = '',
     required this.color,
     required this.title,
     required this.text,
@@ -492,11 +511,14 @@ class _BannersState extends State<_Banners> {
                 child: InkWell(
                   onTap: s.onTap,
                   child: Stack(children: [
-                    Positioned(
-                      left: -18,
-                      bottom: -22,
-                      child: Icon(s.icon, size: 120, color: Colors.white.withValues(alpha: 0.12)),
-                    ),
+                    if (s.imageId.isNotEmpty)
+                      Positioned.fill(child: AppImage(imageId: s.imageId, height: 112, fallback: const SizedBox.shrink())),
+                    if (s.imageId.isEmpty)
+                      Positioned(
+                        left: -18,
+                        bottom: -22,
+                        child: Icon(s.icon, size: 120, color: Colors.white.withValues(alpha: 0.12)),
+                      ),
                     Padding(
                       padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
                       child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.center, children: [
@@ -546,37 +568,27 @@ class _MarketTab extends StatelessWidget {
       physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.only(top: 12, bottom: 24),
       children: [
-        CatStrip(cats: marketCats, market: true),
+        if (app.content.show('cats')) CatStrip(cats: marketCats, market: true),
         const SizedBox(height: 6),
-        _Banners(slides: [
-          const _Slide(
-            color: DepoColors.ink,
-            title: 'عروض الأسبوع',
-            titleColor: DepoColors.accent,
-            text: 'خصومات قوية على مواد قريبة الانتهاء — باقي 3 أيام',
-            icon: Icons.local_offer_rounded,
-          ),
-          _Slide(
-            color: DepoColors.dark,
-            title: 'كلشي بـ 1,000 دينار',
-            text: 'منتجات مختارة بسعر واحد',
-            icon: Icons.sell_rounded,
-          ),
-        ]),
-        if (cheap.isNotEmpty) ...[
+        if (app.content.show('banners')) _Banners(slides: slidesFor(context, 'market')),
+        if (app.content.show('marketCheap') && cheap.isNotEmpty) ...[
           _Section(title: 'كلشي بـ 1,000 دينار'),
           OfferStrip(offers: cheap),
         ],
-        _Section(title: 'عروض قوية اليوم', subtitle: 'من محلات الموصل مباشرة'),
-        if (products.isEmpty)
-          const EmptyState(icon: Icons.shopping_basket_outlined, text: 'ماكو عروض بالماركت هسه')
-        else
-          Padding(padding: const EdgeInsets.symmetric(horizontal: 16), child: ProductGrid(products: products)),
-        _Section(title: 'المحلات'),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Column(children: [for (final s in merchants) StoreTile(store: s)]),
-        ),
+        if (app.content.show('marketGrid')) ...[
+          _Section(title: 'عروض قوية اليوم', subtitle: 'من محلات الموصل مباشرة'),
+          if (products.isEmpty)
+            const EmptyState(icon: Icons.shopping_basket_outlined, text: 'ماكو عروض بالماركت هسه')
+          else
+            Padding(padding: const EdgeInsets.symmetric(horizontal: 16), child: ProductGrid(products: products)),
+        ],
+        if (app.content.show('marketStores')) ...[
+          _Section(title: 'المحلات'),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Column(children: [for (final s in merchants) StoreTile(store: s)]),
+          ),
+        ],
       ],
       ),
     );

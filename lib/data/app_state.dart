@@ -6,6 +6,7 @@ import 'package:cloud_firestore/cloud_firestore.dart' as fs;
 import 'package:crypto/crypto.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'cloud.dart';
+import 'content.dart';
 import 'models.dart';
 
 /// حالة التطبيق: البيانات تنحفظ بـ Firebase (Firestore) وتتزامن بين كل الأجهزة.
@@ -25,6 +26,7 @@ class AppState extends ChangeNotifier {
   List<Complaint> complaints = [];
   List<String> audit = [];
   AppSettings settings = AppSettings();
+  ContentConfig content = ContentConfig.defaults();
   String? currentPhone;
   bool courierAvailable = true;
   bool loaded = false;
@@ -49,6 +51,13 @@ class AppState extends ChangeNotifier {
       notifyListeners();
     });
     final prefs = await SharedPreferences.getInstance();
+    // آخر محتوى معروف (حتى شاشة البداية والرئيسية تطلع صح فوراً)
+    final cached = prefs.getString('depo_content_cache');
+    if (cached != null) {
+      try {
+        content = ContentConfig.fromJson(Map<String, dynamic>.from(jsonDecode(cached) as Map));
+      } catch (_) {}
+    }
     currentPhone = prefs.getString('depo_phone');
     courierAvailable = prefs.getBool('depo_courier_available') ?? true;
     if (await Cloud.init()) {
@@ -90,6 +99,7 @@ class AppState extends ChangeNotifier {
       complaints = l('complaints').map(Complaint.fromJson).toList();
       audit = List<String>.from(j['audit'] ?? const []);
       settings = AppSettings.fromJson(Map<String, dynamic>.from(j['settings'] ?? const {}));
+      if (j['content'] is Map) content = ContentConfig.fromJson(Map<String, dynamic>.from(j['content'] as Map));
       currentPhone ??= j['currentPhone'] as String?;
     } catch (_) {
       _seed();
@@ -167,6 +177,7 @@ class AppState extends ChangeNotifier {
         return {
           'settings': settings.toJson(),
           'audit': {'items': audit},
+          'content': content.toJson(),
         };
     }
     return {};
@@ -225,6 +236,10 @@ class AppState extends ChangeNotifier {
         for (final d in list) {
           if (d.id == 'settings') settings = AppSettings.fromJson(_clean(d.data()));
           if (d.id == 'audit') audit = List<String>.from(d.data()['items'] ?? const []);
+          if (d.id == 'content') {
+            content = ContentConfig.fromJson(_clean(d.data()));
+            SharedPreferences.getInstance().then((p) => p.setString('depo_content_cache', jsonEncode(content.toJson())));
+          }
         }
     }
     // نحفظ النسخة «الموحّدة» حتى ما نرجع نكتب نفس الشي
@@ -325,6 +340,7 @@ class AppState extends ChangeNotifier {
         'complaints': complaints.map((e) => e.toJson()).toList(),
         'audit': audit,
         'settings': settings.toJson(),
+        'content': content.toJson(),
       }),
     );
   }
@@ -1073,6 +1089,50 @@ class AppState extends ChangeNotifier {
     if (!canAny([Perm.support, Perm.quality])) return;
     c.status = 'closed';
     _log('إغلاق شكوى على الطلب #${c.orderId}');
+    _changed();
+  }
+
+  // ---------------- المحتوى (يتعدل من داخل التطبيق) ----------------
+  bool get canEditBanners => canAny([Perm.design, Perm.marketing]);
+  bool get canEditContent => can(Perm.design);
+
+  void saveBanners(List<BannerItem> list) {
+    if (!canEditBanners) return;
+    content.banners = list;
+    _log('تعديل البنرات');
+    _changed();
+  }
+
+  void saveCats({required bool market, required List<CatItem> list}) {
+    if (!canEditContent) return;
+    if (market) {
+      content.marketCats = list;
+    } else {
+      content.restCats = list;
+    }
+    _log('تعديل ${market ? 'أصناف الماركت' : 'أقسام المطاعم'}');
+    _changed();
+  }
+
+  void savePhrases(List<String> list) {
+    if (!canEditContent) return;
+    content.searchPhrases = list.where((e) => e.trim().isNotEmpty).map((e) => e.trim()).toList();
+    _log('تعديل جمل البحث');
+    _changed();
+  }
+
+  void saveSplash(String l1, String l2) {
+    if (!canEditContent) return;
+    content.splash1 = l1.trim();
+    content.splash2 = l2.trim();
+    _log('تعديل جملة شاشة البداية');
+    _changed();
+  }
+
+  void saveSections(Map<String, bool> m) {
+    if (!canEditContent) return;
+    content.sections = Map.of(m);
+    _log('تعديل أجزاء الرئيسية');
     _changed();
   }
 
