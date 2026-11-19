@@ -1317,11 +1317,11 @@ extension DebtBook on AppState {
     return null;
   }
 
-  List<Store> get shops => stores.where((s) => s.type == StoreType.shop && !s.suspended).toList();
+  List<Store> get shops => stores.where((s) => s.type == StoreType.shop && !s.suspended && s.listed).toList();
 
   bool ownsStore(String storeId) => storeById(storeId)?.ownerPhone == currentPhone && currentPhone != null;
 
-  Store? openShop({required String name, required String area, String about = ''}) {
+  Store? openShop({required String name, required String area, String about = '', String phone = '', String mapLink = '', bool listed = true, String imageId = ''}) {
     final u = me;
     if (u == null || u.suspended || myShop != null) return null;
     final s = Store(
@@ -1332,6 +1332,10 @@ extension DebtBook on AppState {
       ownerPhone: u.phone,
       eta: 'استلام أو توصيل من المحل',
       usuallyPublishes: about.trim(),
+      phone: phone.trim(),
+      mapLink: mapLink.trim(),
+      listed: listed,
+      imageId: imageId,
     );
     stores.add(s);
     _logPublic('فتح متجر مجاني: ${s.name} — ${u.phone}');
@@ -1339,8 +1343,64 @@ extension DebtBook on AppState {
     return s;
   }
 
+  void updateShop(Store s, {required String name, required String area, required String about, required String phone, required String mapLink, required bool listed}) {
+    if (!ownsStore(s.id) || name.trim().length < 2) return;
+    s
+      ..name = name.trim()
+      ..area = area.trim()
+      ..usuallyPublishes = about.trim()
+      ..phone = phone.trim()
+      ..mapLink = mapLink.trim()
+      ..listed = listed;
+    _changedPublic();
+  }
+
+  void setShopPromo(Store s, {required String imageId, required String text}) {
+    if (!ownsStore(s.id)) return;
+    s.promoImageId = imageId;
+    s.promoText = text.trim();
+    _changedPublic();
+  }
+
+  void setShopImage(Store s, String imageId) {
+    if (!ownsStore(s.id)) return;
+    s.imageId = imageId;
+    _changedPublic();
+  }
+
+  /// يلقى زبون بنفس الاسم أو الرقم، أو يسوي جديد
+  Debtor? findOrAddDebtor(String storeId, {required String name, String phone = ''}) {
+    final n = name.trim(), p = phone.trim();
+    for (final d in debtorsOf(storeId)) {
+      if ((p.isNotEmpty && d.phone == p) || (p.isEmpty && d.name == n)) return d;
+    }
+    return addDebtor(storeId, name: n, phone: p);
+  }
+
+  /// يلغي كل الحركات المفتوحة لزبون (حذف الكل)
+  void voidAllOf(Debtor d) {
+    if (!ownsStore(d.storeId)) return;
+    for (final e in debts.where((e) => e.debtorId == d.id && !e.voided)) {
+      e.voided = true;
+    }
+    _changedPublic();
+  }
+
+  void updateShopProductFull(Offer o, {required String name, required int price, required String category, required String description, required bool available, String? imageId}) {
+    if (!ownsStore(o.storeId) || name.trim().isEmpty || price <= 0) return;
+    o
+      ..title = name.trim()
+      ..price = price
+      ..originalPrice = o.originalPrice > price ? o.originalPrice : price
+      ..category = category.trim()
+      ..description = description.trim()
+      ..active = available;
+    if (imageId != null) o.imageId = imageId;
+    _changedPublic();
+  }
+
   /// منتج بالمتجر المجاني (سعر عادي، بدون كمية محددة)
-  void addShopProduct(Store s, {required String name, required int price, int? oldPrice, String imageId = '', String description = '', String category = ''}) {
+  void addShopProduct(Store s, {required String name, required int price, int? oldPrice, String imageId = '', String description = '', String category = '', bool available = true}) {
     if (!ownsStore(s.id) || s.type != StoreType.shop || s.suspended || name.trim().isEmpty || price <= 0) return;
     offers.insert(
       0,
@@ -1355,6 +1415,7 @@ extension DebtBook on AppState {
         category: category.trim(),
         imageId: imageId,
         description: description.trim(),
+        active: available,
       ),
     );
     _changedPublic();

@@ -5,8 +5,6 @@ import '../theme.dart';
 import 'following.dart';
 import 'chat_screen.dart';
 import 'shop/markets.dart';
-import 'shop/my_debts.dart';
-import 'shop/my_shop.dart';
 import '../widgets/common.dart';
 import 'auth.dart';
 import 'join.dart';
@@ -104,9 +102,7 @@ class AccountScreen extends StatelessWidget {
                 Icon(Icons.chevron_left),
               ]),
             ),
-          _MenuItem(Icons.account_balance_wallet_outlined, 'ديوني عند المحلات', () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const MyDebtsScreen()))),
-          _MenuItem(Icons.local_grocery_store_outlined, 'الأسواق القريبة', () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const MarketsScreen()))),
-          _MenuItem(Icons.storefront_outlined, app.myShop == null ? 'افتح محلك مجاناً' : 'محلي: ${app.myShop!.name}', () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const MyShopScreen()))),
+          const MarketsTile(),
           _MenuItem(Icons.favorite_border, 'محلاتي (${u.follows.length})', () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const FollowingScreen()))),
           _MenuItem(Icons.notifications_none, 'الإشعارات (${u.notifications.length})', () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const NotificationsScreen()))),
           _MenuItem(Icons.location_on_outlined, 'عناويني', () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const AddressesScreen()))),
@@ -381,4 +377,45 @@ String _supportLabel() {
   final mine = app.chats.where((c) => c.kind != 'support' ? false : c.userPhone == app.currentPhone);
   final n = mine.fold(0, (s, c) => s + c.unreadFor(staff: false));
   return n > 0 ? 'الدعم ($n رسالة جديدة)' : 'الدعم';
+}
+
+
+/// خانة «الأسواق» الوحدة: ديوني عند المحلات + الأسواق القريبة + محلي
+class MarketsTile extends StatelessWidget {
+  const MarketsTile({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final debts = app.myDebtAccounts.fold(0, (s, d) => s + app.summaryOf(d.id).remaining);
+    final shop = app.myShop;
+    final sub = [
+      if (debts > 0) 'ديونك ${iqd(debts)}' else 'ديوني عند المحلات',
+      shop == null ? 'افتح محلك مجاناً' : 'محلي: ${shop.name}',
+    ].join(' • ');
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Material(
+        borderRadius: BorderRadius.circular(20),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const MarketsScreen())),
+          child: Ink(
+            padding: const EdgeInsets.all(16),
+            decoration: const BoxDecoration(gradient: LinearGradient(colors: [Color(0xFF0E4A44), Color(0xFF061F1C)])),
+            child: Row(children: [
+              const CircleAvatar(radius: 22, backgroundColor: Color(0x332EE6E0), child: Icon(Icons.storefront_rounded, color: Color(0xFF2EE6E0))),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  const Text('الأسواق', style: TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w900)),
+                  Text(sub, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white70, fontSize: 12)),
+                ]),
+              ),
+              const Icon(Icons.chevron_left, color: Colors.white70),
+            ]),
+          ),
+        ),
+      ),
+    );
+  }
 }

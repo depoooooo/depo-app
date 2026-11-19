@@ -153,6 +153,11 @@ class Store {
   int approvedAt; // بداية الشهر المجاني
   String imageId; // صورة/شعار المحل ('' = ماكو)
   String cuisine; // نوع المطعم (مشاوي، بيتزا...) — للأقسام
+  String phone; // هاتف المحل (المتجر المجاني)
+  String mapLink; // رابط الموقع على الخريطة
+  bool listed; // يظهر بالأسواق للجميع
+  String promoImageId; // بنر العرض الخاص بصفحة المحل
+  String promoText;
 
   Store({
     required this.id,
@@ -170,6 +175,11 @@ class Store {
     int? approvedAt,
     this.imageId = '',
     this.cuisine = '',
+    this.phone = '',
+    this.mapLink = '',
+    this.listed = true,
+    this.promoImageId = '',
+    this.promoText = '',
   }) : approvedAt = approvedAt ?? _now();
 
   String get fullName => '$name — $area';
@@ -190,6 +200,11 @@ class Store {
         'approvedAt': approvedAt,
         'imageId': imageId,
         'cuisine': cuisine,
+        'phone': phone,
+        'mapLink': mapLink,
+        'listed': listed,
+        'promoImageId': promoImageId,
+        'promoText': promoText,
       };
 
   factory Store.fromJson(Map<String, dynamic> j) => Store(
@@ -208,6 +223,11 @@ class Store {
         approvedAt: j['approvedAt'] as int?,
         imageId: (j['imageId'] ?? '') as String,
         cuisine: (j['cuisine'] ?? '') as String,
+        phone: (j['phone'] ?? '') as String,
+        mapLink: (j['mapLink'] ?? '') as String,
+        listed: (j['listed'] ?? true) as bool,
+        promoImageId: (j['promoImageId'] ?? '') as String,
+        promoText: (j['promoText'] ?? '') as String,
       );
 }
 

@@ -63,7 +63,7 @@ class MonthChip extends StatelessWidget {
         child: Row(mainAxisSize: MainAxisSize.min, children: [
           Container(width: 8, height: 8, decoration: BoxDecoration(color: selected ? Colors.white : c, shape: BoxShape.circle)),
           const SizedBox(width: 6),
-          Text(monthLabel(month), style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12, color: selected ? Colors.white : DepoColors.ink)),
+          Text(monthLabel(month), style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12, color: selected ? Colors.white : (Theme.of(context).brightness == Brightness.dark ? Colors.white : DepoColors.ink))),
         ]),
       ),
     );
@@ -102,6 +102,7 @@ class _MonthHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = monthColor(month);
+    final dark = Theme.of(context).brightness == Brightness.dark;
     final orders = entries.where((e) => !e.payment).fold(0, (s, e) => s + e.amount);
     final paid = entries.where((e) => e.payment).fold(0, (s, e) => s + e.amount);
     return Container(
@@ -111,9 +112,9 @@ class _MonthHeader extends StatelessWidget {
       child: Row(children: [
         Container(width: 5, height: 22, decoration: BoxDecoration(color: c, borderRadius: BorderRadius.circular(3))),
         const SizedBox(width: 8),
-        Text(monthLabel(month), style: TextStyle(fontWeight: FontWeight.w900, color: c)),
+        Text(monthLabel(month), style: TextStyle(fontWeight: FontWeight.w900, color: dark ? Color.lerp(c, Colors.white, 0.35) : c)),
         const Spacer(),
-        Text('طلبات ${iqd(orders)}${paid > 0 ? ' • دفع ${iqd(paid)}' : ''}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+        Text('طلبات ${iqd(orders)}${paid > 0 ? ' • دفع ${iqd(paid)}' : ''}', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: dark ? Colors.white70 : null)),
       ]),
     );
   }
@@ -127,13 +128,16 @@ class _EntryTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = monthColor(e.month);
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final ink = dark ? Colors.white : DepoColors.ink;
+    final muted = dark ? Colors.white60 : DepoColors.muted;
     final strike = e.voided ? TextDecoration.lineThrough : null;
     final overdue = !e.payment && e.dueAt > 0 && e.dueAt < DateTime.now().millisecondsSinceEpoch;
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: Material(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
+        color: dark ? const Color(0x14FFFFFF) : Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14), side: dark ? BorderSide(color: c.withValues(alpha: 0.5)) : BorderSide.none),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
           onLongPress: onLongPress == null || e.voided ? null : () => onLongPress!(e),
@@ -147,18 +151,25 @@ class _EntryTile extends StatelessWidget {
                     Row(children: [
                       Icon(e.payment ? Icons.south_west_rounded : Icons.north_east_rounded, size: 18, color: e.payment ? DepoColors.success : DepoColors.danger),
                       const SizedBox(width: 6),
-                      Text(e.payment ? 'دفعة' : 'طلب', style: TextStyle(fontWeight: FontWeight.w900, decoration: strike)),
+                      Flexible(child: Text(e.payment ? 'دفعة' : (e.items.length == 1 ? e.items.first.name : 'طلب'), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontWeight: FontWeight.w900, decoration: strike, color: ink))),
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                        decoration: BoxDecoration(color: c.withValues(alpha: 0.18), borderRadius: BorderRadius.circular(8), border: Border.all(color: c)),
+                        child: Text(dateLabel(e.createdAt), style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: dark ? Colors.white : c)),
+                      ),
                       if (e.voided) ...[const SizedBox(width: 6), const Badge2('ملغية', bg: DepoColors.soft, fg: DepoColors.muted)],
                       const Spacer(),
                       Text('${e.payment ? '-' : '+'}${iqd(e.amount)}',
-                          style: TextStyle(fontWeight: FontWeight.w900, decoration: strike, color: e.payment ? DepoColors.success : DepoColors.ink)),
+                          style: TextStyle(fontWeight: FontWeight.w900, decoration: strike, color: e.payment ? (dark ? const Color(0xFF4ADE80) : DepoColors.success) : ink)),
                     ]),
-                    for (final i in e.items)
-                      Text('• ${i.name} ×${i.qty} — ${iqd(i.total)}', style: TextStyle(fontSize: 12, color: DepoColors.muted, decoration: strike)),
-                    if (e.note.isNotEmpty) Text(e.note, style: const TextStyle(fontSize: 12)),
+                    if (e.items.length > 1)
+                      for (final i in e.items)
+                        Text('• ${i.name} ×${i.qty} — ${iqd(i.total)}', style: TextStyle(fontSize: 12, color: muted, decoration: strike)),
+                    if (e.note.isNotEmpty) Text(e.note, style: TextStyle(fontSize: 12, color: ink)),
                     const SizedBox(height: 2),
                     Row(children: [
-                      Text(dateLabel(e.createdAt), style: const TextStyle(fontSize: 11, color: DepoColors.muted)),
+                      Text(e.items.length == 1 && e.items.first.qty > 1 ? '×${e.items.first.qty}' : '', style: TextStyle(fontSize: 11, color: muted)),
                       if (!e.payment && e.dueAt > 0) ...[
                         const Spacer(),
                         Badge2('يستحق ${dateLabel(e.dueAt)}', bg: overdue ? const Color(0xFFFDECED) : DepoColors.soft, fg: overdue ? DepoColors.danger : DepoColors.dark),
@@ -245,4 +256,24 @@ Future<void> callPhone(BuildContext context, String phone) async {
 Future<void> copyText(BuildContext context, String text, {String done = 'انسخ'}) async {
   await Clipboard.setData(ClipboardData(text: text));
   if (context.mounted) toast(context, done);
+}
+
+Future<void> openLink(BuildContext context, String url) async {
+  var u = url.trim();
+  if (!u.startsWith('http')) u = 'https://www.google.com/maps/search/?api=1&query=${Uri.encodeComponent(u)}';
+  try {
+    if (!await launchUrl(Uri.parse(u), mode: LaunchMode.externalApplication)) throw 'x';
+  } catch (_) {
+    if (context.mounted) toast(context, 'ما انفتح الرابط');
+  }
+}
+
+/// مشاركة نص عبر تطبيقات الجهاز (رسائل)، وإذا ما صار ننسخه
+Future<void> shareText(BuildContext context, String text) async {
+  try {
+    if (!await launchUrl(Uri.parse('sms:?body=${Uri.encodeComponent(text)}'), mode: LaunchMode.externalApplication)) throw 'x';
+  } catch (_) {
+    await Clipboard.setData(ClipboardData(text: text));
+    if (context.mounted) toast(context, 'انسخت الرسالة، الصقها وين ما تريد');
+  }
 }
