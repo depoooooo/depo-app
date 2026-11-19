@@ -180,7 +180,8 @@ class _Earnings extends StatelessWidget {
           Text(iqd(now.earned), style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: DepoColors.dark)),
         ]),
         Text('${now.orders.length} توصيلة • ${now.km.toStringAsFixed(1)} كم • التسوية آخر الشهر', style: const TextStyle(fontSize: 12, color: DepoColors.muted)),
-        Text('الأجرة = ${iqd(s.courierBasePay)} + ${iqd(s.courierPerKm)} لكل كم (أقل شي ${iqd(s.courierMinPay)})', style: const TextStyle(fontSize: 11, color: DepoColors.muted)),
+        Text('الأجرة = ${iqd(s.courierBasePay)} + ${iqd(s.courierPerKm)} لكل كم، تقريب لأقرب 250، وأقل شي ${iqd(s.courierMinPay)}', style: const TextStyle(fontSize: 11, color: DepoColors.muted)),
+        const Text('اضغط حتى تشوف كل توصيلة وشلون انحسبت أجرتها', style: TextStyle(fontSize: 11, color: DepoColors.dark, fontWeight: FontWeight.w700)),
         for (final x in list.skip(1).take(3))
           Padding(
             padding: const EdgeInsets.only(top: 6),
@@ -188,7 +189,7 @@ class _Earnings extends StatelessWidget {
               Expanded(child: Text(monthLabel(x.month), style: const TextStyle(fontSize: 12))),
               Text(iqd(x.earned), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800)),
               const SizedBox(width: 6),
-              Badge2(x.settled ? 'استلمتها' : 'بانتظار', bg: x.settled ? DepoColors.successBg : const Color(0xFFFFF6E5), fg: x.settled ? DepoColors.success : const Color(0xFF8A5A00)),
+              StatusBadge(x.balance),
             ]),
           ),
       ]),

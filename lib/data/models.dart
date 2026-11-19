@@ -370,6 +370,8 @@ class Order {
   double distanceKm; // مسافة التوصيل (لأجرة المندوب)
   int courierPay; // أجرة المندوب (تنحسب عند التسليم)
   int deliveredAt; // وقت التسليم (للتسوية الشهرية)
+  String commissionRule; // كيف انحسبت العمولة (15% / الحد الأدنى / الشهر المجاني)
+  List<int> payRule; // تسعيرة المندوب وقت التسليم: [ثابت، لكل كم، حد أدنى، أقصى كم]
 
   Order({
     required this.id,
@@ -391,7 +393,10 @@ class Order {
     this.distanceKm = 0,
     this.courierPay = 0,
     this.deliveredAt = 0,
-  }) : createdAt = createdAt ?? _now();
+    this.commissionRule = '',
+    List<int>? payRule,
+  })  : payRule = payRule ?? const [],
+        createdAt = createdAt ?? _now();
 
   /// شهر التسوية (حسب وقت التسليم)
   String get settleMonth => monthKey(DateTime.fromMillisecondsSinceEpoch(deliveredAt > 0 ? deliveredAt : createdAt));
@@ -421,6 +426,8 @@ class Order {
         'distanceKm': distanceKm,
         'courierPay': courierPay,
         'deliveredAt': deliveredAt,
+        'commissionRule': commissionRule,
+        'payRule': payRule,
       };
 
   factory Order.fromJson(Map<String, dynamic> j) => Order(
@@ -443,6 +450,8 @@ class Order {
         distanceKm: ((j['distanceKm'] ?? 0) as num).toDouble(),
         courierPay: (j['courierPay'] ?? 0) as int,
         deliveredAt: (j['deliveredAt'] ?? 0) as int,
+        commissionRule: (j['commissionRule'] ?? '') as String,
+        payRule: [for (final x in (j['payRule'] as List? ?? const [])) (x as num).toInt()],
       );
 }
 
@@ -456,9 +465,10 @@ class Settlement {
   final int at;
   final String by;
   final String note;
-  const Settlement({required this.id, required this.kind, required this.target, required this.month, required this.amount, required this.at, required this.by, this.note = ''});
+  final List<String> orderIds; // للنقد: الطلبات اللي انستلم نقدها
+  const Settlement({required this.id, required this.kind, required this.target, required this.month, required this.amount, required this.at, required this.by, this.note = '', this.orderIds = const []});
 
-  Map<String, dynamic> toJson() => {'id': id, 'kind': kind, 'target': target, 'month': month, 'amount': amount, 'at': at, 'by': by, 'note': note};
+  Map<String, dynamic> toJson() => {'id': id, 'kind': kind, 'target': target, 'month': month, 'amount': amount, 'at': at, 'by': by, 'note': note, 'orderIds': orderIds};
   factory Settlement.fromJson(Map<String, dynamic> j) => Settlement(
         id: j['id'] as String,
         kind: j['kind'] as String,
@@ -468,7 +478,34 @@ class Settlement {
         at: (j['at'] ?? 0) as int,
         by: (j['by'] ?? '') as String,
         note: (j['note'] ?? '') as String,
+        orderIds: List<String>.from(j['orderIds'] ?? const []),
       );
+}
+
+/// حساب أجرة المندوب بالتفصيل (نفس الحساب بكل مكان حتى ما يصير فرق ولا دينار)
+class CourierPay {
+  final int base, perKm, minPay, maxKm;
+  const CourierPay(this.base, this.perKm, this.minPay, this.maxKm);
+  factory CourierPay.of(List<int> r, AppSettings s) =>
+      r.length == 4 ? CourierPay(r[0], r[1], r[2], r[3]) : CourierPay(s.courierBasePay, s.courierPerKm, s.courierMinPay, s.courierMaxKm);
+  List<int> get rule => [base, perKm, minPay, maxKm];
+
+  /// المسافة تنحسب لأقرب 0.1 كم وما تعبر الحد الأقصى
+  double kmOf(double km) => (km.clamp(0, maxKm.toDouble()) * 10).round() / 10;
+  int raw(double km) => base + (perKm * kmOf(km)).round();
+  int rounded(double km) => (raw(km) / 250).round() * 250;
+  int pay(double km) => rounded(km) < minPay ? minPay : rounded(km);
+
+  /// شرح الحساب بالأرقام
+  String explain(double km) {
+    final k = kmOf(km);
+    final r = raw(km);
+    final b = StringBuffer('${iqd(base)} + ${iqd(perKm)} × ${k.toStringAsFixed(1)} كم = ${iqd(r)}');
+    if (rounded(km) != r) b.write(' ← تقريب لأقرب 250 = ${iqd(rounded(km))}');
+    if (rounded(km) < minPay) b.write(' ← أقل من الحد الأدنى، فتصير ${iqd(minPay)}');
+    if (km > maxKm) b.write(' (المسافة انحسبت $maxKm كم = الحد الأقصى)');
+    return b.toString();
+  }
 }
 
 class JoinRequest {
@@ -620,12 +657,7 @@ class AppSettings {
   });
 
   /// أجرة المندوب حسب المسافة: ثابت + لكل كم، وما تنزل عن الحد الأدنى (مقرّبة لـ 250)
-  int courierPayFor(double km) {
-    final k = km.clamp(0, courierMaxKm.toDouble());
-    final raw = courierBasePay + courierPerKm * k;
-    final rounded = ((raw / 250).round() * 250);
-    return rounded < courierMinPay ? courierMinPay : rounded;
-  }
+  int courierPayFor(double km) => CourierPay(courierBasePay, courierPerKm, courierMinPay, courierMaxKm).pay(km);
 
   Map<String, dynamic> toJson() => {
         'restaurantCommission': restaurantCommission,

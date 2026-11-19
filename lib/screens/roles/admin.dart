@@ -238,7 +238,7 @@ class _SettingsTabState extends State<_SettingsTab> {
             courierMinPay: parseInt(c['courierMinPay']!.text) ?? 0,
             courierMaxKm: parseInt(c['courierMaxKm']!.text) ?? 30,
           );
-          return Text('مثال: 2 كم = ${iqd(t.courierPayFor(2))} • 5 كم = ${iqd(t.courierPayFor(5))} • 10 كم = ${iqd(t.courierPayFor(10))}\nالتسوية ويا المندوبين والمطاعم شهرية من تبويب «الحسابات».',
+          return Text('مثال: 2 كم = ${iqd(t.courierPayFor(2))} • 5 كم = ${iqd(t.courierPayFor(5))} • 10 كم = ${iqd(t.courierPayFor(10))}\nالأجرة تتقرّب لأقرب 250 وما تنزل عن الحد الأدنى. التعديل يسري على التوصيلات الجديدة بس، والقديمة تبقى بتسعيرتها. التسوية شهرية من تبويب «الحسابات».',
               style: const TextStyle(fontSize: 12, color: DepoColors.muted));
         }),
         const SizedBox(height: 8),
