@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../data/app_state.dart';
-import '../data/categories.dart';
 import '../data/models.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
@@ -158,12 +157,10 @@ class _RawajiTab extends StatefulWidget {
 }
 
 class _RawajiTabState extends State<_RawajiTab> {
-  FoodCat? cat;
   _Filter filter = _Filter.none;
 
   List<Offer> _filtered(List<Offer> offers) {
     var l = offers;
-    if (cat != null) l = l.where((o) => inCat(cat!, o, app.storeById(o.storeId))).toList();
     final now = DateTime.now().millisecondsSinceEpoch;
     switch (filter) {
       case _Filter.discount:
@@ -197,52 +194,12 @@ class _RawajiTabState extends State<_RawajiTab> {
     final boxes = offers.where((o) => o.surpriseBox).toList();
     final st = app.settings;
     final campaign = restaurants.where((s) => app.offersOf(s.id).any((o) => o.discountPercent >= st.campaignMinDiscount)).toList();
-    final filtering = cat != null || filter != _Filter.none;
+    final filtering = filter != _Filter.none;
 
     return ListView(
       padding: const EdgeInsets.only(top: 12, bottom: 24),
       children: [
         if (st.promoText.isNotEmpty && app.eligibleFirstOrder) _PromoStrip(text: st.promoText),
-        // شتشتهي اليوم؟
-        _Section(title: 'شتشتهي اليوم؟'),
-        SizedBox(
-          height: 100,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            itemCount: foodCats.length,
-            separatorBuilder: (_, __) => const SizedBox(width: 12),
-            itemBuilder: (context, i) {
-              final c = foodCats[i];
-              final on = cat == c;
-              return InkWell(
-                borderRadius: BorderRadius.circular(20),
-                onTap: () => setState(() => cat = on ? null : c),
-                child: SizedBox(
-                  width: 70,
-                  child: Column(children: [
-                    AnimatedContainer(
-                      duration: const Duration(milliseconds: 200),
-                      width: 66,
-                      height: 66,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: on ? DepoColors.brand : Colors.white,
-                        border: Border.all(color: on ? DepoColors.dark : const Color(0xFFE8F4F6), width: on ? 2.5 : 1),
-                        boxShadow: const [BoxShadow(color: Color(0x1606363C), blurRadius: 6, offset: Offset(0, 2))],
-                      ),
-                      alignment: Alignment.center,
-                      child: Text(c.emoji, style: const TextStyle(fontSize: 32)),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(c.name, maxLines: 1, overflow: TextOverflow.ellipsis,
-                        style: TextStyle(fontSize: 12, fontWeight: on ? FontWeight.w900 : FontWeight.w700)),
-                  ]),
-                ),
-              );
-            },
-          ),
-        ),
         // أزرار الفلترة
         SizedBox(
           height: 46,
@@ -327,17 +284,14 @@ class _RawajiTabState extends State<_RawajiTab> {
 
   List<Widget> _results(List<Offer> offers) {
     final res = _filtered(offers);
-    final title = [if (cat != null) '${cat!.emoji} ${cat!.name}', if (filter != _Filter.none) _filterNames[filter]!].join(' • ');
+    final title = _filterNames[filter] ?? '';
     return [
       Padding(
         padding: const EdgeInsets.fromLTRB(16, 12, 8, 4),
         child: Row(children: [
           Expanded(child: Text('$title (${res.length})', style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w900))),
           TextButton.icon(
-            onPressed: () => setState(() {
-              cat = null;
-              filter = _Filter.none;
-            }),
+            onPressed: () => setState(() => filter = _Filter.none),
             icon: const Icon(Icons.close_rounded, size: 18),
             label: const Text('مسح', style: TextStyle(fontWeight: FontWeight.w800)),
           ),
