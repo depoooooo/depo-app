@@ -82,6 +82,7 @@ class AppUser {
   String pinHash; // رمز سري للحسابات الخاصة (مطعم/تاجر/مندوب/مشرف/مدير)
   List<String> perms; // أقسام المشرف
   List<String> debtCodes; // رموز الديون اللي ضافها الزبون
+  List<Address> places; // العناوين المفصّلة ويه موقعها على الخريطة
 
   AppUser({
     required this.phone,
@@ -97,7 +98,9 @@ class AppUser {
     this.pinHash = '',
     List<String>? perms,
     List<String>? debtCodes,
-  })  : perms = perms ?? [],
+    List<Address>? places,
+  })  : places = places ?? [],
+        perms = perms ?? [],
         debtCodes = debtCodes ?? [],
         addresses = addresses ?? [],
         follows = follows ?? [],
@@ -118,6 +121,7 @@ class AppUser {
         'pinHash': pinHash,
         'perms': perms,
         'debtCodes': debtCodes,
+        'places': places.map((e) => e.toJson()).toList(),
       };
 
   factory AppUser.fromJson(Map<String, dynamic> j) => AppUser(
@@ -134,6 +138,10 @@ class AppUser {
         pinHash: (j['pinHash'] ?? '') as String,
         perms: List<String>.from(j['perms'] ?? const []),
         debtCodes: List<String>.from(j['debtCodes'] ?? const []),
+        places: (j['places'] as List?) != null
+            ? [for (final e in j['places'] as List) Address.fromJson(Map<String, dynamic>.from(e as Map))]
+            // العناوين القديمة (نص بس) تتحول عناوين بدون خريطة
+            : [for (final (k, a) in List<String>.from(j['addresses'] ?? const []).indexed) Address(id: 'old$k', name: 'عنوان', details: a)],
       );
 }
 
@@ -577,6 +585,66 @@ class CourierPay {
 }
 
 double _d(Object? v) => ((v ?? 0) as num).toDouble();
+
+/// عنوان توصيل مفصّل
+class Address {
+  String id;
+  String name; // البيت، الشغل...
+  String details; // تفاصيل العنوان (الحي والمنطقة)
+  String phone;
+  String street, building, floor, apt, landmark;
+  double lat, lng; // 0 = بدون خريطة (عنوان قديم)
+
+  Address({
+    required this.id,
+    this.name = '',
+    this.details = '',
+    this.phone = '',
+    this.street = '',
+    this.building = '',
+    this.floor = '',
+    this.apt = '',
+    this.landmark = '',
+    this.lat = 0,
+    this.lng = 0,
+  });
+
+  bool get hasMap => lat != 0 && lng != 0;
+
+  /// نص العنوان كامل (ينكتب بالطلب للمندوب والمحل)
+  String get full {
+    final b = <String>[
+      if (details.isNotEmpty) details,
+      if (street.isNotEmpty) 'شارع $street',
+      if (building.isNotEmpty) 'بناية $building',
+      if (floor.isNotEmpty) 'طابق $floor',
+      if (apt.isNotEmpty) 'شقة $apt',
+      if (landmark.isNotEmpty) 'قرب $landmark',
+    ];
+    return '${name.isEmpty ? '' : '$name: '}${b.join('، ')}${phone.isEmpty ? '' : ' • هاتف $phone'}';
+  }
+
+  String get short => [details, if (landmark.isNotEmpty) 'قرب $landmark'].where((e) => e.isNotEmpty).join(' — ');
+
+  Map<String, dynamic> toJson() => {
+        'id': id, 'name': name, 'details': details, 'phone': phone, 'street': street, 'building': building,
+        'floor': floor, 'apt': apt, 'landmark': landmark, 'lat': lat, 'lng': lng,
+      };
+  factory Address.fromJson(Map<String, dynamic> j) => Address(
+        id: (j['id'] ?? '') as String,
+        name: (j['name'] ?? '') as String,
+        details: (j['details'] ?? '') as String,
+        phone: (j['phone'] ?? '') as String,
+        street: (j['street'] ?? '') as String,
+        building: (j['building'] ?? '') as String,
+        floor: (j['floor'] ?? '') as String,
+        apt: (j['apt'] ?? '') as String,
+        landmark: (j['landmark'] ?? '') as String,
+        lat: _d(j['lat']),
+        lng: _d(j['lng']),
+      );
+  Address copy() => Address.fromJson(toJson());
+}
 
 class JoinRequest {
   String id;

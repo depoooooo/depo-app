@@ -61,6 +61,7 @@ class AppState extends ChangeNotifier {
       } catch (_) {}
     }
     currentPhone = prefs.getString('depo_phone');
+    _selectedPlace = prefs.getString('depo_place');
     courierAvailable = prefs.getBool('depo_courier_available') ?? true;
     if (await Cloud.init()) {
       try {
@@ -1268,6 +1269,72 @@ class AppState extends ChangeNotifier {
 
   void removeAddress(String a) {
     me?.addresses.remove(a);
+    _changed();
+  }
+
+  // ---------------- العناوين المفصّلة ----------------
+  String? _selectedPlace; // رقم العنوان المختار، أو 'current' = الموقع الحالي
+  GeoFix? currentFix; // الموقع الحالي (للتصفح)
+
+  List<Address> get places => me?.places ?? const [];
+
+  /// العنوان المختار للتوصيل (إذا ماكو اختيار: أول عنوان)
+  Address? get selectedPlace {
+    if (_selectedPlace == 'current') return null;
+    for (final a in places) {
+      if (a.id == _selectedPlace) return a;
+    }
+    return places.isEmpty ? null : places.first;
+  }
+
+  bool get usingCurrentLocation => _selectedPlace == 'current' || (places.isEmpty && currentFix != null);
+
+  String get deliveryLabel {
+    if (usingCurrentLocation) return 'الموقع الحالي';
+    final a = selectedPlace;
+    if (a == null) return 'الموصل';
+    return a.name.isEmpty ? a.short : '${a.name} — ${a.short}';
+  }
+
+  Future<void> selectPlace(String id, {GeoFix? fix}) async {
+    _selectedPlace = id;
+    if (fix != null) currentFix = fix;
+    notifyListeners();
+    final p = await SharedPreferences.getInstance();
+    await p.setString('depo_place', id);
+  }
+
+  Future<void> loadSelectedPlace() async {
+    final p = await SharedPreferences.getInstance();
+    _selectedPlace = p.getString('depo_place');
+  }
+
+  /// يحفظ عنوان (جديد أو تعديل) ويختاره
+  String? savePlace(Address a) {
+    final u = me;
+    if (u == null) return 'سجّل دخولك أول';
+    if (a.name.trim().isEmpty || a.details.trim().isEmpty || a.phone.trim().isEmpty) return 'املأ الحقول المطلوبة (*)';
+    if (a.id.isEmpty) a.id = 'pl${DateTime.now().millisecondsSinceEpoch}';
+    final i = u.places.indexWhere((x) => x.id == a.id);
+    if (i >= 0) {
+      u.places[i] = a;
+    } else {
+      u.places.insert(0, a);
+      if (u.places.length > 15) u.places.removeLast();
+    }
+    u.addresses = [for (final x in u.places) x.full]; // للنسخ القديمة
+    _selectedPlace = a.id;
+    SharedPreferences.getInstance().then((p) => p.setString('depo_place', a.id));
+    _changed();
+    return null;
+  }
+
+  void deletePlace(String id) {
+    final u = me;
+    if (u == null) return;
+    u.places.removeWhere((x) => x.id == id);
+    u.addresses = [for (final x in u.places) x.full];
+    if (_selectedPlace == id) _selectedPlace = null;
     _changed();
   }
 

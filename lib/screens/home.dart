@@ -5,6 +5,7 @@ import '../data/categories.dart';
 import '../data/content.dart';
 import '../data/models.dart';
 import 'categories_screen.dart';
+import 'address/address_ui.dart';
 import '../widgets/depo_refresh.dart';
 import '../widgets/typewriter_hint.dart';
 import '../theme.dart';
@@ -53,7 +54,7 @@ class _Header extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final address = app.me?.addresses.isNotEmpty == true ? app.me!.addresses.first : 'الموصل';
+    final address = app.deliveryLabel;
     return Container(
       padding: EdgeInsets.fromLTRB(16, MediaQuery.of(context).padding.top + 10, 16, 14),
       decoration: const BoxDecoration(
@@ -63,7 +64,10 @@ class _Header extends StatelessWidget {
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         Row(children: [
           Expanded(
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            child: InkWell(
+              borderRadius: BorderRadius.circular(12),
+              onTap: () => showAddressSheet(context),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               const Text('التوصيل إلى', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: DepoColors.ink)),
               Row(children: [
                 Flexible(
@@ -73,6 +77,7 @@ class _Header extends StatelessWidget {
                 const Icon(Icons.keyboard_arrow_down_rounded, size: 20),
               ]),
             ]),
+            ),
           ),
           Image.asset('assets/logo/depo-ar-white.png', height: 30, semanticLabel: 'ديبو'),
           const SizedBox(width: 6),

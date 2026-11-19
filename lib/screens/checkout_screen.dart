@@ -6,7 +6,7 @@ import '../widgets/common.dart';
 import 'auth.dart';
 import 'orders.dart';
 import '../data/geo.dart';
-import '../widgets/geo_ui.dart';
+import 'address/address_ui.dart';
 
 class CheckoutScreen extends StatefulWidget {
   const CheckoutScreen({super.key});
@@ -19,7 +19,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   bool pickup = false;
   String? address;
   bool placing = false;
-  GeoFix? here;
 
   int get fee {
     if (pickup) return 0;
@@ -30,15 +29,17 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     if (cart.isEmpty) return;
     final ok = await ensureLoggedIn(context, reason: 'دخّل رقم تلفونك حتى نأكد طلبك');
     if (!ok || !mounted) return;
-    final addr = address ?? (app.me!.addresses.isNotEmpty ? app.me!.addresses.first : '');
-    if (!pickup && addr.isEmpty) {
+    final place = _place;
+    if (!pickup && place == null) {
       toast(context, 'ضيف عنوان التوصيل');
       return;
     }
+    final addr = place?.full ?? '';
+    final loc = place != null && place.hasMap ? GeoFix(place.lat, place.lng, 0, false, DateTime.now().millisecondsSinceEpoch) : null;
     setState(() => placing = true);
     final Order order;
     try {
-      order = await app.placeOrder(pickup: pickup, address: addr, location: here);
+      order = await app.placeOrder(pickup: pickup, address: addr, location: loc);
     } on OrderError catch (e) {
       if (mounted) {
         setState(() => placing = false);
@@ -55,11 +56,17 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   Future<void> _addAddress() async {
     if (!await ensureLoggedIn(context, reason: 'سجّل حتى نحفظ عنوانك') || !mounted) return;
-    final a = await askAddress(context);
-    if (a != null) {
-      app.addAddress(a);
-      setState(() => address = a);
+    final a = await addAddressFlow(context);
+    if (a != null && mounted) setState(() => address = a.id);
+  }
+
+  Address? get _place {
+    final list = app.places;
+    if (list.isEmpty) return null;
+    for (final a in list) {
+      if (a.id == address) return a;
     }
+    return app.selectedPlace ?? list.first;
   }
 
   @override
@@ -68,7 +75,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   Widget _build(BuildContext context) {
     final deliveryFee = app.settings.deliveryFee;
     final remaining = app.settings.freeDeliveryThreshold - cart.total;
-    final addresses = app.me?.addresses ?? const <String>[];
+    final places = app.places;
+    final place = _place;
     final firstFree = !pickup && app.eligibleFirstOrder && cart.total < app.settings.freeDeliveryThreshold;
     return Scaffold(
       appBar: AppBar(title: const Text('إكمال الطلب')),
@@ -95,40 +103,32 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             const SizedBox(height: 6),
             const Text('العنوان', style: TextStyle(fontWeight: FontWeight.w900)),
             const SizedBox(height: 6),
-            for (final a in addresses)
+            for (final a in places)
               _Option(
-                selected: (address ?? addresses.first) == a,
-                icon: Icons.location_on_outlined,
-                title: a,
-                subtitle: '',
-                onTap: () => setState(() => address = a),
+                selected: place?.id == a.id,
+                icon: a.hasMap ? Icons.location_on_outlined : Icons.location_off_outlined,
+                title: a.name.isEmpty ? 'عنوان' : a.name,
+                subtitle: a.short,
+                onTap: () => setState(() => address = a.id),
               ),
             OutlinedButton.icon(
               style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(46)),
               onPressed: _addAddress,
               icon: const Icon(Icons.add_location_alt_outlined),
-              label: Text(addresses.isEmpty ? 'أضف عنوان التوصيل' : 'عنوان جديد'),
+              label: Text(places.isEmpty ? 'أضف عنوان التوصيل (على الخريطة)' : 'عنوان جديد'),
             ),
-            const SizedBox(height: 8),
-            AppCard(
-              borderColor: here != null ? DepoColors.success : null,
-              onTap: () async {
-                final r = await locateWithProgress(context);
-                if (!context.mounted) return;
-                if (r.fix == null) return toast(context, r.error);
-                setState(() => here = r.fix);
-              },
-              child: Row(children: [
-                Icon(here != null ? Icons.check_circle : Icons.my_location, color: here != null ? DepoColors.success : DepoColors.dark),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text(here != null ? 'انرسل موقعك ✓' : 'أرسل موقعي الحالي (اختياري)', style: const TextStyle(fontWeight: FontWeight.w800)),
-                    const Text('إذا انت هسه بمكان التوصيل، المندوب يوصلك أسرع', style: TextStyle(fontSize: 12, color: DepoColors.muted)),
-                  ]),
-                ),
-              ]),
-            ),
+            if (place != null && !place.hasMap) ...[
+              const SizedBox(height: 8),
+              AppCard(
+                borderColor: DepoColors.accent,
+                onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => AddressFormScreen(address: place.copy()))),
+                child: const Row(children: [
+                  Icon(Icons.edit_location_alt_outlined, color: DepoColors.dark),
+                  SizedBox(width: 10),
+                  Expanded(child: Text('هذا العنوان بدون خريطة — حدده على الخريطة حتى المندوب يوصلك أسرع', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13))),
+                ]),
+              ),
+            ],
             const SizedBox(height: 10),
           ],
           const SizedBox(height: 6),

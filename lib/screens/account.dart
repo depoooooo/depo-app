@@ -4,6 +4,7 @@ import '../data/models.dart';
 import '../theme.dart';
 import 'following.dart';
 import 'chat_screen.dart';
+import 'address/address_ui.dart';
 import 'shop/markets.dart';
 import '../widgets/common.dart';
 import 'auth.dart';
@@ -254,7 +255,7 @@ class AddressesScreen extends StatelessWidget {
     return ListenableBuilder(
       listenable: app,
       builder: (context, _) {
-        final list = app.me?.addresses ?? const <String>[];
+        final list = app.places;
         return Scaffold(
           appBar: AppBar(title: const Text('عناويني')),
           body: ListView(
@@ -262,20 +263,24 @@ class AddressesScreen extends StatelessWidget {
             children: [
               for (final a in list)
                 AppCard(
+                  onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => AddressFormScreen(address: a.copy()))),
                   child: Row(children: [
-                    const Icon(Icons.location_on_outlined, color: DepoColors.dark),
+                    Icon(a.hasMap ? Icons.location_on_outlined : Icons.location_off_outlined, color: DepoColors.dark),
                     const SizedBox(width: 10),
-                    Expanded(child: Text(a)),
-                    IconButton(tooltip: 'حذف', onPressed: () => app.removeAddress(a), icon: const Icon(Icons.delete_outline)),
+                    Expanded(
+                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        Text(a.name.isEmpty ? 'عنوان' : a.name, style: const TextStyle(fontWeight: FontWeight.w900)),
+                        Text(a.short, style: const TextStyle(fontSize: 12, color: DepoColors.muted)),
+                        if (!a.hasMap) const Text('بدون خريطة — اضغط وحدده', style: TextStyle(fontSize: 11, color: DepoColors.danger)),
+                      ]),
+                    ),
+                    const Icon(Icons.edit_outlined, size: 20, color: DepoColors.muted),
                   ]),
                 ),
               FilledButton.icon(
-                onPressed: () async {
-                  final a = await askAddress(context);
-                  if (a != null) app.addAddress(a);
-                },
+                onPressed: () => addAddressFlow(context),
                 icon: const Icon(Icons.add),
-                label: const Text('أضف عنوان'),
+                label: const Text('إضافة عنوان'),
               ),
             ],
           ),
