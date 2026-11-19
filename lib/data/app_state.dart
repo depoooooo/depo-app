@@ -162,9 +162,27 @@ class AppState extends ChangeNotifier {
       Cloud.status = 'متصل بالسيرفر ✓';
     }
     for (final c in _cols) {
+      var skipped = false;
       _subs.add(db.collection(c).snapshots(includeMetadataChanges: true).listen((qs) {
-        if (!qs.metadata.isFromCache && !Cloud.status.startsWith('تعذر الحفظ')) Cloud.status = 'متصل بالسيرفر ✓';
-        _applyDocs(c, qs.docs);
+        var statusChanged = false;
+        if (!qs.metadata.isFromCache && Cloud.status != 'متصل بالسيرفر ✓' && !Cloud.status.startsWith('تعذر الحفظ')) {
+          Cloud.status = 'متصل بالسيرفر ✓';
+          statusChanged = true;
+        }
+        // صدى تغييراتنا (بعده ما وصل للسيرفر): البيانات عدنا أصلاً — ما نعيد المعالجة
+        if (qs.metadata.hasPendingWrites) {
+          skipped = true;
+          if (statusChanged) notifyListeners();
+          return;
+        }
+        // تغيير بالحالة بس (بدون بيانات جديدة)
+        if (qs.docChanges.isEmpty && !skipped) {
+          if (statusChanged) notifyListeners();
+          return;
+        }
+        final full = skipped;
+        skipped = false;
+        _applyDocs(c, qs.docs, changed: full ? null : {for (final ch in qs.docChanges) ch.doc.id});
         notifyListeners();
       }, onError: (e) {
         Cloud.status = 'انقطع الاتصال: ${Cloud.describe(e as Object)}';
@@ -209,20 +227,22 @@ class AppState extends ChangeNotifier {
   /// الأقسام الي الجديد بيها ينضاف بالأول (الأحدث فوق)
   static const _newestFirst = {'offers', 'orders', 'joinRequests', 'complaints', 'debts'};
 
-  void _applyDocs(String c, List<fs.QueryDocumentSnapshot<Map<String, dynamic>>> docs) {
+  /// [changed] = المستندات اللي تغيّرت بس (الباقي نخلي نفس الكائن بدون معالجة) — null = الكل
+  void _applyDocs(String c, List<fs.QueryDocumentSnapshot<Map<String, dynamic>>> docs, {Set<String>? changed}) {
     final list = docs.toList()
       ..sort((a, b) {
         final ta = (a.data()['_ts'] ?? 0) as num, tb = (b.data()['_ts'] ?? 0) as num;
         return _newestFirst.contains(c) ? tb.compareTo(ta) : ta.compareTo(tb);
       });
     T keep<T>(String id, Map<String, dynamic> d, T Function(Map<String, dynamic>) from, T? old) {
+      if (changed != null && old != null && !changed.contains(id)) return old;
       final fresh = from(_clean(d));
       // إذا ما تغيّر نخلي نفس الكائن (حتى الشاشات المفتوحة ما تضيع)
       if (old != null && jsonEncode((old as dynamic).toJson()) == jsonEncode((fresh as dynamic).toJson())) return old;
       return fresh;
     }
 
-    _synced[c]!.clear();
+    if (changed == null || c == 'meta') _synced[c]!.clear();
     _ts[c]!.clear();
     for (final d in list) {
       _ts[c]![d.id] = ((d.data()['_ts'] ?? 0) as num).toInt();
@@ -269,7 +289,23 @@ class AppState extends ChangeNotifier {
         }
     }
     // نحفظ النسخة «الموحّدة» حتى ما نرجع نكتب نفس الشي
-    _docsOf(c).forEach((id, v) => _synced[c]![id] = jsonEncode(v));
+    if (changed == null || c == 'meta') {
+      _docsOf(c).forEach((id, v) => _synced[c]![id] = jsonEncode(v));
+    } else {
+      final ids = {for (final d in list) d.id};
+      _synced[c]!.removeWhere((id, _) => !ids.contains(id));
+      if (changed.isNotEmpty) {
+        final cur = _docsOf(c);
+        for (final id in changed) {
+          final v = cur[id];
+          if (v == null) {
+            _synced[c]!.remove(id);
+          } else {
+            _synced[c]![id] = jsonEncode(v);
+          }
+        }
+      }
+    }
   }
 
   Map<String, dynamic> _clean(Map<String, dynamic> d) => Map<String, dynamic>.from(d)..remove('_ts');

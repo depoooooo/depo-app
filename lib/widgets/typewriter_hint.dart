@@ -23,7 +23,7 @@ class _TypewriterHintState extends State<TypewriterHint> {
   void initState() {
     super.initState();
     _blink = Timer.periodic(const Duration(milliseconds: 500), (_) {
-      if (mounted) setState(() => cursorOn = !cursorOn);
+      if (mounted && TickerMode.of(context)) setState(() => cursorOn = !cursorOn);
     });
     _schedule(const Duration(milliseconds: 400));
   }
@@ -35,6 +35,8 @@ class _TypewriterHintState extends State<TypewriterHint> {
 
   void _tick() {
     if (!mounted || widget.phrases.isEmpty) return;
+    // الصفحة مخفية (تبويب ثاني أو شاشة فوقها): نوقف حتى ما نصرف على شي ما ينشاف
+    if (!TickerMode.of(context)) return _schedule(const Duration(milliseconds: 800));
     final text = widget.phrases[phrase % widget.phrases.length];
     setState(() {
       if (!deleting) {

@@ -23,16 +23,24 @@ class _ShellState extends State<Shell> {
   int index = 0;
   void setIndex(int i) => setState(() => index = i);
 
+  // الصفحات تنبني مرة وحدة، وكل صفحة تتحدث لحالها (مو كل التطبيق ويه كل تغيير)
+  late final List<Widget> pages = [
+    const HomeScreen(),
+    const CategoriesScreen(),
+    const CartScreen(embedded: true),
+    ListenableBuilder(listenable: app, builder: (_, __) => const OrdersScreen()),
+    ListenableBuilder(listenable: app, builder: (_, __) => const AccountScreen()),
+  ];
+
   @override
   Widget build(BuildContext context) {
-    return ListenableBuilder(
-      listenable: Listenable.merge([app, cart]),
-      builder: (context, _) => Scaffold(
-        body: IndexedStack(
-          index: index,
-          children: [HomeScreen(), CategoriesScreen(), CartScreen(embedded: true), OrdersScreen(), AccountScreen()], // ignore: prefer_const_constructors
-        ),
-        bottomNavigationBar: NavigationBar(
+    return Scaffold(
+      body: IndexedStack(index: index, children: [
+        for (var i = 0; i < pages.length; i++) TickerMode(enabled: i == index, child: pages[i]),
+      ]),
+      bottomNavigationBar: ListenableBuilder(
+        listenable: Listenable.merge([app, cart]),
+        builder: (context, _) => NavigationBar(
           selectedIndex: index,
           onDestinationSelected: setIndex,
           destinations: [

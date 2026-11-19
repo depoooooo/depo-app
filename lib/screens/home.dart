@@ -477,7 +477,7 @@ class _BannersState extends State<_Banners> {
   void initState() {
     super.initState();
     _t = Timer.periodic(const Duration(seconds: 4), (_) {
-      if (!_page.hasClients || widget.slides.isEmpty) return;
+      if (!mounted || !_page.hasClients || widget.slides.isEmpty || !TickerMode.of(context)) return;
       _page.animateToPage((_i + 1) % widget.slides.length,
           duration: const Duration(milliseconds: 450), curve: Curves.easeOutCubic);
     });
