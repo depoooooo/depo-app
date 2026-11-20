@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../data/app_state.dart';
 import '../data/models.dart';
 import '../theme.dart';
+import '../widgets/nav_icons.dart';
 import 'account.dart';
 import 'cart_screen.dart';
 import 'categories_screen.dart';
@@ -45,11 +46,11 @@ class _ShellState extends State<Shell> {
           index: index,
           onTap: setIndex,
           items: [
-            const _NavItem(Icons.home_outlined, Icons.home_rounded, 'الرئيسية'),
-            const _NavItem(Icons.grid_view_outlined, Icons.grid_view_rounded, 'الأقسام'),
-            _NavItem(Icons.shopping_bag_outlined, Icons.shopping_bag_rounded, 'السلة', badge: cart.count),
-            _NavItem(Icons.receipt_long_outlined, Icons.receipt_long_rounded, 'طلباتي', dot: app.myOrders.any((o) => o.isOpen)),
-            const _NavItem(Icons.person_outline_rounded, Icons.person_rounded, 'حسابي'),
+            const _NavItem(NavGlyph.home, 'الرئيسية'),
+            const _NavItem(NavGlyph.categories, 'الأقسام'),
+            _NavItem(NavGlyph.cart, 'السلة', badge: cart.count),
+            _NavItem(NavGlyph.orders, 'طلباتي', dot: app.myOrders.any((o) => o.isOpen)),
+            const _NavItem(NavGlyph.profile, 'حسابي'),
           ],
         ),
       ),
@@ -59,11 +60,11 @@ class _ShellState extends State<Shell> {
 
 
 class _NavItem {
-  final IconData icon, active;
+  final NavGlyph glyph;
   final String label;
   final int badge;
   final bool dot;
-  const _NavItem(this.icon, this.active, this.label, {this.badge = 0, this.dot = false});
+  const _NavItem(this.glyph, this.label, {this.badge = 0, this.dot = false});
 }
 
 /// الشريط السفلي (نظيف مثل التطبيقات العالمية): خلفية بيضاء، خط رفيع فوق،
@@ -102,15 +103,11 @@ class _BottomBar extends StatelessWidget {
                         smallSize: 8,
                         backgroundColor: DepoColors.accent,
                         label: items[i].badge > 0 ? Text('${items[i].badge}', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w800)) : null,
-                        child: AnimatedSwitcher(
+                        child: AnimatedScale(
+                          scale: i == index ? 1.08 : 1.0,
                           duration: const Duration(milliseconds: 180),
-                          transitionBuilder: (c, a) => ScaleTransition(scale: Tween(begin: 0.8, end: 1.0).animate(a), child: c),
-                          child: Icon(
-                            i == index ? items[i].active : items[i].icon,
-                            key: ValueKey(i == index),
-                            size: 27,
-                            color: i == index ? DepoColors.dark : const Color(0xFF8A9A9D),
-                          ),
+                          curve: Curves.easeOutBack,
+                          child: NavIcon(items[i].glyph, size: 28, color: i == index ? DepoColors.dark : const Color(0xFFA3B1B4)),
                         ),
                       ),
                       const SizedBox(height: 4),
