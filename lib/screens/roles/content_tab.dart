@@ -480,11 +480,11 @@ class _CatsEditorState extends State<CatsEditor> {
                 Container(
                   width: 56,
                   height: 56,
-                  decoration: BoxDecoration(color: Color(c.color).withValues(alpha: 0.2), shape: BoxShape.circle),
-                  clipBehavior: Clip.antiAlias,
+                  padding: c.imageId.isEmpty ? null : const EdgeInsets.all(4),
+                  decoration: BoxDecoration(color: c.imageId.isEmpty ? Color(c.color).withValues(alpha: 0.2) : DepoColors.soft, borderRadius: BorderRadius.circular(16)),
                   child: c.imageId.isEmpty
                       ? Icon(iconOf(c.icon), color: Color(c.color), size: 28)
-                      : AppImage(imageId: c.imageId, height: 56, width: 56, fallback: Icon(iconOf(c.icon))),
+                      : AppImage(imageId: c.imageId, height: 48, width: 48, fit: BoxFit.contain, fallback: Icon(iconOf(c.icon))),
                 ),
                 const SizedBox(width: 12),
                 Expanded(child: TextField(controller: name, decoration: const InputDecoration(labelText: 'اسم القسم'))),
@@ -500,9 +500,9 @@ class _CatsEditorState extends State<CatsEditor> {
                     uploading = v;
                     if (ctx.mounted) set(() {});
                   },
-                  label: 'صورة القسم (تطلع بالدائرة بدل الأيقونة)',
+                  label: 'صورة القسم (تطلع بالمربع بدل الأيقونة)',
                   maxSide: 600,
-                  hint: 'القياس: 500 × 500 بكسل (مربعة)\n• تنقص دائرة: خلي الأكلة/المنتج بالنص ويه فراغ حواليه\n• خلفية بيضاء أو لون سادة'),
+                  hint: 'القياس: 500 × 500 بكسل (مربعة)\n• تبين كاملة بمربع بدون قص\n• الأحلى PNG شفافة (بدون خلفية)'),
               const SizedBox(height: 10),
               const Text('الأيقونة', style: TextStyle(fontWeight: FontWeight.w900)),
               const SizedBox(height: 6),
@@ -563,11 +563,11 @@ class _CatsEditorState extends State<CatsEditor> {
               Container(
                 width: 44,
                 height: 44,
-                decoration: BoxDecoration(color: Color(list[i].color).withValues(alpha: 0.2), shape: BoxShape.circle),
-                clipBehavior: Clip.antiAlias,
+                padding: list[i].imageId.isEmpty ? null : const EdgeInsets.all(3),
+                decoration: BoxDecoration(color: list[i].imageId.isEmpty ? Color(list[i].color).withValues(alpha: 0.2) : DepoColors.soft, borderRadius: BorderRadius.circular(12)),
                 child: list[i].imageId.isEmpty
                     ? Icon(iconOf(list[i].icon), color: Color(list[i].color))
-                    : AppImage(imageId: list[i].imageId, height: 44, width: 44, fallback: Icon(iconOf(list[i].icon))),
+                    : AppImage(imageId: list[i].imageId, height: 38, width: 38, fit: BoxFit.contain, fallback: Icon(iconOf(list[i].icon))),
               ),
               const SizedBox(width: 10),
               Expanded(child: Text(list[i].name, style: TextStyle(fontWeight: FontWeight.w900, color: list[i].active ? DepoColors.ink : DepoColors.muted))),

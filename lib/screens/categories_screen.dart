@@ -94,7 +94,7 @@ class CatTile extends StatelessWidget {
             ),
             child: cat.imageId.isEmpty
                 ? Icon(cat.icon, size: 36, color: cat.color)
-                : AppImage(imageId: cat.imageId, height: 72, width: 72, radius: 20, fallback: Icon(cat.icon, size: 36, color: cat.color)),
+                : Padding(padding: const EdgeInsets.all(6), child: AppImage(imageId: cat.imageId, height: 60, width: 60, fit: BoxFit.contain, fallback: Icon(cat.icon, size: 36, color: cat.color))),
           ),
           if (n > 0)
             Positioned(
@@ -194,7 +194,7 @@ class CatStrip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 88,
+      height: 94,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
@@ -207,24 +207,23 @@ class CatStrip extends StatelessWidget {
             borderRadius: BorderRadius.circular(40),
             onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => CategoryResults(cat: c, market: market))),
             child: SizedBox(
-              width: 60,
+              width: 64,
               child: Column(children: [
                 Stack(clipBehavior: Clip.none, children: [
+                  // مربع بحواف ناعمة: الصورة/الأيقونة تبين كاملة بدون قص
                   Container(
-                    width: 52,
-                    height: 52,
-                    decoration: c.imageId.isEmpty
-                        ? BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: Colors.white,
-                            boxShadow: const [BoxShadow(color: Color(0x1F06363C), blurRadius: 6, offset: Offset(0, 2))],
-                            gradient: RadialGradient(colors: [Colors.white, c.color.withValues(alpha: 0.22)], radius: 0.9),
-                          )
-                        // ويه صورة: لون خلفية التطبيق، فالصورة الشفافة تبين بدون خلفية
-                        : const BoxDecoration(shape: BoxShape.circle, color: DepoColors.bg),
+                    width: 56,
+                    height: 56,
+                    padding: c.imageId.isEmpty ? null : const EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(16),
+                      color: c.imageId.isEmpty ? Colors.white : DepoColors.soft,
+                      border: Border.all(color: const Color(0xFFE2F2F4)),
+                      gradient: c.imageId.isEmpty ? LinearGradient(begin: Alignment.topRight, end: Alignment.bottomLeft, colors: [Colors.white, c.color.withValues(alpha: 0.18)]) : null,
+                    ),
                     child: c.imageId.isEmpty
-                        ? Icon(c.icon, size: 26, color: c.color)
-                        : ClipOval(child: AppImage(imageId: c.imageId, height: 52, width: 52, fallback: Icon(c.icon, size: 26, color: c.color))),
+                        ? Icon(c.icon, size: 28, color: c.color)
+                        : AppImage(imageId: c.imageId, height: 48, width: 48, fit: BoxFit.contain, fallback: Icon(c.icon, size: 28, color: c.color)),
                   ),
                   if (n > 0)
                     Positioned(

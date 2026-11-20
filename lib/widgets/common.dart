@@ -237,7 +237,8 @@ class AppImage extends StatefulWidget {
   final double? width;
   final double radius;
   final Widget fallback;
-  const AppImage({super.key, required this.imageId, required this.fallback, this.height = 110, this.width, this.radius = 0});
+  final BoxFit fit;
+  const AppImage({super.key, required this.imageId, required this.fallback, this.height = 110, this.width, this.radius = 0, this.fit = BoxFit.cover});
 
   @override
   State<AppImage> createState() => _AppImageState();
@@ -266,7 +267,7 @@ class _AppImageState extends State<AppImage> {
     final cached = Images.cached(widget.imageId);
     Widget img(Uint8List b) => ClipRRect(
           borderRadius: BorderRadius.circular(widget.radius),
-          child: Image.memory(b, height: widget.height, width: widget.width ?? double.infinity, fit: BoxFit.cover, gaplessPlayback: true),
+          child: Image.memory(b, height: widget.height, width: widget.width ?? double.infinity, fit: widget.fit, gaplessPlayback: true),
         );
     if (cached != null) return img(cached);
     return FutureBuilder<Uint8List?>(
