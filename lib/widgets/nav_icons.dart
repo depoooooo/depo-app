@@ -26,6 +26,10 @@ class _NavPainter extends CustomPainter {
     final fill = Paint()
       ..color = color
       ..isAntiAlias = true;
+    // القصّ نرسمه بلون خلفية الشريط (أضمن من عمليات دمج المسارات على كل الأجهزة)
+    final cut = Paint()
+      ..color = Colors.white
+      ..isAntiAlias = true;
     switch (g) {
       case NavGlyph.home:
         // بيت مدوّر ويه شبّاك دائري
@@ -43,8 +47,8 @@ class _NavPainter extends CustomPainter {
           ..lineTo(10.4, 3.2)
           ..cubicTo(10.9, 2.8, 11.4, 2.6, 12, 2.6)
           ..close();
-        final win = Path()..addOval(Rect.fromCircle(center: const Offset(12, 14.2), radius: 3.0));
-        canvas.drawPath(Path.combine(PathOperation.difference, house, win), fill);
+        canvas.drawPath(house, fill);
+        canvas.drawCircle(const Offset(12, 14.2), 3.0, cut);
       case NavGlyph.categories:
         // ثلاث مربعات مدوّرة ودائرة
         const r = Radius.circular(2.4);
@@ -62,14 +66,13 @@ class _NavPainter extends CustomPainter {
           ..cubicTo(8.4, 14.4, 10.0, 16.0, 12.0, 16.0)
           ..cubicTo(14.0, 16.0, 15.6, 14.4, 15.6, 12.2);
         final smileStroke = Paint()
+          ..color = Colors.white
           ..style = PaintingStyle.stroke
           ..strokeWidth = 1.9
-          ..strokeCap = StrokeCap.round;
-        // نقصّ الابتسامة من الكيس
-        canvas.saveLayer(const Rect.fromLTWH(0, 0, 24, 24), Paint());
+          ..strokeCap = StrokeCap.round
+          ..isAntiAlias = true;
         canvas.drawPath(body, fill);
-        canvas.drawPath(smile, smileStroke..blendMode = BlendMode.clear);
-        canvas.restore();
+        canvas.drawPath(smile, smileStroke);
         final handle = Paint()
           ..color = color
           ..style = PaintingStyle.stroke
@@ -78,16 +81,14 @@ class _NavPainter extends CustomPainter {
         canvas.drawArc(Rect.fromLTRB(8.0, 2.4, 16.0, 11.0), pi, pi, false, handle);
       case NavGlyph.orders:
         // ورقة طلب ويه خطوط
-        final paper = Path()..addRRect(RRect.fromLTRBR(4.0, 2.5, 20.0, 21.5, const Radius.circular(3.2)));
-        final lines = Path()
-          ..addRRect(RRect.fromLTRBR(7.6, 7.2, 16.4, 9.2, const Radius.circular(1)))
-          ..addRRect(RRect.fromLTRBR(7.6, 11.0, 16.4, 13.0, const Radius.circular(1)))
-          ..addRRect(RRect.fromLTRBR(7.6, 14.8, 12.8, 16.8, const Radius.circular(1)));
-        canvas.drawPath(Path.combine(PathOperation.difference, paper, lines), fill);
+        canvas.drawRRect(RRect.fromLTRBR(4.0, 2.5, 20.0, 21.5, const Radius.circular(3.2)), fill);
+        canvas.drawRRect(RRect.fromLTRBR(7.6, 7.2, 16.4, 9.2, const Radius.circular(1)), cut);
+        canvas.drawRRect(RRect.fromLTRBR(7.6, 11.0, 16.4, 13.0, const Radius.circular(1)), cut);
+        canvas.drawRRect(RRect.fromLTRBR(7.6, 14.8, 12.8, 16.8, const Radius.circular(1)), cut);
       case NavGlyph.profile:
         // دائرة ممتلئة بداخلها شخص مقصوص
-        final circle = Path()..addOval(Rect.fromCircle(center: const Offset(12, 12), radius: 9.6));
-        final head = Path()..addOval(Rect.fromCircle(center: const Offset(12, 9.4), radius: 3.3));
+        canvas.drawCircle(const Offset(12, 12), 9.6, fill);
+        canvas.drawCircle(const Offset(12, 9.4), 3.3, cut);
         final shoulders = Path()
           ..moveTo(5.6, 18.6)
           ..cubicTo(6.8, 15.6, 9.2, 14.2, 12, 14.2)
@@ -95,8 +96,10 @@ class _NavPainter extends CustomPainter {
           ..cubicTo(16.7, 20.4, 14.5, 21.4, 12, 21.4)
           ..cubicTo(9.5, 21.4, 7.3, 20.4, 5.6, 18.6)
           ..close();
-        final cut = Path.combine(PathOperation.union, head, shoulders);
-        canvas.drawPath(Path.combine(PathOperation.difference, circle, cut), fill);
+        canvas.save();
+        canvas.clipPath(Path()..addOval(Rect.fromCircle(center: const Offset(12, 12), radius: 9.6)));
+        canvas.drawPath(shoulders, cut);
+        canvas.restore();
     }
   }
 
