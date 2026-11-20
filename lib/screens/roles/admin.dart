@@ -6,6 +6,8 @@ import '../../widgets/common.dart';
 import 'supervisor.dart';
 import 'content_tab.dart';
 import 'finance_tab.dart';
+import '../../main.dart' show errorLog;
+import '../../widgets/debt_ui.dart' show copyText;
 
 /// واجهة المدير العام: كل صلاحيات المشرف + التقارير والإعدادات والمشرفين وسجل العمليات
 class AdminHome extends StatelessWidget {
@@ -314,6 +316,29 @@ class _SettingsTabState extends State<_SettingsTab> {
             },
             icon: const Icon(Icons.cleaning_services_outlined),
             label: const Text('حذف البيانات التجريبية'),
+          ),
+          const SizedBox(height: 8),
+          OutlinedButton.icon(
+            onPressed: () => showDialog<void>(
+              context: context,
+              builder: (c) => AlertDialog(
+                title: Text('سجل الأخطاء (${errorLog.length})'),
+                content: SizedBox(
+                  width: double.maxFinite,
+                  child: errorLog.isEmpty
+                      ? const Text('ماكو أخطاء بهذي الجلسة ✓')
+                      : ListView(shrinkWrap: true, children: [
+                          for (final e in errorLog.reversed) Padding(padding: const EdgeInsets.only(bottom: 8), child: Text(e, textDirection: TextDirection.ltr, style: const TextStyle(fontSize: 11))),
+                        ]),
+                ),
+                actions: [
+                  if (errorLog.isNotEmpty) TextButton(onPressed: () => copyText(c, errorLog.reversed.join('\n\n'), done: 'انسخ السجل'), child: const Text('نسخ')),
+                  TextButton(onPressed: () => Navigator.pop(c), child: const Text('سد')),
+                ],
+              ),
+            ),
+            icon: const Icon(Icons.bug_report_outlined),
+            label: const Text('سجل الأخطاء (للدعم الفني)'),
           ),
         ],
       ],

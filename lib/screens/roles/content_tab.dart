@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../data/app_state.dart';
 import '../../data/content.dart';
 import '../../data/images.dart';
+import '../../main.dart' show errorLog;
 import '../../data/models.dart';
 import '../../theme.dart';
 import '../../widgets/common.dart';
@@ -163,19 +164,22 @@ class _ImagePickFieldState extends State<ImagePickField> {
         widget.onChanged(id);
       }
     } catch (e) {
-      err = e.toString().replaceFirst('Exception: ', '');
+      final t = e.toString().replaceFirst('Exception: ', '');
+      err = t.contains('Timeout') ? 'النت ضعيف، جرّب مرة ثانية' : (t.length > 200 ? t.substring(0, 200) : t);
+      errorLog.add('${DateTime.now()} [رفع صورة] $t');
     }
     if (!mounted) return;
     setState(() => busy = false);
     widget.onBusy?.call(false);
-    if (err != null) {
+    final msg = err;
+    if (msg != null) {
       // نافذة (مو شريط تحت) حتى تبين حتى لو الشاشة نافذة منبثقة
       await showDialog<void>(
         context: context,
         builder: (c) => AlertDialog(
           title: const Text('ما انرفعت الصورة'),
-          content: Text(err!.contains('Timeout') ? 'النت ضعيف، جرّب مرة ثانية' : err),
-          actions: [FilledButton(style: FilledButton.styleFrom(minimumSize: const Size(0, 44)), onPressed: () => Navigator.pop(c), child: const Text('تمام'))],
+          content: SingleChildScrollView(child: Text(msg)),
+          actions: [TextButton(onPressed: () => Navigator.pop(c), child: const Text('تمام'))],
         ),
       );
     }
