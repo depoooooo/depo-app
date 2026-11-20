@@ -110,7 +110,7 @@ Uint8List? shrinkImage(Map<String, Object> a) {
       if (out.length <= maxImageBytes) return out;
       side = (side * 0.8).round();
     }
-    // ما صغرت بما فيه الكفاية: الشفاف ياخذ لون خلفية التطبيق (مو أبيض)
+    // ما صغرت بما فيه الكفاية (نادر): الشفاف ياخذ لون خلفية التطبيق بالضبط (مو أبيض)
     final bg = img.Image(width: im.width, height: im.height);
     img.fill(bg, color: img.ColorRgb8(0xF4, 0xFD, 0xFE));
     img.compositeImage(bg, im);

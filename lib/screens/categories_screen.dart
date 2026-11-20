@@ -88,13 +88,16 @@ class CatTile extends StatelessWidget {
           Container(
             width: 72,
             height: 72,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(begin: Alignment.topRight, end: Alignment.bottomLeft, colors: [cat.color.withValues(alpha: 0.18), cat.color.withValues(alpha: 0.35)]),
-              borderRadius: BorderRadius.circular(20),
-            ),
+            // ويه صورة: بدون خلفية ولا حدود (نفس لون التطبيق) فالعنصر الشفاف يطلع كأنه أيقونة
+            decoration: cat.imageId.isEmpty
+                ? BoxDecoration(
+                    gradient: LinearGradient(begin: Alignment.topRight, end: Alignment.bottomLeft, colors: [cat.color.withValues(alpha: 0.18), cat.color.withValues(alpha: 0.35)]),
+                    borderRadius: BorderRadius.circular(20),
+                  )
+                : null,
             child: cat.imageId.isEmpty
                 ? Icon(cat.icon, size: 36, color: cat.color)
-                : Padding(padding: const EdgeInsets.all(6), child: AppImage(imageId: cat.imageId, height: 60, width: 60, fit: BoxFit.contain, fallback: Icon(cat.icon, size: 36, color: cat.color))),
+                : AppImage(imageId: cat.imageId, height: 72, width: 72, fit: BoxFit.contain, fallback: Icon(cat.icon, size: 36, color: cat.color)),
           ),
           if (n > 0)
             Positioned(
@@ -214,16 +217,17 @@ class CatStrip extends StatelessWidget {
                   Container(
                     width: 56,
                     height: 56,
-                    padding: c.imageId.isEmpty ? null : const EdgeInsets.all(4),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(16),
-                      color: c.imageId.isEmpty ? Colors.white : DepoColors.soft,
-                      border: Border.all(color: const Color(0xFFE2F2F4)),
-                      gradient: c.imageId.isEmpty ? LinearGradient(begin: Alignment.topRight, end: Alignment.bottomLeft, colors: [Colors.white, c.color.withValues(alpha: 0.18)]) : null,
-                    ),
+                    decoration: c.imageId.isEmpty
+                        ? BoxDecoration(
+                            borderRadius: BorderRadius.circular(16),
+                            color: Colors.white,
+                            border: Border.all(color: const Color(0xFFE2F2F4)),
+                            gradient: LinearGradient(begin: Alignment.topRight, end: Alignment.bottomLeft, colors: [Colors.white, c.color.withValues(alpha: 0.18)]),
+                          )
+                        : null, // ويه صورة: بدون خلفية ولا حدود
                     child: c.imageId.isEmpty
                         ? Icon(c.icon, size: 28, color: c.color)
-                        : AppImage(imageId: c.imageId, height: 48, width: 48, fit: BoxFit.contain, fallback: Icon(c.icon, size: 28, color: c.color)),
+                        : AppImage(imageId: c.imageId, height: 56, width: 56, fit: BoxFit.contain, fallback: Icon(c.icon, size: 28, color: c.color)),
                   ),
                   if (n > 0)
                     Positioned(
