@@ -93,12 +93,26 @@ Uint8List? shrinkImage(Map<String, Object> a) {
   final startQ = (a['quality'] as int).clamp(40, 90);
   final isJpg = raw.length > 3 && raw[0] == 0xFF && raw[1] == 0xD8;
   if (isJpg && raw.length <= maxImageBytes) return raw; // جاهزة
+  final isPng = raw.length > 3 && raw[0] == 0x89 && raw[1] == 0x50;
   var im = img.decodeImage(raw);
   if (im == null) return null;
-  // الشفافية تصير خلفية بيضاء (JPG ما بيه شفافية)
   if (im.hasAlpha) {
+    // صورة شفافة: نخليها PNG حتى تبقى بدون خلفية — نصغّر لحد ما تصير أقل من الحد
+    if (isPng && raw.length <= maxImageBytes) {
+      final big0 = im.width > im.height ? im.width : im.height;
+      if (big0 <= maxSide) return raw;
+    }
+    var side = maxSide;
+    for (var round = 0; round < 6; round++) {
+      final big = im.width > im.height ? im.width : im.height;
+      final scaled = big > side ? (im.width >= im.height ? img.copyResize(im, width: side) : img.copyResize(im, height: side)) : im;
+      final out = img.encodePng(scaled, level: 9);
+      if (out.length <= maxImageBytes) return out;
+      side = (side * 0.8).round();
+    }
+    // ما صغرت بما فيه الكفاية: الشفاف ياخذ لون خلفية التطبيق (مو أبيض)
     final bg = img.Image(width: im.width, height: im.height);
-    img.fill(bg, color: img.ColorRgb8(255, 255, 255));
+    img.fill(bg, color: img.ColorRgb8(0xF4, 0xFD, 0xFE));
     img.compositeImage(bg, im);
     im = bg;
   }

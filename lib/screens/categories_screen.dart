@@ -213,12 +213,15 @@ class CatStrip extends StatelessWidget {
                   Container(
                     width: 52,
                     height: 52,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: Colors.white,
-                      boxShadow: const [BoxShadow(color: Color(0x1F06363C), blurRadius: 6, offset: Offset(0, 2))],
-                      gradient: RadialGradient(colors: [Colors.white, c.color.withValues(alpha: 0.22)], radius: 0.9),
-                    ),
+                    decoration: c.imageId.isEmpty
+                        ? BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: Colors.white,
+                            boxShadow: const [BoxShadow(color: Color(0x1F06363C), blurRadius: 6, offset: Offset(0, 2))],
+                            gradient: RadialGradient(colors: [Colors.white, c.color.withValues(alpha: 0.22)], radius: 0.9),
+                          )
+                        // ويه صورة: لون خلفية التطبيق، فالصورة الشفافة تبين بدون خلفية
+                        : const BoxDecoration(shape: BoxShape.circle, color: DepoColors.bg),
                     child: c.imageId.isEmpty
                         ? Icon(c.icon, size: 26, color: c.color)
                         : ClipOval(child: AppImage(imageId: c.imageId, height: 52, width: 52, fallback: Icon(c.icon, size: 26, color: c.color))),
