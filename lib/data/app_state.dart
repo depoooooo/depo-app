@@ -533,12 +533,36 @@ class AppState extends ChangeNotifier {
     _changed();
   }
 
+  /// رقم المالك (المدير العام). أي حساب جديد غيره يصير «زبون» — ولا يوجد ترقية تلقائية أبداً
+  static const ownerPhones = {'07704720344'};
+
+  /// قبل الدخول: نتأكد من السيرفر هل الرقم مسجّل (حتى ما نسوي حساب جديد فوق حساب موجود، وما نسجّل وإحنا بدون اتصال)
+  Future<String?> prepareLogin(String phone) async {
+    if (offline || !Cloud.enabled || Cloud.db == null) return 'ماكو اتصال بالسيرفر — تأكد من الإنترنت وجرّب مرة ثانية';
+    try {
+      final d = await Cloud.db!.collection('users').doc(phone).get(const fs.GetOptions(source: fs.Source.server)).timeout(const Duration(seconds: 12));
+      final data = d.data();
+      if (data != null) {
+        final fresh = AppUser.fromJson(_clean(data));
+        final i = users.indexWhere((x) => x.phone == phone);
+        if (i >= 0) {
+          users[i] = fresh;
+        } else {
+          users.add(fresh);
+        }
+        _synced['users']![phone] = jsonEncode(fresh.toJson());
+      }
+      return null;
+    } catch (_) {
+      return 'ماكو اتصال بالسيرفر — تأكد من الإنترنت وجرّب مرة ثانية';
+    }
+  }
+
   void login(String phone, {String name = ''}) {
     var u = userByPhone(phone);
     if (u != null && u.suspended) return;
     if (u == null) {
-      final noRealUsers = users.where((x) => !x.phone.startsWith('0700000')).isEmpty;
-      u = AppUser(phone: phone, name: name, role: noRealUsers ? Role.admin : Role.customer);
+      u = AppUser(phone: phone, name: name, role: ownerPhones.contains(phone) ? Role.admin : Role.customer);
       users.add(u);
       _log('تسجيل حساب جديد: $phone${u.role == Role.admin ? ' (المدير العام)' : ''}');
     } else if (name.isNotEmpty) {

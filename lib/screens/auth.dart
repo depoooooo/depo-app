@@ -106,6 +106,12 @@ class _LoginScreenState extends State<LoginScreen> {
       return;
     }
     if (!mounted) return;
+    final err = await app.prepareLogin(phoneNorm);
+    if (!mounted) return;
+    if (err != null) {
+      toast(context, err);
+      return;
+    }
     if (app.isNewUser(phoneNorm)) {
       setState(() => step = _Step.name);
     } else {
