@@ -70,52 +70,61 @@ class AppState extends ChangeNotifier {
     currentPhone = prefs.getString('depo_phone');
     _selectedPlace = prefs.getString('depo_place');
     courierAvailable = prefs.getBool('depo_courier_available') ?? true;
-    if (await Cloud.init()) {
-      try {
-        await _loadCloud();
-        await loadSeen();
-        loaded = true;
-        notifyListeners();
-        return;
-      } catch (e) {
-        Cloud.enabled = false;
-        Cloud.status = Cloud.describe(e);
-      }
+    if (await _tryConnect()) {
+      await loadSeen();
+      loaded = true;
+      notifyListeners();
+      return;
     }
-    _loadLocal(prefs);
+    // ماكو اتصال: ما نعرض بيانات تجريبية (تضلّل). نفتح التطبيق ونعيد المحاولة بالخلفية لحد ما يتصل
     await loadSeen();
     loaded = true;
+    offline = true;
+    notifyListeners();
+    _reconnect ??= Timer.periodic(const Duration(seconds: 8), (_) async {
+      if (_connecting) return;
+      if (await _tryConnect()) {
+        _reconnect?.cancel();
+        _reconnect = null;
+        offline = false;
+        await loadSeen();
+        notifyListeners();
+      }
+    });
+  }
+
+  /// ماكو اتصال بالسيرفر هسه (نحاول بالخلفية)
+  bool offline = false;
+  Timer? _reconnect;
+  bool _connecting = false;
+
+  Future<bool> _tryConnect() async {
+    _connecting = true;
+    try {
+      if (!await Cloud.init()) return false;
+      await _loadCloud();
+      return true;
+    } catch (e) {
+      Cloud.enabled = false;
+      Cloud.status = Cloud.describe(e);
+      return false;
+    } finally {
+      _connecting = false;
+    }
+  }
+
+  /// زر «أعد المحاولة»
+  Future<void> retryConnect() async {
+    if (_connecting || !offline) return;
+    if (await _tryConnect()) {
+      _reconnect?.cancel();
+      _reconnect = null;
+      offline = false;
+      await loadSeen();
+    }
     notifyListeners();
   }
 
-  void _loadLocal(SharedPreferences prefs) {
-    final raw = prefs.getString(_key);
-    if (raw == null) {
-      _seed();
-      return;
-    }
-    try {
-      final j = jsonDecode(raw) as Map<String, dynamic>;
-      List<Map<String, dynamic>> l(String k) =>
-          (j[k] as List? ?? const []).map((e) => Map<String, dynamic>.from(e as Map)).toList();
-      users = l('users').map(AppUser.fromJson).toList();
-      stores = l('stores').map(Store.fromJson).toList();
-      offers = l('offers').map(Offer.fromJson).toList();
-      orders = l('orders').map(Order.fromJson).toList();
-      joinRequests = l('joinRequests').map(JoinRequest.fromJson).toList();
-      debtors = l('debtors').map(Debtor.fromJson).toList();
-      debts = l('debts').map(DebtEntry.fromJson).toList();
-      chats = l('chats').map(Chat.fromJson).toList();
-      complaints = l('complaints').map(Complaint.fromJson).toList();
-      audit = List<String>.from(j['audit'] ?? const []);
-      settlements = l('settlements').map(Settlement.fromJson).toList();
-      settings = AppSettings.fromJson(Map<String, dynamic>.from(j['settings'] ?? const {}));
-      if (j['content'] is Map) content = ContentConfig.fromJson(Map<String, dynamic>.from(j['content'] as Map));
-      currentPhone ??= j['currentPhone'] as String?;
-    } catch (_) {
-      _seed();
-    }
-  }
 
   // ---- Firestore ----
   /// السحب للتحديث: نجيب آخر نسخة من السيرفر (والتغييرات توصل لحالها أصلاً)
@@ -150,10 +159,11 @@ class AppState extends ChangeNotifier {
     }
 
     final cached = await Future.wait(_cols.map(fromCache));
-    final hasCache = cached.every((x) => x != null) && (cached[_cols.indexOf('stores')]!.docs.isNotEmpty || cached[_cols.indexOf('users')]!.docs.isNotEmpty);
+    final cs = cached[_cols.indexOf('stores')], cu = cached[_cols.indexOf('users')];
+    final hasCache = (cs != null && cs.docs.isNotEmpty) || (cu != null && cu.docs.isNotEmpty);
     if (hasCache) {
       for (var i = 0; i < _cols.length; i++) {
-        _applyDocs(_cols[i], cached[i]!.docs);
+        if (cached[i] != null) _applyDocs(_cols[i], cached[i]!.docs);
       }
     } else {
       final first = await Future.wait(_cols.map((c) => db.collection(c).get().timeout(const Duration(seconds: 20))));

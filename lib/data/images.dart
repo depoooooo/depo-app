@@ -63,7 +63,7 @@ class Images {
           data = c.data()?['data'] as String?;
         } catch (_) {}
         if (data == null) {
-          final d = await Cloud.db!.collection('images').doc(id).get();
+          final d = await Cloud.db!.collection('images').doc(id).get().timeout(const Duration(seconds: 15));
           data = d.data()?['data'] as String?;
         }
       } else {

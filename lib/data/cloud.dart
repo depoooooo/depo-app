@@ -13,16 +13,20 @@ class Cloud {
   /// تهيئة Firebase + دخول مجهول. ما ننتظر السيرفر هنا (الدخول المحفوظ ما يحتاج نت)
   static Future<bool> init() async {
     try {
-      await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform).timeout(const Duration(seconds: 12));
+      if (Firebase.apps.isEmpty) {
+        await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform).timeout(const Duration(seconds: 12));
+      }
       final auth = FirebaseAuth.instance;
       if (auth.currentUser == null) {
         await auth.signInAnonymously().timeout(const Duration(seconds: 15));
       }
       final d = FirebaseFirestore.instance;
-      try {
-        // نسخة محلية من البيانات: التطبيق يفتح فوراً من آخر بيانات، والجديد يجي بالخلفية
-        d.settings = const Settings(persistenceEnabled: true, cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED);
-      } catch (_) {}
+      if (db == null) {
+        try {
+          // نسخة محلية من البيانات: التطبيق يفتح فوراً من آخر بيانات، والجديد يجي بالخلفية
+          d.settings = const Settings(persistenceEnabled: true, cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED);
+        } catch (_) {}
+      }
       db = d;
       enabled = true;
       status = 'جاري الاتصال...';

@@ -37,8 +37,39 @@ class _ShellState extends State<Shell> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: IndexedStack(index: index, children: [
-        for (var i = 0; i < pages.length; i++) TickerMode(enabled: i == index, child: pages[i]),
+      body: Column(children: [
+        // شريط «ماكو اتصال» — يختفي لحاله أول ما يتصل
+        ListenableBuilder(
+          listenable: app,
+          builder: (context, _) => AnimatedSize(
+            duration: const Duration(milliseconds: 250),
+            child: !app.offline
+                ? const SizedBox(width: double.infinity)
+                : Material(
+                    color: DepoColors.ink,
+                    child: SafeArea(
+                      bottom: false,
+                      child: InkWell(
+                        onTap: app.retryConnect,
+                        child: const Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                          child: Row(children: [
+                            SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)),
+                            SizedBox(width: 10),
+                            Expanded(child: Text('ماكو اتصال بالإنترنت — نحاول نتصل…', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 13))),
+                            Text('أعد المحاولة', style: TextStyle(color: Color(0xFF7FE3EC), fontWeight: FontWeight.w800, fontSize: 12)),
+                          ]),
+                        ),
+                      ),
+                    ),
+                  ),
+          ),
+        ),
+        Expanded(
+          child: IndexedStack(index: index, children: [
+            for (var i = 0; i < pages.length; i++) TickerMode(enabled: i == index, child: pages[i]),
+          ]),
+        ),
       ]),
       bottomNavigationBar: ListenableBuilder(
         listenable: Listenable.merge([app, cart]),

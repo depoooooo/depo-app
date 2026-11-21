@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../data/images.dart';
@@ -246,8 +247,28 @@ class AppImage extends StatefulWidget {
 
 class _AppImageState extends State<AppImage> {
   Future<Uint8List?>? _f;
+  int _tries = 0;
+  Timer? _retry;
 
-  void _load() => _f = widget.imageId.isEmpty ? null : Images.get(widget.imageId);
+  void _load() {
+    _f = widget.imageId.isEmpty ? null : Images.get(widget.imageId);
+    // إذا ما وصلت (نت ضعيف أو بعده ما اتصل): نعيد المحاولة تلقائياً، كل مرة أبطأ شوية
+    _f?.then((b) {
+      if (b != null || !mounted || _tries >= 8) return;
+      _retry?.cancel();
+      _retry = Timer(Duration(seconds: 2 + _tries * 3), () {
+        if (!mounted) return;
+        _tries++;
+        setState(_load);
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _retry?.cancel();
+    super.dispose();
+  }
 
   @override
   void initState() {
@@ -258,7 +279,10 @@ class _AppImageState extends State<AppImage> {
   @override
   void didUpdateWidget(AppImage old) {
     super.didUpdateWidget(old);
-    if (old.imageId != widget.imageId) _load();
+    if (old.imageId != widget.imageId) {
+      _tries = 0;
+      _load();
+    }
   }
 
   @override
