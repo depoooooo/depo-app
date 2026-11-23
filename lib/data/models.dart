@@ -83,6 +83,9 @@ class AppUser {
   List<String> perms; // أقسام المشرف
   List<String> debtCodes; // رموز الديون اللي ضافها الزبون
   List<Address> places; // العناوين المفصّلة ويه موقعها على الخريطة
+  double locLat, locLng; // آخر موقع (للمندوب المتاح — للمراقبة)
+  int locAt;
+  bool onDuty; // المندوب مفعّل «متاح للتوصيل»
 
   AppUser({
     required this.phone,
@@ -99,6 +102,10 @@ class AppUser {
     List<String>? perms,
     List<String>? debtCodes,
     List<Address>? places,
+    this.locLat = 0,
+    this.locLng = 0,
+    this.locAt = 0,
+    this.onDuty = false,
   })  : places = places ?? [],
         perms = perms ?? [],
         debtCodes = debtCodes ?? [],
@@ -122,6 +129,10 @@ class AppUser {
         'perms': perms,
         'debtCodes': debtCodes,
         'places': places.map((e) => e.toJson()).toList(),
+        'locLat': locLat,
+        'locLng': locLng,
+        'locAt': locAt,
+        'onDuty': onDuty,
       };
 
   factory AppUser.fromJson(Map<String, dynamic> j) => AppUser(
@@ -138,6 +149,10 @@ class AppUser {
         pinHash: (j['pinHash'] ?? '') as String,
         perms: List<String>.from(j['perms'] ?? const []),
         debtCodes: List<String>.from(j['debtCodes'] ?? const []),
+        locLat: _d(j['locLat']),
+        locLng: _d(j['locLng']),
+        locAt: (j['locAt'] ?? 0) as int,
+        onDuty: (j['onDuty'] ?? false) as bool,
         places: (j['places'] as List?) != null
             ? [for (final e in j['places'] as List) Address.fromJson(Map<String, dynamic>.from(e as Map))]
             // العناوين القديمة (نص بس) تتحول عناوين بدون خريطة

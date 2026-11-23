@@ -1,4 +1,6 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import '../widgets/waze_map.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import '../data/geo.dart';
@@ -295,13 +297,20 @@ class _ComplaintScreenState extends State<ComplaintScreen> {
 
 
 /// تتبّع المندوب على الخريطة (يتحدّث كل 30 ثانية تقريباً)
-class TrackMap extends StatelessWidget {
+class TrackMap extends StatefulWidget {
   final Order order;
   const TrackMap({super.key, required this.order});
 
   @override
+  State<TrackMap> createState() => _TrackMapState();
+}
+
+class _TrackMapState extends State<TrackMap> {
+  bool waze = !kIsWeb; // ويز أوضح للطرق؛ «خريطة ديبو» تبين المندوب وبيتك سوا
+
+  @override
   Widget build(BuildContext context) {
-    final o = order;
+    final o = widget.order;
     final courier = LatLng(o.courierLat, o.courierLng);
     final dest = o.custLat != 0 ? LatLng(o.custLat, o.custLng) : null;
     final mins = ((DateTime.now().millisecondsSinceEpoch - o.courierLocAt) / 60000).floor();
@@ -309,7 +318,28 @@ class TrackMap extends StatelessWidget {
     return AppCard(
       padding: EdgeInsets.zero,
       child: Column(children: [
-        ClipRRect(
+        Padding(
+          padding: const EdgeInsets.fromLTRB(10, 10, 10, 6),
+          child: SegmentedButton<bool>(
+            segments: const [
+              ButtonSegment(value: true, label: Text('ويز'), icon: Icon(Icons.traffic_rounded, size: 18)),
+              ButtonSegment(value: false, label: Text('خريطة ديبو'), icon: Icon(Icons.map_outlined, size: 18)),
+            ],
+            selected: {waze},
+            showSelectedIcon: false,
+            onSelectionChanged: (v) => setState(() => waze = v.first),
+          ),
+        ),
+        if (waze)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: WazeMap(lat: courier.latitude, lng: courier.longitude, height: 230),
+            ),
+          )
+        else
+          ClipRRect(
           borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
           child: SizedBox(
             height: 190,

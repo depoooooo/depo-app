@@ -50,10 +50,17 @@ class AppState extends ChangeNotifier {
   Future<void> load() async {
     // كل دقيقة نحدّث الشاشات (العروض اللي خلص وقتها تختفي، والعدّاد ينقص)
     // تتبّع المندوب: كل 30 ثانية وهو بالطريق نحدّث موقعه للزبون
+    // والمندوب المتاح: كل دقيقة تقريباً موقعه للمراقبة (حتى لو بدون طلب)
+    var trackTick = 0;
     _track ??= Timer.periodic(const Duration(seconds: 30), (_) async {
-      if (!hasActiveDelivery) return;
+      trackTick++;
+      final u = me;
+      final dutyNow = u != null && u.role == Role.courier && courierAvailable;
+      if (!hasActiveDelivery && !(dutyNow && trackTick.isEven)) return;
       final r = await Geo.current();
-      if (r.fix != null) updateCourierLocation(r.fix!);
+      if (r.fix == null) return;
+      if (hasActiveDelivery) updateCourierLocation(r.fix!);
+      if (dutyNow) updateMyCourierSpot(r.fix!);
     });
     _tick ??= Timer.periodic(const Duration(minutes: 1), (_) {
       if (Cloud.enabled && Cloud.status.startsWith('تعذر الحفظ')) _save(); // نعيد المحاولة
@@ -1175,6 +1182,7 @@ class AppState extends ChangeNotifier {
 
   void setCourierAvailable(bool v) {
     courierAvailable = v;
+    if (me?.role == Role.courier) me!.onDuty = v;
     _changed();
   }
 
@@ -2576,6 +2584,45 @@ extension Growth on AppState {
       any = true;
     }
     if (any) _changed();
+  }
+
+  /// موقع المندوب المتاح (للمراقبة من الإدارة)
+  void updateMyCourierSpot(GeoFix f) {
+    final u = me;
+    if (u == null || u.role != Role.courier) return;
+    u
+      ..locLat = f.lat
+      ..locLng = f.lng
+      ..locAt = DateTime.now().millisecondsSinceEpoch
+      ..onDuty = courierAvailable;
+    _changed();
+  }
+
+  /// المندوبين للمراقبة: اللي عندهم موقع، الأحدث أول
+  List<AppUser> get trackedCouriers {
+    final l = users.where((u) => u.role == Role.courier && (u.locAt > 0 || orders.any((o) => o.courierPhone == u.phone && o.status == OrderStatus.onTheWay))).toList();
+    int at(AppUser u) {
+      final o = orders.where((o) => o.courierPhone == u.phone && o.status == OrderStatus.onTheWay && o.courierLocAt > 0);
+      return [u.locAt, ...o.map((x) => x.courierLocAt)].reduce((a, b) => a > b ? a : b);
+    }
+    l.sort((a, b) => at(b).compareTo(at(a)));
+    return l;
+  }
+
+  double distanceBetween(double aLat, double aLng, double bLat, double bLng) => Geo.straightKm(aLat, aLng, bLat, bLng) * settings.roadFactor / 100;
+
+  /// آخر موقع معروف للمندوب (من طلبه الحالي أو من موقعه وهو متاح)
+  ({double lat, double lng, int at, Order? order})? courierSpot(String phone) {
+    final u = userByPhone(phone);
+    Order? cur;
+    for (final o in orders) {
+      if (o.courierPhone == phone && o.status == OrderStatus.onTheWay && o.courierLocAt > 0) {
+        if (cur == null || o.courierLocAt > cur.courierLocAt) cur = o;
+      }
+    }
+    if (cur != null && (u == null || cur.courierLocAt >= u.locAt)) return (lat: cur.courierLat, lng: cur.courierLng, at: cur.courierLocAt, order: cur);
+    if (u != null && u.locAt > 0) return (lat: u.locLat, lng: u.locLng, at: u.locAt, order: cur);
+    return null;
   }
 
   bool get hasActiveDelivery => currentPhone != null && orders.any((o) => o.courierPhone == currentPhone && o.status == OrderStatus.onTheWay);

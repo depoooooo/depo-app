@@ -6,6 +6,7 @@ import '../../widgets/common.dart';
 import 'supervisor.dart';
 import 'content_tab.dart';
 import 'finance_tab.dart';
+import 'couriers_monitor.dart';
 import '../../main.dart' show errorLog;
 import '../../widgets/debt_ui.dart' show copyText;
 
@@ -18,10 +19,10 @@ class AdminHome extends StatelessWidget {
     final pending = app.joinRequests.where((r) => r.status == 'pending').length;
     final openC = app.complaints.where((c) => c.status == 'open').length;
     return DefaultTabController(
-      length: 12,
+      length: 13,
       child: Scaffold(
         appBar: roleAppBar('واجهة المدير العام',
-            bottom: roleTabs(['التقارير', 'الحسابات', 'الإعدادات', 'المحتوى', 'المشرفين', 'طلبات الانضمام ($pending)', 'الطلبات', 'محادثات الدعم', 'الشكاوى ($openC)', 'المستخدمين', 'العروض والمحلات', 'سجل العمليات'])),
+            bottom: roleTabs(['التقارير', 'الحسابات', 'الإعدادات', 'المحتوى', 'المشرفين', 'طلبات الانضمام ($pending)', 'الطلبات', 'المندوبين', 'محادثات الدعم', 'الشكاوى ($openC)', 'المستخدمين', 'العروض والمحلات', 'سجل العمليات'])),
         // ignore: prefer_const_constructors
         body: TabBarView(children: [
           ReportsTab(),
@@ -31,6 +32,7 @@ class AdminHome extends StatelessWidget {
           _SupervisorsTab(),
           JoinRequestsTab(),
           OrdersMonitorTab(),
+          CouriersMonitorTab(),
           SupportChatsTab(),
           ComplaintsTab(),
           UsersTab(),
