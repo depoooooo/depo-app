@@ -403,6 +403,7 @@ class Order {
   double courierLat, courierLng; // آخر موقع للمندوب وهو بالطريق (للتتبّع)
   int courierLocAt;
   int peakBonus; // مكافأة وقت الذروة (ضمن أجرة المندوب)
+  bool walletMode; // المندوب دافع رصيد مقدّماً: مبلغ الطلب ينخصم من رصيده عند التسليم
 
   Order({
     required this.id,
@@ -446,6 +447,7 @@ class Order {
     this.courierLng = 0,
     this.courierLocAt = 0,
     this.peakBonus = 0,
+    this.walletMode = false,
   })  : payRule = payRule ?? const [],
         kmFlags = kmFlags ?? [],
         createdAt = createdAt ?? _now();
@@ -500,6 +502,7 @@ class Order {
         'courierLng': courierLng,
         'courierLocAt': courierLocAt,
         'peakBonus': peakBonus,
+        'walletMode': walletMode,
       };
 
   factory Order.fromJson(Map<String, dynamic> j) => Order(
@@ -544,6 +547,7 @@ class Order {
         courierLng: _d(j['courierLng']),
         courierLocAt: (j['courierLocAt'] ?? 0) as int,
         peakBonus: (j['peakBonus'] ?? 0) as int,
+        walletMode: (j['walletMode'] ?? false) as bool,
       );
 
   /// المسافة تحتاج مراجعة قبل تسوية أجور المندوب
@@ -579,17 +583,23 @@ class Settlement {
 
 /// حساب أجرة المندوب بالتفصيل (نفس الحساب بكل مكان حتى ما يصير فرق ولا دينار)
 class CourierPay {
-  final int base, perKm, minPay, maxKm;
-  const CourierPay(this.base, this.perKm, this.minPay, this.maxKm);
-  factory CourierPay.of(List<int> r, AppSettings s) =>
-      r.length == 4 ? CourierPay(r[0], r[1], r[2], r[3]) : CourierPay(s.courierBasePay, s.courierPerKm, s.courierMinPay, s.courierMaxKm);
-  List<int> get rule => [base, perKm, minPay, maxKm];
+  final int base, perKm, minPay, maxKm, maxPay; // maxPay = 0 يعني بدون سقف (طلبات قديمة)
+  const CourierPay(this.base, this.perKm, this.minPay, this.maxKm, [this.maxPay = 0]);
+  factory CourierPay.of(List<int> r, AppSettings s) => r.length >= 5
+      ? CourierPay(r[0], r[1], r[2], r[3], r[4])
+      : r.length == 4
+          ? CourierPay(r[0], r[1], r[2], r[3])
+          : CourierPay(s.courierBasePay, s.courierPerKm, s.courierMinPay, s.courierMaxKm, s.courierMaxPay);
+  List<int> get rule => [base, perKm, minPay, maxKm, maxPay];
 
   /// المسافة تنحسب لأقرب 0.1 كم وما تعبر الحد الأقصى
   double kmOf(double km) => (km.clamp(0, maxKm.toDouble()) * 10).round() / 10;
   int raw(double km) => base + (perKm * kmOf(km)).round();
   int rounded(double km) => (raw(km) / 250).round() * 250;
-  int pay(double km) => rounded(km) < minPay ? minPay : rounded(km);
+  int pay(double km) {
+    final p = rounded(km) < minPay ? minPay : rounded(km);
+    return maxPay > 0 && p > maxPay ? maxPay : p;
+  }
 
   /// شرح الحساب بالأرقام
   String explain(double km) {
@@ -598,6 +608,7 @@ class CourierPay {
     final b = StringBuffer('${iqd(base)} + ${iqd(perKm)} × ${k.toStringAsFixed(1)} كم = ${iqd(r)}');
     if (rounded(km) != r) b.write(' ← تقريب لأقرب 250 = ${iqd(rounded(km))}');
     if (rounded(km) < minPay) b.write(' ← أقل من الحد الأدنى، فتصير ${iqd(minPay)}');
+    if (maxPay > 0 && rounded(km) > maxPay) b.write(' ← أعلى من السقف، فتصير ${iqd(maxPay)}');
     if (km > maxKm) b.write(' (المسافة انحسبت $maxKm كم = الحد الأقصى)');
     return b.toString();
   }
@@ -794,6 +805,10 @@ class AppSettings {
   int gpsMaxAccuracy; // أسوأ دقة GPS مقبولة (متر)
   int peakBonus; // مكافأة المندوب بوقت الذروة (د.ع لكل توصيلة)
   String peakHours; // ساعات الذروة، مثل: 12-15,19-23
+  int courierMaxPay; // أعلى أجرة للتوصيلة
+  int walletMinTopup; // أقل مبلغ لشحن رصيد المندوب
+  int walletLowAlert; // تنبيه المندوب إذا رصيده نزل تحت هذا
+  String paymentMethods; // طرق شحن الرصيد، مفصولة بفاصلة
 
   AppSettings({
     this.restaurantCommission = 15,
@@ -810,8 +825,8 @@ class AppSettings {
     this.promoText = 'توصيل مجاني لأول طلب',
     this.campaignName = 'خصم فوق الخصم',
     this.campaignMinDiscount = 60,
-    this.courierBasePay = 1000,
-    this.courierPerKm = 250,
+    this.courierBasePay = 750,
+    this.courierPerKm = 350,
     this.courierMinPay = 1500,
     this.courierMaxKm = 30,
     this.courierCashCap = 100000,
@@ -819,6 +834,10 @@ class AppSettings {
     this.gpsMaxAccuracy = 150,
     this.peakBonus = 500,
     this.peakHours = '12-15,19-23',
+    this.courierMaxPay = 6000,
+    this.walletMinTopup = 100000,
+    this.walletLowAlert = 20000,
+    this.paymentMethods = 'زين كاش,FIB,كي كارد,كاش بالمكتب',
   });
 
   /// هل الساعة [h] ضمن الذروة؟
@@ -835,7 +854,7 @@ class AppSettings {
   }
 
   /// أجرة المندوب حسب المسافة: ثابت + لكل كم، وما تنزل عن الحد الأدنى (مقرّبة لـ 250)
-  int courierPayFor(double km) => CourierPay(courierBasePay, courierPerKm, courierMinPay, courierMaxKm).pay(km);
+  int courierPayFor(double km) => CourierPay(courierBasePay, courierPerKm, courierMinPay, courierMaxKm, courierMaxPay).pay(km);
 
   Map<String, dynamic> toJson() => {
         'restaurantCommission': restaurantCommission,
@@ -861,6 +880,10 @@ class AppSettings {
         'gpsMaxAccuracy': gpsMaxAccuracy,
         'peakBonus': peakBonus,
         'peakHours': peakHours,
+        'courierMaxPay': courierMaxPay,
+        'walletMinTopup': walletMinTopup,
+        'walletLowAlert': walletLowAlert,
+        'paymentMethods': paymentMethods,
       };
 
   factory AppSettings.fromJson(Map<String, dynamic> j) {
@@ -881,15 +904,20 @@ class AppSettings {
       promoText: (j['promoText'] ?? d.promoText) as String,
       campaignName: ((j['campaignName'] ?? d.campaignName) as String) == 'رخيييييص' ? d.campaignName : (j['campaignName'] ?? d.campaignName) as String,
       campaignMinDiscount: g('campaignMinDiscount', d.campaignMinDiscount),
-      courierBasePay: g('courierBasePay', d.courierBasePay),
-      courierPerKm: g('courierPerKm', d.courierPerKm),
-      courierMinPay: g('courierMinPay', d.courierMinPay),
+      // التسعيرة الجديدة (1,500 إلى 6,000): إذا الإعدادات المحفوظة قبلها، ناخذ الافتراضي الجديد
+      courierBasePay: j.containsKey('courierMaxPay') ? g('courierBasePay', d.courierBasePay) : d.courierBasePay,
+      courierPerKm: j.containsKey('courierMaxPay') ? g('courierPerKm', d.courierPerKm) : d.courierPerKm,
+      courierMinPay: j.containsKey('courierMaxPay') ? g('courierMinPay', d.courierMinPay) : d.courierMinPay,
       courierMaxKm: g('courierMaxKm', d.courierMaxKm),
       courierCashCap: g('courierCashCap', d.courierCashCap),
       roadFactor: g('roadFactor', d.roadFactor),
       gpsMaxAccuracy: g('gpsMaxAccuracy', d.gpsMaxAccuracy),
       peakBonus: g('peakBonus', d.peakBonus),
       peakHours: (j['peakHours'] ?? d.peakHours) as String,
+      courierMaxPay: g('courierMaxPay', d.courierMaxPay),
+      walletMinTopup: g('walletMinTopup', d.walletMinTopup),
+      walletLowAlert: g('walletLowAlert', d.walletLowAlert),
+      paymentMethods: (j['paymentMethods'] ?? d.paymentMethods) as String,
     );
   }
 }

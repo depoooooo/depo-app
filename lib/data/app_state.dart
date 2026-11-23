@@ -986,6 +986,13 @@ class AppState extends ChangeNotifier {
         }
       }
     }
+    if (st == OrderStatus.delivered && o.walletMode && o.courierPhone != null) {
+      // مبلغ الطلب انخصم من رصيد المندوب: إذا نزل تحت حد التنبيه نبلّغه
+      final left = this.walletBalance(o.courierPhone!); // الطلب صار مسلّم فمبلغه انخصم
+      if (left < settings.walletLowAlert) {
+        notify(o.courierPhone!, left <= 0 ? 'رصيدك خلص (${iqd(left)}) — اشحن رصيد حتى توصلك مهام جديدة' : 'رصيدك صار ${iqd(left)} — اشحن قريباً حتى ما توقف المهام');
+      }
+    }
     if (st == OrderStatus.delivered) {
       o.deliveredAt = DateTime.now().millisecondsSinceEpoch;
       if (paidCourier(o)) {
@@ -1098,14 +1105,14 @@ class AppState extends ChangeNotifier {
 
   /// النقد اللي بيد المندوب وبعده ما سلّمه لـ Depo
   int cashOf(String phone) => orders
-      .where((o) => o.courierPhone == phone && o.status == OrderStatus.delivered && !o.cashSettled && !selfDelivered(o))
+      .where((o) => o.courierPhone == phone && o.status == OrderStatus.delivered && !o.cashSettled && !o.walletMode && !selfDelivered(o))
       .fold(0, (s, o) => s + o.total);
   int get courierCash => currentPhone == null ? 0 : cashOf(currentPhone!);
 
   /// المندوبين اللي بيدهم نقد (للمشرف)
   Map<String, int> get couriersCash {
     final m = <String, int>{};
-    for (final o in orders.where((o) => o.courierPhone != null && o.status == OrderStatus.delivered && !o.cashSettled && !selfDelivered(o))) {
+    for (final o in orders.where((o) => o.courierPhone != null && o.status == OrderStatus.delivered && !o.cashSettled && !o.walletMode && !selfDelivered(o))) {
       m[o.courierPhone!] = (m[o.courierPhone!] ?? 0) + o.total;
     }
     return m;
@@ -1115,7 +1122,7 @@ class AppState extends ChangeNotifier {
   /// استلام النقد من المندوب. بالسيرفر نتأكد إن كل طلب ما انستلم نقده قبل (حتى لو مشرفين ضغطوا سوا)
   Future<String?> settleCourier(String phone, {int? expected}) async {
     if (!canAny([Perm.operations, Perm.finance])) return 'ما عندك صلاحية';
-    final list = orders.where((o) => o.courierPhone == phone && o.status == OrderStatus.delivered && !o.cashSettled && !selfDelivered(o)).toList();
+    final list = orders.where((o) => o.courierPhone == phone && o.status == OrderStatus.delivered && !o.cashSettled && !o.walletMode && !selfDelivered(o)).toList();
     if (list.isEmpty) return 'ماكو نقد بيده';
     final amount = list.fold(0, (s, o) => s + o.total);
     if (expected != null && expected != amount) return 'المبلغ تغيّر هسه (صار ${iqd(amount)}) — تأكد من المندوب وأعد';
@@ -1173,6 +1180,7 @@ class AppState extends ChangeNotifier {
   /// المندوب ياخذ المهمة. بالسيرفر نتأكد ما أخذها غيره بنفس اللحظة.
   Future<bool> takeTask(Order o) async {
     if (o.courierPhone != null || currentPhone == null) return false;
+    if (this.walletAvailable(currentPhone!) < o.total) return false; // رصيده ما يغطي مبلغ الطلب
     if (Cloud.enabled) {
       final db = Cloud.db!;
       try {
@@ -1182,11 +1190,12 @@ class AppState extends ChangeNotifier {
           if (d == null || d['courierPhone'] != null) return false;
           final st = d['status'];
           if (st != 'ready' && st != 'preparing') return false;
-          tx.update(ref, {'courierPhone': currentPhone});
+          tx.update(ref, {'courierPhone': currentPhone, 'walletMode': true});
           return true;
         }).timeout(const Duration(seconds: 15));
         if (!ok) return false;
         o.courierPhone = currentPhone;
+        o.walletMode = true;
         _markSynced('orders', o.id);
         notifyListeners();
         return true;
@@ -1195,6 +1204,7 @@ class AppState extends ChangeNotifier {
       }
     }
     o.courierPhone = currentPhone;
+    o.walletMode = true;
     _changed();
     return true;
   }
@@ -2099,7 +2109,7 @@ extension Finance on AppState {
 
   /// النقد: كل اللي حصّله المندوب − كل اللي سلّمه (من سجل الاستلام)
   int cashCollectedBy(String phone) =>
-      orders.where((o) => o.courierPhone == phone && o.status == OrderStatus.delivered && paidCourier(o)).fold(0, (s, o) => s + o.total);
+      orders.where((o) => o.courierPhone == phone && o.status == OrderStatus.delivered && paidCourier(o) && !o.walletMode).fold(0, (s, o) => s + o.total);
   int cashHandedBy(String phone) => settlements.where((x) => x.kind == 'cash' && x.target == phone).fold(0, (s, x) => s - x.amount);
   List<Settlement> cashRecordsOf(String phone) => settlements.where((x) => x.kind == 'cash' && x.target == phone).toList();
 
@@ -2115,7 +2125,7 @@ extension Finance on AppState {
     o.kmReviewed = true;
     if (!o.kmFlags.contains('edited:${oldKm.toStringAsFixed(1)}')) o.kmFlags.add('edited:${oldKm.toStringAsFixed(1)}');
     if (o.status == OrderStatus.delivered && paidCourier(o)) {
-      if (o.payRule.length != 4) o.payRule = cp.rule;
+      if (o.payRule.length < 4) o.payRule = cp.rule;
       o.courierPay = cp.pay(o.distanceKm) + o.peakBonus;
     }
     _log('تعديل مسافة الطلب #${o.id} إلى ${o.distanceKm.toStringAsFixed(1)} كم (الأجرة ${iqd(old)} ← ${iqd(o.courierPay)})');
@@ -2566,4 +2576,97 @@ extension Growth on AppState {
   }
 
   bool get hasActiveDelivery => currentPhone != null && orders.any((o) => o.courierPhone == currentPhone && o.status == OrderStatus.onTheWay);
+}
+
+
+// ======================= رصيد المندوب (دفع مقدّم) =======================
+// المندوب يشحن رصيد (أقل شي 100,000) بطرق الدفع، وكل توصيلة: يستلم الكاش من الزبون وينخصم مبلغ الطلب من رصيده.
+// الرصيد ينحسب من السجل نفسه كل مرة: الشحنات المؤكدة − مبالغ الطلبات المسلّمة. ولا رقم مخزون ممكن يختلف.
+extension Wallet on AppState {
+  int walletTopups(String phone) => settlements.where((x) => x.kind == 'topup' && x.target == phone).fold(0, (a, x) => a + x.amount);
+  int walletUsed(String phone) =>
+      orders.where((o) => o.courierPhone == phone && o.walletMode && o.status == OrderStatus.delivered).fold(0, (a, o) => a + o.total);
+  int walletReserved(String phone) => orders.where((o) => o.courierPhone == phone && o.walletMode && o.isOpen).fold(0, (a, o) => a + o.total);
+  int walletBalance(String phone) => walletTopups(phone) - walletUsed(phone);
+  /// المتاح لمهام جديدة = الرصيد − مبالغ المهام اللي بيده هسه
+  int walletAvailable(String phone) => walletBalance(phone) - walletReserved(phone);
+
+  List<Settlement> topupRequests({String? phone}) =>
+      settlements.where((x) => x.kind == 'topup_req' && (phone == null || x.target == phone)).toList();
+
+  /// حركات الرصيد (للمندوب والمالية)، الأحدث أول
+  List<({int at, String title, int amount})> walletMoves(String phone) {
+    final l = <({int at, String title, int amount})>[
+      for (final s in settlements.where((x) => x.kind == 'topup' && x.target == phone)) (at: s.at, title: 'شحن رصيد${s.note.isEmpty ? '' : ' • ${s.note}'}', amount: s.amount),
+      for (final o in orders.where((o) => o.courierPhone == phone && o.walletMode && o.status == OrderStatus.delivered))
+        (at: o.deliveredAt > 0 ? o.deliveredAt : o.createdAt, title: 'طلب #${o.id} (${storeById(o.storeId)?.name ?? ''})', amount: -o.total),
+    ];
+    l.sort((a, b) => b.at.compareTo(a.at));
+    return l;
+  }
+
+  /// المندوب يطلب شحن رصيد (بعد ما يحوّل المبلغ بطريقة دفع). المالية تأكد.
+  String? requestTopup(int amount, String method, String ref) {
+    final p = currentPhone;
+    if (p == null) return 'سجّل دخول';
+    if (amount < settings.walletMinTopup) return 'أقل مبلغ للشحن ${iqd(settings.walletMinTopup)}';
+    if (topupRequests(phone: p).isNotEmpty) return 'عندك طلب شحن بانتظار التأكيد';
+    settlements.insert(
+      0,
+      Settlement(
+        id: 'topup_${DateTime.now().millisecondsSinceEpoch}',
+        kind: 'topup_req',
+        target: p,
+        month: monthKey(DateTime.now()),
+        amount: amount,
+        at: DateTime.now().millisecondsSinceEpoch,
+        by: me?.name ?? p,
+        note: [method, if (ref.trim().isNotEmpty) 'رقم العملية ${ref.trim()}'].join(' • '),
+      ),
+    );
+    _log('طلب شحن رصيد ${iqd(amount)} من المندوب $p ($method)');
+    _changed();
+    return null;
+  }
+
+  /// المالية تأكد الشحن بعد ما توصل الفلوس (بـ transaction حتى ما ينضاف مرتين)
+  Future<String?> decideTopup(Settlement req, {required bool approve, String reason = ''}) async {
+    if (!canFinance) return 'ما عندك صلاحية المالية';
+    if (req.kind != 'topup_req') return 'انحسم قبل';
+    final kind = approve ? 'topup' : 'topup_rej';
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final note = approve ? req.note : [req.note, if (reason.isNotEmpty) 'سبب الرفض: $reason'].join(' • ');
+    if (Cloud.enabled) {
+      final db = Cloud.db!;
+      String? fail;
+      try {
+        await db.runTransaction((tx) async {
+          final ref = db.collection('settlements').doc(req.id);
+          final d = (await tx.get(ref)).data();
+          if (d == null || d['kind'] != 'topup_req') {
+            fail = 'هذا الطلب انحسم قبل شوية من جهاز ثاني';
+            return;
+          }
+          tx.update(ref, {'kind': kind, 'by': _who(), 'at': now, 'note': note});
+        }).timeout(const Duration(seconds: 20));
+      } catch (_) {
+        return 'ماكو اتصال، جرّب مرة ثانية';
+      }
+      if (fail != null) return fail;
+    }
+    final i = settlements.indexWhere((x) => x.id == req.id);
+    final done = Settlement(id: req.id, kind: kind, target: req.target, month: req.month, amount: req.amount, at: now, by: _who(), note: note);
+    if (i >= 0) settlements[i] = done;
+    if (Cloud.enabled) _markSynced('settlements', req.id);
+    notify(req.target, approve ? 'انضاف رصيد ${iqd(req.amount)} — رصيدك هسه ${iqd(walletBalance(req.target))}' : 'ما انضاف الشحن (${iqd(req.amount)})${reason.isEmpty ? '' : ': $reason'}');
+    _log('${approve ? 'تأكيد' : 'رفض'} شحن رصيد ${iqd(req.amount)} للمندوب ${req.target}');
+    _changed();
+    return null;
+  }
+
+  /// المندوبين اللي عندهم رصيد أو حركات
+  List<String> get walletCouriers => {
+        for (final s in settlements.where((x) => x.kind.startsWith('topup'))) s.target,
+        for (final o in orders.where((o) => o.walletMode && o.courierPhone != null)) o.courierPhone!,
+      }.toList();
 }

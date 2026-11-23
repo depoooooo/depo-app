@@ -28,7 +28,7 @@ class _FinanceTabState extends State<FinanceTab> {
         final couriers = app.courierStatements(m);
         final current = app.isCurrentMonth(m);
         final cashPhones = {
-          for (final o in app.orders) if (o.status == OrderStatus.delivered && o.courierPhone != null && app.paidCourier(o)) o.courierPhone!,
+          for (final o in app.orders) if (o.status == OrderStatus.delivered && o.courierPhone != null && app.paidCourier(o) && !o.walletMode) o.courierPhone!,
         }.toList();
         return ListView(padding: const EdgeInsets.fromLTRB(16, 12, 16, 96), children: [
           SizedBox(
@@ -154,6 +154,59 @@ class _FinanceTabState extends State<FinanceTab> {
                 ]),
               ]),
             ),
+          // ---------- رصيد المندوبين ----------
+          SectionTitle('شحن رصيد المندوبين${app.topupRequests().isEmpty ? '' : ' (${app.topupRequests().length} بانتظار)'}'),
+          const Note('المندوب يحوّل المبلغ بطريقة دفع ويطلب الشحن. تأكد إن الفلوس وصلت قبل «تأكيد».'),
+          for (final r in app.topupRequests())
+            AppCard(
+              borderColor: DepoColors.accent,
+              child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                Row(children: [
+                  Expanded(child: Text(app.userByPhone(r.target)?.name ?? r.target, style: const TextStyle(fontWeight: FontWeight.w900))),
+                  Text(iqd(r.amount), style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
+                ]),
+                Note('${r.note} • ${dateTimeLabel(r.at)}'),
+                if (app.canFinance)
+                  Row(children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        style: OutlinedButton.styleFrom(minimumSize: const Size(0, 42), foregroundColor: DepoColors.danger, side: const BorderSide(color: DepoColors.danger)),
+                        onPressed: () async {
+                          final err = await app.decideTopup(r, approve: false, reason: 'ما وصل المبلغ');
+                          if (context.mounted) toast(context, err ?? 'انرفض الطلب');
+                        },
+                        child: const Text('رفض'),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: FilledButton(
+                        style: FilledButton.styleFrom(minimumSize: const Size(0, 42)),
+                        onPressed: () async {
+                          if (!await confirmDialog(context, 'تأكد الشحن؟', 'وصلك ${iqd(r.amount)} من ${app.userByPhone(r.target)?.name ?? r.target}؟', ok: 'إي، وصل')) return;
+                          final err = await app.decideTopup(r, approve: true);
+                          if (context.mounted) toast(context, err ?? 'انضاف الرصيد');
+                        },
+                        child: const Text('تأكيد'),
+                      ),
+                    ),
+                  ]),
+              ]),
+            ),
+          for (final p in app.walletCouriers)
+            AppCard(
+              child: Row(children: [
+                const CircleAvatar(backgroundColor: DepoColors.soft, child: Icon(Icons.account_balance_wallet_outlined, color: DepoColors.dark)),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(app.userByPhone(p)?.name ?? p, style: const TextStyle(fontWeight: FontWeight.w900)),
+                    Text('شحن ${iqd(app.walletTopups(p))} − طلبات ${iqd(app.walletUsed(p))}', style: const TextStyle(fontSize: 12, color: DepoColors.muted)),
+                  ]),
+                ),
+                Text(iqd(app.walletBalance(p)), style: TextStyle(fontWeight: FontWeight.w900, color: app.walletBalance(p) < app.settings.walletLowAlert ? DepoColors.danger : DepoColors.dark)),
+              ]),
+            ),
           // ---------- النقد ----------
           const SectionTitle('النقد بيد المندوبين (كل الشهور)'),
           const Note('المندوب يحصّل من الزبون البضاعة + التوصيل، ويسلّمها لديبو. الاستلام من تبويب «الطلبات» ← «استلمت».'),
@@ -269,6 +322,9 @@ class SettlementTile extends StatelessWidget {
     final what = switch (s.kind) {
       'store' => s.amount > 0 ? 'دفعنا للمحل' : 'استلمنا من المحل',
       'courier' => 'دفعنا أجور المندوب',
+      'topup' => 'شحن رصيد المندوب',
+      'topup_req' => 'طلب شحن رصيد (بانتظار)',
+      'topup_rej' => 'طلب شحن مرفوض',
       _ => 'استلمنا نقد من المندوب (${s.orderIds.length} طلب)',
     };
     return AppCard(
@@ -282,7 +338,7 @@ class SettlementTile extends StatelessWidget {
                 style: const TextStyle(fontSize: 11, color: DepoColors.muted)),
           ]),
         ),
-        Text(iqd(s.amount.abs()), style: TextStyle(fontWeight: FontWeight.w900, color: s.amount > 0 ? DepoColors.danger : DepoColors.success)),
+        Text(iqd(s.amount.abs()), style: TextStyle(fontWeight: FontWeight.w900, color: s.kind.startsWith('topup') ? (s.kind == 'topup' ? DepoColors.success : DepoColors.muted) : (s.amount > 0 ? DepoColors.danger : DepoColors.success))),
         if (app.me?.role == Role.admin)
           IconButton(
             tooltip: 'إلغاء',

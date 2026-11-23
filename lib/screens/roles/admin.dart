@@ -174,7 +174,10 @@ class _SettingsTabState extends State<_SettingsTab> {
       'courierPerKm': TextEditingController(text: '${s.courierPerKm}'),
       'courierMinPay': TextEditingController(text: '${s.courierMinPay}'),
       'courierMaxKm': TextEditingController(text: '${s.courierMaxKm}'),
-      'courierCashCap': TextEditingController(text: '${s.courierCashCap}'),
+      'courierMaxPay': TextEditingController(text: '${s.courierMaxPay}'),
+      'walletMinTopup': TextEditingController(text: '${s.walletMinTopup}'),
+      'walletLowAlert': TextEditingController(text: '${s.walletLowAlert}'),
+      'paymentMethods': TextEditingController(text: s.paymentMethods),
       'roadFactor': TextEditingController(text: '${s.roadFactor}'),
       'gpsMaxAccuracy': TextEditingController(text: '${s.gpsMaxAccuracy}'),
       'peakBonus': TextEditingController(text: '${s.peakBonus}'),
@@ -216,10 +219,14 @@ class _SettingsTabState extends State<_SettingsTab> {
     s.courierPerKm = v('courierPerKm', s.courierPerKm);
     s.courierMinPay = v('courierMinPay', s.courierMinPay);
     s.courierMaxKm = v('courierMaxKm', s.courierMaxKm).clamp(1, 200);
-    s.courierCashCap = v('courierCashCap', s.courierCashCap);
+    s.courierMaxPay = v('courierMaxPay', s.courierMaxPay);
+    if (s.courierMaxPay < s.courierMinPay) s.courierMaxPay = s.courierMinPay;
+    s.walletMinTopup = v('walletMinTopup', s.walletMinTopup);
+    s.walletLowAlert = v('walletLowAlert', s.walletLowAlert);
+    s.paymentMethods = c['paymentMethods']!.text.replaceAll('،', ',').split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).join(',');
     s.roadFactor = v('roadFactor', s.roadFactor).clamp(100, 250);
     s.gpsMaxAccuracy = v('gpsMaxAccuracy', s.gpsMaxAccuracy).clamp(20, 1000);
-    s.peakBonus = v('peakBonus', s.peakBonus);
+    s.peakBonus = c['peakBonus']!.text.trim().isEmpty ? 0 : v('peakBonus', s.peakBonus); // فارغة = صفر
     final ph = c['peakHours']!.text.replaceAll(' ', '').replaceAll('،', ',');
     if (RegExp(r'^(\d{1,2}-\d{1,2})(,\d{1,2}-\d{1,2})*$').hasMatch(ph) || ph.isEmpty) s.peakHours = ph;
     s.campaignName = campaign.text.trim().isEmpty ? s.campaignName : campaign.text.trim();
@@ -241,7 +248,15 @@ class _SettingsTabState extends State<_SettingsTab> {
         const SectionTitle('أجرة المندوب (حسب المسافة)'),
         Row(children: [Expanded(child: f('courierBasePay', 'ثابت لكل طلب')), const SizedBox(width: 10), Expanded(child: f('courierPerKm', 'لكل كيلومتر'))]),
         Row(children: [Expanded(child: f('courierMinPay', 'الحد الأدنى للأجرة')), const SizedBox(width: 10), Expanded(child: f('courierMaxKm', 'أقصى مسافة تنحسب (كم)'))]),
-        f('courierCashCap', 'سقف النقد بيد المندوب'),
+        Row(children: [Expanded(child: f('courierMaxPay', 'أعلى أجرة للتوصيلة')), const SizedBox(width: 10), const Expanded(child: SizedBox())]),
+        const SectionTitle('رصيد المندوب (دفع مقدّم)'),
+        Row(children: [Expanded(child: f('walletMinTopup', 'أقل مبلغ شحن')), const SizedBox(width: 10), Expanded(child: f('walletLowAlert', 'تنبيه إذا الرصيد أقل من'))]),
+        Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: TextField(controller: c['paymentMethods'], decoration: const InputDecoration(labelText: 'طرق الدفع للشحن', helperText: 'مفصولة بفاصلة، مثل: زين كاش,FIB,كي كارد,كاش بالمكتب')),
+        ),
+        const Text('المندوب يشحن رصيد، وكل توصيلة يستلم الكاش من الزبون وينخصم مبلغ الطلب من رصيده. ما يقبل مهمة إذا رصيده ما يكفيها.', style: TextStyle(fontSize: 12, color: DepoColors.muted)),
+        const SizedBox(height: 8),
         Row(children: [Expanded(child: f('roadFactor', 'معامل الطرق % (130 = الطريق أطول 30%)')), const SizedBox(width: 10), Expanded(child: f('gpsMaxAccuracy', 'أسوأ دقة GPS مقبولة (متر)'))]),
         const Text('المسافة = الخط المستقيم بين المحل ومكان التسليم (GPS) × معامل الطرق.', style: TextStyle(fontSize: 12, color: DepoColors.muted)),
         const SizedBox(height: 8),
