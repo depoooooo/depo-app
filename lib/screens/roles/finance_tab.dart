@@ -573,7 +573,8 @@ class CourierStatementScreen extends StatelessWidget {
                 for (final p in b.payments.reversed) MoneyRow('استلم ${dateTimeLabel(p.at)}${p.note.isEmpty ? '' : ' • ${p.note}'}', p.amount, sign: '−'),
                 if (b.payments.isNotEmpty) MoneyRow('الباقي', b.remaining, bold: true, color: b.remaining == 0 ? DepoColors.success : DepoColors.danger),
                 const Divider(),
-                MoneyRow('النقد اللي بيده هسه (كل الشهور)', app.cashOf(phone), color: DepoColors.danger),
+                MoneyRow('رصيده هسه', app.walletBalance(phone), color: DepoColors.dark),
+                if (app.cashOf(phone) > 0) MoneyRow('نقد قديم بيده (قبل نظام الرصيد)', app.cashOf(phone), color: DepoColors.danger),
                 const Note('الأجور تنحسب لكل طلب بتسعيرة يوم التسليم، وموضّحة تحت طلب طلب.'),
                 Row(children: [StatusBadge(b), const Spacer()]),
               ]),
@@ -608,7 +609,7 @@ class CourierStatementScreen extends StatelessWidget {
                   Note('المسافة: ${app.kmSourceText(o)}', color: o.kmNeedsReview ? const Color(0xFF8A5A00) : null),
                   Note('الأجرة: ${CourierPay.of(o.payRule, app.settings).explain(o.distanceKm)}${o.peakBonus > 0 ? ' + مكافأة الذروة ${iqd(o.peakBonus)}' : ''}'),
                   MoneyRow('الأجرة', o.courierPay, bold: true),
-                  MoneyRow('حصّل من الزبون (يسلّمه لديبو)', o.total),
+                  MoneyRow(o.walletMode ? 'حصّل من الزبون (انخصم من رصيده)' : 'حصّل من الزبون (يسلّمه لديبو)', o.total),
                   Wrap(spacing: 8, children: [
                     if (o.endLat != 0)
                       TextButton.icon(
