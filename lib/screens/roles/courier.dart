@@ -54,7 +54,7 @@ class CourierHome extends StatelessWidget {
                 trailing: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
                   Text('استلم من: ${app.storeById(o.storeId)?.fullName ?? ''}', style: const TextStyle(fontWeight: FontWeight.w700)),
                   Text('سلّم إلى: ${o.address}', style: const TextStyle(fontWeight: FontWeight.w700)),
-                  Text('حصّل من الزبون: ${iqd(o.total)} (ينخصم من رصيدك)', style: const TextStyle(color: DepoColors.dark, fontWeight: FontWeight.w800)),
+                  Text('حصّل من الزبون: ${iqd(o.total)} كاش (ينخصم من رصيدك وأجرتك تنضاف)', style: const TextStyle(color: DepoColors.dark, fontWeight: FontWeight.w800)),
                   const SizedBox(height: 6),
                   if (avail < o.total)
                     Text('رصيدك المتاح (${iqd(avail)}) ما يكفي هذا الطلب — اشحن رصيد', style: const TextStyle(color: DepoColors.danger, fontWeight: FontWeight.w800, fontSize: 12)),
@@ -206,7 +206,7 @@ class _Earnings extends StatelessWidget {
           Expanded(child: Text('أجوري · ${monthLabel(now.month)}', style: const TextStyle(fontWeight: FontWeight.w900))),
           Text(iqd(now.earned), style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: DepoColors.dark)),
         ]),
-        Text('${now.orders.length} توصيلة • ${now.km.toStringAsFixed(1)} كم • التسوية آخر الشهر', style: const TextStyle(fontSize: 12, color: DepoColors.muted)),
+        Text('${now.orders.length} توصيلة • ${now.km.toStringAsFixed(1)} كم • ${now.walletPaid == now.earned ? 'انضافت لرصيدك مباشرة' : 'التسوية آخر الشهر'}', style: const TextStyle(fontSize: 12, color: DepoColors.muted)),
         if (app.courierRatingOf(app.currentPhone!).$2 > 0)
           Text('تقييمك من الزبائن: ${app.courierRatingOf(app.currentPhone!).$1.toStringAsFixed(1)} ★ (${app.courierRatingOf(app.currentPhone!).$2} تقييم)',
               style: const TextStyle(fontSize: 12, color: DepoColors.dark, fontWeight: FontWeight.w700)),
@@ -254,7 +254,7 @@ class _WalletCard extends StatelessWidget {
         Text(
           low
               ? (bal <= 0 ? 'رصيدك خلص — اشحن حتى تقبل مهام جديدة' : 'رصيدك قليل — اشحن قريباً حتى ما توقف المهام')
-              : 'كل توصيلة: تستلم الكاش من الزبون، ومبلغ الطلب ينخصم من رصيدك تلقائياً',
+              : 'كل توصيلة: تستلم الكاش من الزبون فينخصم من رصيدك، وأجرتك تنضاف لرصيدك مباشرة',
           style: TextStyle(fontSize: 12, color: low ? DepoColors.danger : DepoColors.muted, fontWeight: low ? FontWeight.w800 : FontWeight.w500),
         ),
         const SizedBox(height: 10),

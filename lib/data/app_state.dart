@@ -986,13 +986,6 @@ class AppState extends ChangeNotifier {
         }
       }
     }
-    if (st == OrderStatus.delivered && o.walletMode && o.courierPhone != null) {
-      // مبلغ الطلب انخصم من رصيد المندوب: إذا نزل تحت حد التنبيه نبلّغه
-      final left = this.walletBalance(o.courierPhone!); // الطلب صار مسلّم فمبلغه انخصم
-      if (left < settings.walletLowAlert) {
-        notify(o.courierPhone!, left <= 0 ? 'رصيدك خلص (${iqd(left)}) — اشحن رصيد حتى توصلك مهام جديدة' : 'رصيدك صار ${iqd(left)} — اشحن قريباً حتى ما توقف المهام');
-      }
-    }
     if (st == OrderStatus.delivered) {
       o.deliveredAt = DateTime.now().millisecondsSinceEpoch;
       if (paidCourier(o)) {
@@ -1012,6 +1005,14 @@ class AppState extends ChangeNotifier {
           Cloud.db!.collection('users').doc(u.phone).update({'points': fs.FieldValue.increment(pts)}).catchError((_) {});
           _markFieldSynced('users', u.phone, 'points');
         }
+      }
+    }
+    if (st == OrderStatus.delivered && o.walletMode && o.courierPhone != null) {
+      // مثل شركات التوصيل: الكاش صار بيد المندوب، فينخصم مبلغه من المحفظة وأجرته تنضاف إلها
+      final left = this.walletBalance(o.courierPhone!);
+      notify(o.courierPhone!, 'طلب #${o.id}: انخصم ${iqd(o.total)} (الكاش اللي استلمته) وانضافت أجرتك ${iqd(o.courierPay)} — رصيدك ${iqd(left)}');
+      if (left < settings.walletLowAlert) {
+        notify(o.courierPhone!, left <= 0 ? 'رصيدك خلص (${iqd(left)}) — اشحن رصيد حتى توصلك مهام جديدة' : 'رصيدك قليل (${iqd(left)}) — اشحن قريباً حتى ما توقف المهام');
       }
     }
     notify(o.customerPhone, 'طلبك #${o.id}: ${orderStatusNames[st]}${reason.isEmpty ? '' : ' — $reason'}');
@@ -2016,6 +2017,7 @@ class CourierStatement {
   final Balance balance;
   const CourierStatement(this.phone, this.month, this.orders, this.balance);
   int get earned => orders.fold(0, (s, o) => s + o.courierPay);
+  int get walletPaid => orders.where((o) => o.walletMode).fold(0, (s, o) => s + o.courierPay); // انضافت لمحفظته
   double get km => orders.fold(0.0, (s, o) => s + o.distanceKm);
   int get collected => orders.fold(0, (s, o) => s + o.total);
 }
@@ -2076,7 +2078,8 @@ extension Finance on AppState {
 
   CourierStatement courierStatement(String phone, String month) {
     final list = deliveredIn(month).where((o) => o.courierPhone == phone && paidCourier(o)).toList()..sort((a, b) => b.deliveredAt.compareTo(a.deliveredAt));
-    return CourierStatement(phone, month, list, Balance(list.fold(0, (s, o) => s + o.courierPay), paymentsOf('courier', phone, month)));
+    // أجور طلبات المحفظة انضافت لرصيده مباشرة؛ المستحق بالتسوية الشهرية بس للطلبات القديمة (قبل المحفظة)
+    return CourierStatement(phone, month, list, Balance(list.where((o) => !o.walletMode).fold(0, (s, o) => s + o.courierPay), paymentsOf('courier', phone, month)));
   }
 
   List<CourierStatement> courierStatements(String month) {
@@ -2263,7 +2266,7 @@ extension Finance on AppState {
     if (amount.sign != remaining.sign) return 'اتجاه المبلغ غلط';
     if (amount.abs() > remaining.abs()) return 'المبلغ أكثر من الباقي (${iqd(remaining.abs())})';
     if (kind == 'courier') {
-      final n = courierStatement(target, month).orders.where((o) => o.kmNeedsReview).length;
+      final n = courierStatement(target, month).orders.where((o) => !o.walletMode && o.kmNeedsReview).length;
       if (n > 0) return 'راجع مسافة $n ${n == 1 ? 'توصيلة' : 'توصيلات'} أول (معلّمة «تحتاج مراجعة»)';
     }
     final localPaid = paymentsOf(kind, target, month).fold(0, (a, p) => a + p.amount);
@@ -2587,7 +2590,11 @@ extension Wallet on AppState {
   int walletUsed(String phone) =>
       orders.where((o) => o.courierPhone == phone && o.walletMode && o.status == OrderStatus.delivered).fold(0, (a, o) => a + o.total);
   int walletReserved(String phone) => orders.where((o) => o.courierPhone == phone && o.walletMode && o.isOpen).fold(0, (a, o) => a + o.total);
-  int walletBalance(String phone) => walletTopups(phone) - walletUsed(phone);
+  /// أجور التوصيلات اللي انضافت للمحفظة مباشرة
+  int walletEarned(String phone) =>
+      orders.where((o) => o.courierPhone == phone && o.walletMode && o.status == OrderStatus.delivered).fold(0, (a, o) => a + o.courierPay);
+  /// الرصيد = الشحنات − كاش الطلبات اللي استلمها + أجوره
+  int walletBalance(String phone) => walletTopups(phone) - walletUsed(phone) + walletEarned(phone);
   /// المتاح لمهام جديدة = الرصيد − مبالغ المهام اللي بيده هسه
   int walletAvailable(String phone) => walletBalance(phone) - walletReserved(phone);
 
@@ -2598,8 +2605,10 @@ extension Wallet on AppState {
   List<({int at, String title, int amount})> walletMoves(String phone) {
     final l = <({int at, String title, int amount})>[
       for (final s in settlements.where((x) => x.kind == 'topup' && x.target == phone)) (at: s.at, title: 'شحن رصيد${s.note.isEmpty ? '' : ' • ${s.note}'}', amount: s.amount),
-      for (final o in orders.where((o) => o.courierPhone == phone && o.walletMode && o.status == OrderStatus.delivered))
-        (at: o.deliveredAt > 0 ? o.deliveredAt : o.createdAt, title: 'طلب #${o.id} (${storeById(o.storeId)?.name ?? ''})', amount: -o.total),
+      for (final o in orders.where((o) => o.courierPhone == phone && o.walletMode && o.status == OrderStatus.delivered)) ...[
+        (at: o.deliveredAt > 0 ? o.deliveredAt : o.createdAt, title: 'كاش طلب #${o.id} (${storeById(o.storeId)?.name ?? ''})', amount: -o.total),
+        if (o.courierPay > 0) (at: (o.deliveredAt > 0 ? o.deliveredAt : o.createdAt) + 1, title: 'أجرتك عن طلب #${o.id}', amount: o.courierPay),
+      ],
     ];
     l.sort((a, b) => b.at.compareTo(a.at));
     return l;

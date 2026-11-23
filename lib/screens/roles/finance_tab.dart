@@ -569,7 +569,9 @@ class CourierStatementScreen extends StatelessWidget {
             AppCard(
               child: Column(children: [
                 Note('${st.orders.length} توصيلة • ${st.km.toStringAsFixed(1)} كم${app.courierRatingOf(phone).$2 == 0 ? '' : ' • التقييم ${app.courierRatingOf(phone).$1.toStringAsFixed(1)} ★ (${app.courierRatingOf(phone).$2})'}'),
-                MoneyRow('الأجور المستحقة', st.earned, bold: true, color: DepoColors.dark),
+                MoneyRow('كل الأجور', st.earned, bold: true, color: DepoColors.dark),
+                if (st.walletPaid > 0) MoneyRow('انضافت لمحفظته مباشرة', st.walletPaid, sign: '−'),
+                if (st.walletPaid > 0) MoneyRow('مستحق بالتسوية الشهرية', b.due, bold: true),
                 for (final p in b.payments.reversed) MoneyRow('استلم ${dateTimeLabel(p.at)}${p.note.isEmpty ? '' : ' • ${p.note}'}', p.amount, sign: '−'),
                 if (b.payments.isNotEmpty) MoneyRow('الباقي', b.remaining, bold: true, color: b.remaining == 0 ? DepoColors.success : DepoColors.danger),
                 const Divider(),
