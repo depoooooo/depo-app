@@ -77,7 +77,7 @@ class _SearchScreenState extends State<SearchScreen> {
       case _Collection.bakery:
         list = list.where((o) => app.storeById(o.storeId)!.name.contains('فرن') || o.title.contains('صمون') || o.title.contains('معجنات')).toList();
       case _Collection.under3000:
-        list = list.where((o) => o.price <= 3000).toList();
+        list = list.where((o) => o.shownPrice <= 3000).toList();
       case _Collection.sweets:
         list = list.where((o) => app.storeById(o.storeId)!.name.contains('حلويات') || o.title.contains('كنافة')).toList();
       case _Collection.none:

@@ -39,7 +39,7 @@ class CartScreen extends StatelessWidget {
                     Expanded(
                       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                         Text(line.offer.title, style: const TextStyle(fontWeight: FontWeight.w800)),
-                        PriceTag(price: line.offer.price, original: line.offer.originalPrice, size: 15),
+                        PriceTag(price: line.offer.shownPrice, original: line.offer.shownOriginal, size: 15),
                         if (_lineIssue(line) != null)
                           Text(_lineIssue(line)!, style: const TextStyle(fontSize: 12, color: DepoColors.danger, fontWeight: FontWeight.w800)),
                       ]),

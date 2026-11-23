@@ -58,6 +58,7 @@ class _FinanceTabState extends State<FinanceTab> {
             child: Column(children: [
               const _Head('شلون انحسب الربح'),
               MoneyRow('عمولات المطاعم والتجار', r.commission, sign: '+'),
+              if (r.markup > 0) MoneyRow('زيادة الأسعار (المخفية)', r.markup, sign: '+'),
               MoneyRow('رسوم التوصيل اللي دفعها الزبائن لمندوبي ديبو', r.deliveryFees, sign: '+'),
               MoneyRow('أجور المندوبين (حسب الكيلومتر)', r.courierPay, sign: '−', color: DepoColors.danger),
               const Divider(),
@@ -76,7 +77,7 @@ class _FinanceTabState extends State<FinanceTab> {
               ]),
               const SizedBox(height: 6),
               MoneyRow('كل اللي دفعه الزبائن (بضاعة + توصيل)', r.customersPaid),
-              MoneyRow('= حصة المحلات (بضاعة − عمولة + توصيل مندوبهم)', r.storesShare),
+              MoneyRow('= حصة المحلات (بسعرها − عمولة + توصيل مندوبهم)', r.storesShare),
               MoneyRow('+ أجور المندوبين', r.courierPay),
               MoneyRow('+ ربح ديبو', r.profit),
               MoneyRow('المجموع', r.storesShare + r.courierPay + r.profit, bold: true),
@@ -483,7 +484,8 @@ class _StoreOrderTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final depo = app.paidCourier(o);
-    final effect = depo ? o.itemsTotal - o.commission : -o.commission;
+    final effect = depo ? o.itemsBase - o.commission : -o.commission - o.markup;
+    final staff = app.canFinance; // الزيادة المخفية تبين للمالية بس، مو للمحل
     return AppCard(
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
@@ -491,12 +493,13 @@ class _StoreOrderTile extends StatelessWidget {
           Badge2(_howCollected(o), bg: depo ? DepoColors.soft : const Color(0xFFFFF6E5), fg: depo ? DepoColors.dark : const Color(0xFF8A5A00)),
         ]),
         const SizedBox(height: 4),
-        MoneyRow('البضاعة', o.itemsTotal),
+        MoneyRow('البضاعة (بسعر المحل)', o.itemsBase),
+        if (staff && o.markup > 0) MoneyRow('زيادة ديبو (دفعها الزبون، مخفية عن المحل)', o.markup, color: DepoColors.success),
         if (o.deliveryFee > 0) MoneyRow(depo ? 'رسم التوصيل (لديبو)' : 'رسم التوصيل (للمحل)', o.deliveryFee),
         MoneyRow('العمولة', o.commission, sign: '−', color: DepoColors.danger),
         if (o.commissionRule.isNotEmpty) Note(o.commissionRule),
         MoneyRow(
-          depo ? 'ديبو حصّلت ${iqd(o.itemsTotal)} ← تدفع للمحل' : 'المحل حصّل بنفسه ← العمولة عليه',
+          depo ? 'ديبو حصّلت ${iqd(o.itemsBase)} من حق المحل ← تدفع له' : 'المحل حصّل بنفسه ← العمولة عليه',
           effect.abs(),
           sign: effect >= 0 ? '+' : '−',
           bold: true,

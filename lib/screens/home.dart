@@ -587,7 +587,7 @@ class _MarketTab extends StatelessWidget {
     final merchants = app.storesOfType(StoreType.merchant);
     final ids = merchants.map((s) => s.id).toSet();
     final products = app.offers.where((o) => o.visible && ids.contains(o.storeId)).toList();
-    final cheap = products.where((o) => o.price <= 1000).toList();
+    final cheap = products.where((o) => o.shownPrice <= 1000).toList();
     return DepoRefresh(
       onRefresh: app.refreshFromServer,
       child: ListView(

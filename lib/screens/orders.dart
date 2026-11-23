@@ -46,7 +46,8 @@ class OrderTile extends StatelessWidget {
   final Order order;
   final VoidCallback? onTap;
   final Widget? trailing;
-  const OrderTile({super.key, required this.order, this.onTap, this.trailing});
+  final bool storeView; // المحل يشوف حقه (بسعره هو)
+  const OrderTile({super.key, required this.order, this.onTap, this.trailing, this.storeView = false});
 
   @override
   Widget build(BuildContext context) {
@@ -67,7 +68,7 @@ class OrderTile extends StatelessWidget {
         Text(order.lines.map((l) => '${l.title} ×${l.qty}').join('، '), style: const TextStyle(fontSize: 13, color: DepoColors.muted)),
         const SizedBox(height: 4),
         Row(children: [
-          Text(iqd(order.total), style: const TextStyle(fontWeight: FontWeight.w900)),
+          Text(iqd(storeView ? order.itemsBase : order.total), style: const TextStyle(fontWeight: FontWeight.w900)),
           const SizedBox(width: 8),
           Text(order.pickup ? '• استلام ذاتي' : '• توصيل', style: const TextStyle(fontSize: 12, color: DepoColors.muted)),
         ]),

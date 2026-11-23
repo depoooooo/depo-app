@@ -244,7 +244,7 @@ class StoreOrdersTab extends StatelessWidget {
             child: Text(store.type == StoreType.restaurant ? 'اقبل الطلبات الجديدة خلال 5 دقايق' : 'اقبل الطلبات الجديدة خلال 10 دقايق',
                 style: const TextStyle(color: DepoColors.danger, fontWeight: FontWeight.w800)),
           ),
-        for (final o in list) OrderTile(order: o, trailing: _actions(context, o)),
+        for (final o in list) OrderTile(order: o, storeView: true, trailing: _actions(context, o)),
       ],
     );
   }
@@ -279,7 +279,7 @@ class StoreOrdersTab extends StatelessWidget {
         if (o.pickup) {
           return row([FilledButton.icon(onPressed: () => _handover(context, o), icon: const Icon(Icons.qr_code_scanner), label: const Text('تسليم للزبون (الرمز)'))]);
         }
-        if (o.courierPhone == null) {
+        if (o.courierPhone == null && app.settings.allowStoreDelivery) {
           return row([
             OutlinedButton.icon(
               onPressed: () {

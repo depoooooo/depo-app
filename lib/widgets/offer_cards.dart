@@ -160,10 +160,10 @@ class OfferCard extends StatelessWidget {
                 Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
                   Expanded(
                     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      if (offer.originalPrice > offer.price)
-                        Text(iqd(offer.originalPrice),
+                      if (offer.shownOriginal > offer.shownPrice)
+                        Text(iqd(offer.shownOriginal),
                             style: const TextStyle(fontSize: 11, color: DepoColors.muted, decoration: TextDecoration.lineThrough)),
-                      Text(iqd(offer.price), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: DepoColors.dark)),
+                      Text(iqd(offer.shownPrice), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: DepoColors.dark)),
                     ]),
                   ),
                   AddButton(offer: offer),
@@ -262,10 +262,10 @@ class ProductCard extends StatelessWidget {
                 Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
                   Expanded(
                     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      if (offer.originalPrice > offer.price)
-                        Text(iqd(offer.originalPrice),
+                      if (offer.shownOriginal > offer.shownPrice)
+                        Text(iqd(offer.shownOriginal),
                             style: const TextStyle(fontSize: 11, color: DepoColors.muted, decoration: TextDecoration.lineThrough)),
-                      Text(iqd(offer.price), style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: DepoColors.dark)),
+                      Text(iqd(offer.shownPrice), style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: DepoColors.dark)),
                     ]),
                   ),
                   AddButton(offer: offer),

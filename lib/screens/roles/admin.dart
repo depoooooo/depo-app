@@ -155,6 +155,8 @@ class _SettingsTabState extends State<_SettingsTab> {
   late final Map<String, TextEditingController> c;
   late final TextEditingController campaign;
   bool firstFree = true;
+  late bool allowPickup = app.settings.allowPickup;
+  late bool allowStoreDelivery = app.settings.allowStoreDelivery;
 
   @override
   void initState() {
@@ -180,6 +182,8 @@ class _SettingsTabState extends State<_SettingsTab> {
       'walletMinTopup': TextEditingController(text: '${s.walletMinTopup}'),
       'walletLowAlert': TextEditingController(text: '${s.walletLowAlert}'),
       'paymentMethods': TextEditingController(text: s.paymentMethods),
+      'restaurantMarkup': TextEditingController(text: '${s.restaurantMarkup}'),
+      'merchantMarkup': TextEditingController(text: '${s.merchantMarkup}'),
       'roadFactor': TextEditingController(text: '${s.roadFactor}'),
       'gpsMaxAccuracy': TextEditingController(text: '${s.gpsMaxAccuracy}'),
       'peakBonus': TextEditingController(text: '${s.peakBonus}'),
@@ -233,6 +237,10 @@ class _SettingsTabState extends State<_SettingsTab> {
     if (RegExp(r'^(\d{1,2}-\d{1,2})(,\d{1,2}-\d{1,2})*$').hasMatch(ph) || ph.isEmpty) s.peakHours = ph;
     s.campaignName = campaign.text.trim().isEmpty ? s.campaignName : campaign.text.trim();
     s.firstOrderFree = firstFree;
+    s.restaurantMarkup = c['restaurantMarkup']!.text.trim().isEmpty ? 0 : v('restaurantMarkup', s.restaurantMarkup).clamp(0, 100);
+    s.merchantMarkup = c['merchantMarkup']!.text.trim().isEmpty ? 0 : v('merchantMarkup', s.merchantMarkup).clamp(0, 100);
+    s.allowPickup = allowPickup;
+    s.allowStoreDelivery = allowStoreDelivery;
     app.saveSettings();
     toast(context, 'انحفظت الإعدادات وتسري على الطلبات الجديدة');
   }
@@ -283,6 +291,33 @@ class _SettingsTabState extends State<_SettingsTab> {
               style: const TextStyle(fontSize: 12, color: DepoColors.muted));
         }),
         const SizedBox(height: 8),
+        const SectionTitle('زيادة الأسعار (مخفية)'),
+        Row(children: [Expanded(child: f('restaurantMarkup', 'نسبة زيادة المطاعم %')), const SizedBox(width: 10), Expanded(child: f('merchantMarkup', 'نسبة زيادة الماركت %'))]),
+        Builder(builder: (context) {
+          final r = parseInt(c['restaurantMarkup']!.text) ?? 0;
+          final x = r <= 0 ? 20000 : ((20000 * (100 + r) / 100) / 250).ceil() * 250;
+          return Text('مثال: المطعم يكتب 20,000 ← الزبون يشوف ويدفع ${iqd(x)}. المحل يشوف سعره هو بس، والعمولة تنحسب على سعره. الزيادة تتقرّب لأقرب 250 وتسري على الطلبات الجديدة.',
+              style: const TextStyle(fontSize: 12, color: DepoColors.muted));
+        }),
+        const SizedBox(height: 8),
+        const SectionTitle('طرق الاستلام'),
+        AppCard(
+          padding: EdgeInsets.zero,
+          child: Column(children: [
+            SwitchListTile(
+              value: allowPickup,
+              onChanged: (v) => setState(() => allowPickup = v),
+              title: const Text('«أستلم بنفسي» من المحل', style: TextStyle(fontWeight: FontWeight.w800)),
+              subtitle: const Text('مطفي = كل الطلبات توصيل بمندوبي ديبو'),
+            ),
+            SwitchListTile(
+              value: allowStoreDelivery,
+              onChanged: (v) => setState(() => allowStoreDelivery = v),
+              title: const Text('التوصيل بمندوب المحل', style: TextStyle(fontWeight: FontWeight.w800)),
+              subtitle: const Text('مطفي = زر «أوصله بمندوبي» ما يطلع للمحل'),
+            ),
+          ]),
+        ),
         const SectionTitle('العروض والحملات'),
         AppCard(
           padding: EdgeInsets.zero,

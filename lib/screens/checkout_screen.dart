@@ -17,7 +17,7 @@ class CheckoutScreen extends StatefulWidget {
 }
 
 class _CheckoutScreenState extends State<CheckoutScreen> {
-  bool pickup = false;
+  bool pickup = false; // «استلام بنفسي» يطلع بس إذا المدير مفعّله
   String? address;
   bool placing = false;
 
@@ -93,6 +93,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             subtitle: 'مندوب Depo — 20 إلى 40 دقيقة • ${iqd(deliveryFee)}',
             onTap: () => setState(() => pickup = false),
           ),
+          if (app.settings.allowPickup)
           _Option(
             selected: pickup,
             icon: Icons.storefront_outlined,

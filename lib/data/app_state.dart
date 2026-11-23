@@ -13,6 +13,19 @@ import 'models.dart';
 /// حالة التطبيق: البيانات تنحفظ بـ Firebase (Firestore) وتتزامن بين كل الأجهزة.
 /// إذا ماكو اتصال بالسيرفر، تشتغل محلياً على الجهاز.
 class AppState extends ChangeNotifier {
+  AppState() {
+    // زيادة الأسعار المخفية: حسب نوع المحل ومن الإعدادات (المحل نفسه يشوف سعره هو)
+    Offer.markupPct = (o) {
+      final s = storeById(o.storeId);
+      if (s == null || ownsStore(s.id) || me?.storeId == s.id) return 0;
+      return switch (s.type) {
+        StoreType.restaurant => settings.restaurantMarkup,
+        StoreType.merchant => settings.merchantMarkup,
+        _ => 0,
+      };
+    };
+  }
+
   static const _key = 'depo_state_v1';
   final _rnd = Random();
 
@@ -694,7 +707,7 @@ class AppState extends ChangeNotifier {
     {
       // إشعار بقائمة المتابعين؛ والإشعار المتدرّج على الشاشة يتحسب بجهاز كل زبون (notifier.dart)
       for (final u in users.where((u) => u.follows.contains(s.id))) {
-        notify(u.phone, '${s.fullName} نشر: ${o.title} بـ ${iqd(o.price)}');
+        notify(u.phone, '${s.fullName} نشر: ${o.title} بـ ${iqd(o.shownPrice)}');
       }
       _log('نشر عرض «${o.title}» — ${s.name}');
     }
@@ -866,7 +879,9 @@ class AppState extends ChangeNotifier {
     if (err != null) throw OrderError(err);
     final u = me!;
     final s = storeById(cart.storeId!)!;
-    final items = cart.total;
+    if (pickup && !settings.allowPickup) throw OrderError('الاستلام من المحل متوقف حالياً — اختار التوصيل');
+    final items = cart.total; // سعر الزبون
+    final itemsBase = cart.lines.fold(0, (a, l) => a + l.offer.price * l.qty); // حق المحل
     final fee = pickup ? 0 : deliveryFeeFor(items);
     final o = Order(
       id: _orderId(),
@@ -874,14 +889,15 @@ class AppState extends ChangeNotifier {
       customerName: u.name,
       storeId: s.id,
       lines: cart.lines
-          .map((l) => OrderLine(offerId: l.offer.id, title: l.offer.title, price: l.offer.price, originalPrice: l.offer.originalPrice, qty: l.qty))
+          .map((l) => OrderLine(offerId: l.offer.id, title: l.offer.title, price: l.offer.shownPrice, originalPrice: l.offer.shownOriginal, qty: l.qty, basePrice: l.offer.price))
           .toList(),
       deliveryFee: fee,
       pickup: pickup,
       address: pickup ? '' : address,
       pickupCode: (1000 + _rnd.nextInt(9000)).toString(),
-      commission: commissionWithRule(s, items).$1,
-      commissionRule: commissionWithRule(s, items).$2,
+      // العمولة على حق المحل (سعره هو)، والزيادة لديبو منفصلة
+      commission: commissionWithRule(s, itemsBase).$1,
+      commissionRule: commissionWithRule(s, itemsBase).$2,
       distanceKm: pickup ? 0 : s.distanceKm,
       custLat: pickup || location == null ? 0 : location.lat,
       custLng: pickup || location == null ? 0 : location.lng,
@@ -914,7 +930,7 @@ class AppState extends ChangeNotifier {
               return;
             }
             final line = o.lines.firstWhere((l) => l.offerId == id);
-            if (of.price != line.price) {
+            if (of.price != line.storePrice) {
               fail = 'سعر «${of.title}» تغيّر (صار ${iqd(of.price)}). ارجع للسلة وأكّد من جديد.';
               return;
             }
@@ -955,7 +971,7 @@ class AppState extends ChangeNotifier {
       }
       orders.insert(0, o);
     }
-    notify(s.ownerPhone, 'طلب جديد #${o.id} — ${iqd(o.itemsTotal)}');
+    notify(s.ownerPhone, 'طلب جديد #${o.id} — ${iqd(o.itemsBase)}');
     cart.clear();
     _changed();
     return orderById(o.id) ?? o;
@@ -1066,6 +1082,7 @@ class AppState extends ChangeNotifier {
 
   /// التوصيل بمندوب المحل نفسه (قرار معتمد)
   void deliverBySelf(Order o) {
+    if (!settings.allowStoreDelivery) return;
     if (o.pickup || o.courierPhone != null || o.status != OrderStatus.ready) return;
     o.courierPhone = currentPhone;
     setStatus(o, OrderStatus.onTheWay);
@@ -2007,14 +2024,15 @@ class StoreStatement {
   final Balance balance;
   const StoreStatement(this.store, this.month, this.orders, this.depoOrders, this.storeOrders, this.balance);
 
-  int get sales => orders.fold(0, (s, o) => s + o.itemsTotal);
+  int get sales => orders.fold(0, (s, o) => s + o.itemsBase); // حق المحل (بسعره)
   int get commission => orders.fold(0, (s, o) => s + o.commission);
-  int get depoGoods => depoOrders.fold(0, (s, o) => s + o.itemsTotal); // (أ) بضاعة حصّلتها ديبو
+  int get depoGoods => depoOrders.fold(0, (s, o) => s + o.itemsBase); // (أ) بضاعة حصّلتها ديبو
   int get depoCommission => depoOrders.fold(0, (s, o) => s + o.commission);
   int get storeCollected => storeOrders.fold(0, (s, o) => s + o.total); // حصّلها المحل (ويه رسم توصيله إن وجد)
   int get storeCommission => storeOrders.fold(0, (s, o) => s + o.commission); // (ب) عمولة على المحل
   /// الصافي: موجب = ديبو تدفع للمحل، سالب = المحل يدفع لديبو
-  int get net => depoGoods - commission;
+  int get storeMarkup => storeOrders.fold(0, (s, o) => s + o.markup); // إذا المحل حصّل كاش فيه زيادة ديبو
+  int get net => depoGoods - commission - storeMarkup;
   int get storeEarnings => sales - commission; // اللي يطلع للمحل فعلياً من البضاعة
 }
 
@@ -2038,7 +2056,8 @@ class MonthReport {
   final int payToStores, collectFromStores, payToCouriers; // اللي بعده ما مسوّى
   const MonthReport(this.month, this.orders, this.sales, this.commission, this.deliveryFees, this.storeDeliveryFees, this.courierPay, this.freeDeliveryCost,
       this.payToStores, this.collectFromStores, this.payToCouriers);
-  int get profit => commission + deliveryFees - courierPay;
+  int get markup => orders.fold(0, (s, o) => s + o.markup); // زيادة الأسعار (مخفية)
+  int get profit => commission + markup + deliveryFees - courierPay;
   int get customersPaid => orders.fold(0, (s, o) => s + o.total);
   // حصة المحلات = بضاعة − عمولة + رسوم توصيل مندوبهم
   int get storesShare => sales - commission + storeDeliveryFees;
@@ -2106,7 +2125,7 @@ extension Finance on AppState {
     return MonthReport(
       month,
       list,
-      list.fold(0, (s, o) => s + o.itemsTotal),
+      list.fold(0, (s, o) => s + o.itemsBase),
       list.fold(0, (s, o) => s + o.commission),
       paid.fold(0, (s, o) => s + o.deliveryFee),
       list.where((o) => !paidCourier(o)).fold(0, (s, o) => s + o.deliveryFee),
@@ -2382,7 +2401,7 @@ extension Finance on AppState {
     b.writeln('الحالة: ${st.balance.status}');
     b.writeln('— التفاصيل —');
     for (final o in st.orders.reversed) {
-      b.writeln('#${o.id} ${dateTimeLabel(o.deliveredAt > 0 ? o.deliveredAt : o.createdAt)} • ${paidCourier(o) ? 'مندوب ديبو' : (o.pickup ? 'استلام ذاتي' : 'مندوب المحل')} • بضاعة ${iqd(o.itemsTotal)} • عمولة ${iqd(o.commission)}');
+      b.writeln('#${o.id} ${dateTimeLabel(o.deliveredAt > 0 ? o.deliveredAt : o.createdAt)} • ${paidCourier(o) ? 'مندوب ديبو' : (o.pickup ? 'استلام ذاتي' : 'مندوب المحل')} • بضاعة ${iqd(o.itemsBase)} • عمولة ${iqd(o.commission)}');
     }
     return b.toString();
   }
@@ -2545,7 +2564,7 @@ extension Growth on AppState {
     return StoreImpact(
       list.length,
       meals,
-      list.fold(0, (a, o) => a + o.itemsTotal),
+      list.fold(0, (a, o) => a + o.itemsBase),
       list.fold(0, (a, o) => a + o.commission),
       {for (final o in list) o.customerPhone}.length,
       orig,

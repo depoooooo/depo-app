@@ -65,7 +65,7 @@ class _OfferDetailScreenState extends State<OfferDetailScreen> {
           Text(o.title, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900)),
           Text('${s.fullName} • ${s.eta}', style: const TextStyle(color: DepoColors.dark, fontWeight: FontWeight.w700)),
           const SizedBox(height: 8),
-          PriceTag(price: o.price, original: o.originalPrice, size: 22),
+          PriceTag(price: o.shownPrice, original: o.shownOriginal, size: 22),
           const SizedBox(height: 12),
           if (!o.unlimited) Row(children: [
             _Info(label: 'باقي', value: o.quantityLeft <= 2 ? '${o.quantityLeft} بس' : '${o.quantityLeft}', danger: o.quantityLeft <= 2),
@@ -116,7 +116,7 @@ class _OfferDetailScreenState extends State<OfferDetailScreen> {
                     : o.expired
                         ? 'انتهى وقت العرض'
                         : o.quantityLeft > 0 && o.visible
-                            ? 'أضف للسلة — ${iqd(o.price * qty)}'
+                            ? 'أضف للسلة — ${iqd(o.shownPrice * qty)}'
                             : 'خلصت'),
               ),
             ),

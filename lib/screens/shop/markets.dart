@@ -197,7 +197,7 @@ class _ShopPublicPageState extends State<ShopPublicPage> {
                     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                       Text(o.title, style: const TextStyle(fontWeight: FontWeight.w900)),
                       if (o.description.isNotEmpty) Text(o.description, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, color: Jm.sub)),
-                      Text(iqd(o.price), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: Jm.cyan)),
+                      Text(iqd(o.shownPrice), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: Jm.cyan)),
                     ]),
                   ),
                   if (!app.ownsStore(s.id)) AddButton(offer: o),

@@ -113,7 +113,7 @@ class Notifier {
     _markDone(id);
     if (o == null || s == null || !o.visible) return; // خلص قبل وقته
     final title = follower ? '${s.name} نشر رواجع جديدة' : 'رواجع قريبة: ${s.name}';
-    final body = '${o.title} بـ ${iqd(o.price)} بدل ${iqd(o.originalPrice)} — باقي ${o.quantityLeft}';
+    final body = '${o.title} بـ ${iqd(o.shownPrice)} بدل ${iqd(o.shownOriginal)} — باقي ${o.quantityLeft}';
     _show(title, body, payload: 'offer:${o.id}');
   }
 

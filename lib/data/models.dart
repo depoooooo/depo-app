@@ -305,6 +305,15 @@ class Offer {
 
   int get discountPercent =>
       originalPrice == 0 ? 0 : ((1 - price / originalPrice) * 100).round();
+
+  /// نسبة الزيادة على سعر المحل (يحددها المدير، ولا تظهر للمحل). AppState يربطها بالإعدادات
+  static int Function(Offer o) markupPct = (_) => 0;
+  static int _withMarkup(int p, int m) => m <= 0 || p <= 0 ? p : ((p * (100 + m) / 100) / 250).ceil() * 250;
+
+  /// السعر اللي يشوفه ويدفعه الزبون
+  int get shownPrice => _withMarkup(price, markupPct(this));
+  /// السعر الأصلي (قبل الخصم) للزبون — بنفس النسبة حتى تبقى نسبة الخصم نفسها
+  int get shownOriginal => originalPrice <= price ? shownPrice : _withMarkup(originalPrice, markupPct(this));
   bool get expired => expiresAt > 0 && _now() >= expiresAt;
   bool get unlimited => quantityLeft >= 9000; // منتجات المتجر المجاني (بدون كمية محددة)
   bool get visible => active && !hidden && quantityLeft > 0 && !expired;
@@ -365,19 +374,23 @@ class Offer {
 class OrderLine {
   final String offerId;
   final String title;
-  final int price;
+  final int price; // سعر الزبون (ويه الزيادة)
   final int originalPrice;
   final int qty;
-  const OrderLine({required this.offerId, required this.title, required this.price, required this.originalPrice, required this.qty});
+  final int basePrice; // سعر المحل (اللي كتبه هو) — 0 بالطلبات القديمة = نفس سعر الزبون
+  const OrderLine({required this.offerId, required this.title, required this.price, required this.originalPrice, required this.qty, this.basePrice = 0});
+
+  int get storePrice => basePrice > 0 ? basePrice : price;
 
   Map<String, dynamic> toJson() =>
-      {'offerId': offerId, 'title': title, 'price': price, 'originalPrice': originalPrice, 'qty': qty};
+      {'offerId': offerId, 'title': title, 'price': price, 'originalPrice': originalPrice, 'qty': qty, 'basePrice': basePrice};
   factory OrderLine.fromJson(Map<String, dynamic> j) => OrderLine(
         offerId: j['offerId'] as String,
         title: j['title'] as String,
         price: j['price'] as int,
         originalPrice: j['originalPrice'] as int,
         qty: j['qty'] as int,
+        basePrice: (j['basePrice'] ?? 0) as int,
       );
 }
 
@@ -470,7 +483,9 @@ class Order {
   /// شهر التسوية (حسب وقت التسليم)
   String get settleMonth => monthKey(DateTime.fromMillisecondsSinceEpoch(deliveredAt > 0 ? deliveredAt : createdAt));
 
-  int get itemsTotal => lines.fold(0, (s, l) => s + l.price * l.qty);
+  int get itemsTotal => lines.fold(0, (s, l) => s + l.price * l.qty); // اللي يدفعه الزبون
+  int get itemsBase => lines.fold(0, (s, l) => s + l.storePrice * l.qty); // حق المحل (سعره هو)
+  int get markup => itemsTotal - itemsBase; // زيادة ديبو
   int get originalTotal => lines.fold(0, (s, l) => s + l.originalPrice * l.qty);
   int get total => itemsTotal + deliveryFee;
   bool get isOpen => status != OrderStatus.delivered && status != OrderStatus.rejected && status != OrderStatus.cancelled;
@@ -824,6 +839,10 @@ class AppSettings {
   int walletMinTopup; // أقل مبلغ لشحن رصيد المندوب
   int walletLowAlert; // تنبيه المندوب إذا رصيده نزل تحت هذا
   String paymentMethods; // طرق شحن الرصيد، مفصولة بفاصلة
+  int restaurantMarkup; // نسبة زيادة على أسعار المطاعم (مخفية)
+  int merchantMarkup; // نسبة زيادة على أسعار التجار (مخفية)
+  bool allowPickup; // «استلام بنفسي»
+  bool allowStoreDelivery; // التوصيل بمندوب المحل
 
   AppSettings({
     this.restaurantCommission = 15,
@@ -853,6 +872,10 @@ class AppSettings {
     this.walletMinTopup = 100000,
     this.walletLowAlert = 20000,
     this.paymentMethods = 'زين كاش,FIB,كي كارد,كاش بالمكتب',
+    this.restaurantMarkup = 0,
+    this.merchantMarkup = 0,
+    this.allowPickup = false,
+    this.allowStoreDelivery = false,
   });
 
   /// هل الساعة [h] ضمن الذروة؟
@@ -899,6 +922,10 @@ class AppSettings {
         'walletMinTopup': walletMinTopup,
         'walletLowAlert': walletLowAlert,
         'paymentMethods': paymentMethods,
+        'restaurantMarkup': restaurantMarkup,
+        'merchantMarkup': merchantMarkup,
+        'allowPickup': allowPickup,
+        'allowStoreDelivery': allowStoreDelivery,
       };
 
   factory AppSettings.fromJson(Map<String, dynamic> j) {
@@ -933,6 +960,10 @@ class AppSettings {
       walletMinTopup: g('walletMinTopup', d.walletMinTopup),
       walletLowAlert: g('walletLowAlert', d.walletLowAlert),
       paymentMethods: (j['paymentMethods'] ?? d.paymentMethods) as String,
+      restaurantMarkup: g('restaurantMarkup', d.restaurantMarkup),
+      merchantMarkup: g('merchantMarkup', d.merchantMarkup),
+      allowPickup: (j['allowPickup'] ?? d.allowPickup) as bool,
+      allowStoreDelivery: (j['allowStoreDelivery'] ?? d.allowStoreDelivery) as bool,
     );
   }
 }
@@ -948,8 +979,8 @@ class Cart extends ChangeNotifier {
   String? storeId;
   final List<CartLine> lines = [];
 
-  int get total => lines.fold(0, (s, l) => s + l.offer.price * l.qty);
-  int get originalTotal => lines.fold(0, (s, l) => s + l.offer.originalPrice * l.qty);
+  int get total => lines.fold(0, (s, l) => s + l.offer.shownPrice * l.qty);
+  int get originalTotal => lines.fold(0, (s, l) => s + l.offer.shownOriginal * l.qty);
   int get saved => originalTotal - total;
   int get count => lines.fold(0, (s, l) => s + l.qty);
   bool get isEmpty => lines.isEmpty;
@@ -960,7 +991,7 @@ class Cart extends ChangeNotifier {
     for (final l in lines) {
       final f = find(l.offer.id);
       if (f == null || identical(f, l.offer)) continue;
-      if (f.price != l.offer.price) changed.add(f.title);
+      if (f.shownPrice != l.offer.shownPrice) changed.add(f.title);
       l.offer = f;
     }
     if (changed.isNotEmpty) notifyListeners();
