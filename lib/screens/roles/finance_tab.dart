@@ -571,7 +571,7 @@ class CourierStatementScreen extends StatelessWidget {
           body: ListView(padding: const EdgeInsets.all(16), children: [
             AppCard(
               child: Column(children: [
-                Note('${st.orders.length} توصيلة • ${st.km.toStringAsFixed(1)} كم${app.courierRatingOf(phone).$2 == 0 ? '' : ' • التقييم ${app.courierRatingOf(phone).$1.toStringAsFixed(1)} ★ (${app.courierRatingOf(phone).$2})'}'${app.settings.ratingTiersOn ? ' • المستوى: ${app.tierOf(phone).name}' : ''}'),
+                Note('${st.orders.length} توصيلة • ${st.km.toStringAsFixed(1)} كم${app.courierRatingOf(phone).$2 == 0 ? '' : ' • التقييم ${app.courierRatingOf(phone).$1.toStringAsFixed(1)} ★ (${app.courierRatingOf(phone).$2})'}${app.settings.ratingTiersOn ? ' • المستوى: ${app.tierOf(phone).name}' : ''}'),
                 MoneyRow('كل الأجور', st.earned, bold: true, color: DepoColors.dark),
                 if (st.walletPaid > 0) MoneyRow('انضافت لمحفظته مباشرة', st.walletPaid, sign: '−'),
                 if (st.walletPaid > 0) MoneyRow('مستحق بالتسوية الشهرية', b.due, bold: true),
