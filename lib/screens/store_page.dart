@@ -5,6 +5,7 @@ import '../theme.dart';
 import '../widgets/common.dart';
 import 'auth.dart';
 import 'home.dart';
+import '../widgets/loyalty_ui.dart';
 import 'chat_screen.dart';
 
 /// صفحة المطعم أو المتجر: متابعة + كل عروضه، ويكدر الزبون يطلب منها مباشرة
@@ -78,6 +79,7 @@ class StorePage extends StatelessWidget {
                 ]),
               ),
               const SizedBox(height: 12),
+              if (s.type != StoreType.shop) StampCard(store: s),
               if (s.suspended)
                 const AppCard(
                   color: Color(0xFFFDECED),

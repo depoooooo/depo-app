@@ -3,6 +3,7 @@ import '../data/app_state.dart';
 import '../data/models.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
+import '../widgets/loyalty_ui.dart';
 import 'checkout_screen.dart';
 
 class CartScreen extends StatelessWidget {
@@ -31,6 +32,7 @@ class CartScreen extends StatelessWidget {
             padding: const EdgeInsets.all(16),
             children: [
               AppCard(child: Text('${store?.fullName ?? ''} — السلة من محل واحد', style: const TextStyle(fontWeight: FontWeight.w800))),
+              if (store != null && store.type != StoreType.shop && app.loggedIn) StampCard(store: store, compact: true),
               for (final line in cart.lines)
                 AppCard(
                   child: Row(children: [

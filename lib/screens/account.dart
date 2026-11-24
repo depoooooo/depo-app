@@ -10,6 +10,7 @@ import 'shop/markets.dart';
 import '../widgets/common.dart';
 import 'auth.dart';
 import 'join.dart';
+import '../widgets/loyalty_ui.dart';
 import 'roles/role_home.dart';
 
 class AccountScreen extends StatelessWidget {
@@ -64,6 +65,7 @@ class AccountScreen extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           const SaverCard(),
+          const LoyaltyWallet(inset: false),
           if (u.role != Role.customer)
             AppCard(
               color: DepoColors.ink,

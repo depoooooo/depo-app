@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
 import '../data/app_state.dart';
 import '../data/models.dart';
@@ -25,6 +26,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     if (pickup) return 0;
     return app.deliveryFeeFor(cart.total);
   }
+
+  // هدايا الولاء — نفس حساب placeOrder بالضبط
+  int get loyalty => cart.storeId != null && app.rewardReady(cart.storeId!) ? app.loyaltyDiscountFor(cart.total) : 0;
+  Coupon? get coupon => app.bestCoupon(cart.total - loyalty);
+  int get couponOff => coupon == null ? 0 : min(coupon!.amount, cart.total - loyalty);
+  int get pay => cart.total + fee - loyalty - couponOff;
 
   Future<void> _confirm() async {
     if (cart.isEmpty) return;
@@ -153,8 +160,22 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   child: Text('أضف ${iqd(remaining)} بعد ويصير التوصيل مجاني تلقائياً',
                       style: const TextStyle(fontSize: 12, color: DepoColors.success, fontWeight: FontWeight.w700)),
                 ),
+              if (loyalty > 0) _Gift(Icons.loyalty_rounded, 'هدية بطاقة الولاء (${app.settings.stampReward}%)', loyalty),
+              if (couponOff > 0) _Gift(Icons.confirmation_number_rounded, 'قسيمة كرت الخدش', couponOff),
               const Divider(),
-              _Line('المجموع', iqd(cart.total + fee), bold: true),
+              _Line('المجموع', iqd(pay), bold: true),
+              if (app.settings.loyaltyOn && app.loggedIn)
+                Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Row(children: [
+                    const Icon(Icons.stars_rounded, size: 16, color: DepoColors.accent),
+                    const SizedBox(width: 4),
+                    Expanded(
+                      child: Text(app.settings.scratchOn ? 'هذا الطلب يعطيك ختم جديد + كرت خدش' : 'هذا الطلب يعطيك ختم جديد',
+                          style: const TextStyle(fontSize: 12, color: DepoColors.dark, fontWeight: FontWeight.w800)),
+                    ),
+                  ]),
+                ),
             ]),
           ),
         ],
@@ -167,7 +188,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               onPressed: placing || cart.isEmpty ? null : _confirm,
               child: placing
                   ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white))
-                  : Text('تأكيد الطلب • ${iqd(cart.total + fee)}'),
+                  : Text('تأكيد الطلب • ${iqd(pay)}'),
             ),
             const SizedBox(height: 6),
             Text(app.loggedIn ? 'الطلب يوصل للمحل فوراً' : 'إذا ما مسجّل، نطلب رقمك بهاي الخطوة بس',
@@ -206,6 +227,23 @@ class _Option extends StatelessWidget {
       ]),
     );
   }
+}
+
+class _Gift extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final int amount;
+  const _Gift(this.icon, this.label, this.amount);
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 3),
+        child: Row(children: [
+          Icon(icon, size: 18, color: DepoColors.accent),
+          const SizedBox(width: 6),
+          Expanded(child: Text(label, style: const TextStyle(color: DepoColors.success, fontWeight: FontWeight.w800))),
+          Text('− ${iqd(amount)}', style: const TextStyle(color: DepoColors.success, fontWeight: FontWeight.w900)),
+        ]),
+      );
 }
 
 class _Line extends StatelessWidget {

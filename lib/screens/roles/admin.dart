@@ -157,6 +157,8 @@ class _SettingsTabState extends State<_SettingsTab> {
   bool firstFree = true;
   late bool allowPickup = app.settings.allowPickup;
   late bool allowStoreDelivery = app.settings.allowStoreDelivery;
+  late bool loyaltyOn = app.settings.loyaltyOn;
+  late bool scratchOn = app.settings.scratchOn;
 
   @override
   void initState() {
@@ -188,6 +190,13 @@ class _SettingsTabState extends State<_SettingsTab> {
       'gpsMaxAccuracy': TextEditingController(text: '${s.gpsMaxAccuracy}'),
       'peakBonus': TextEditingController(text: '${s.peakBonus}'),
       'peakHours': TextEditingController(text: s.peakHours),
+      'stampsNeeded': TextEditingController(text: '${s.stampsNeeded}'),
+      'stampReward': TextEditingController(text: '${s.stampReward}'),
+      'stampRewardCap': TextEditingController(text: '${s.stampRewardCap}'),
+      'stampExpiryDays': TextEditingController(text: '${s.stampExpiryDays}'),
+      'scratchPrizes': TextEditingController(text: s.scratchPrizes),
+      'scratchMinOrder': TextEditingController(text: '${s.scratchMinOrder}'),
+      'couponDays': TextEditingController(text: '${s.couponDays}'),
     };
     campaign = TextEditingController(text: s.campaignName);
     firstFree = s.firstOrderFree;
@@ -241,6 +250,16 @@ class _SettingsTabState extends State<_SettingsTab> {
     s.merchantMarkup = c['merchantMarkup']!.text.trim().isEmpty ? 0 : v('merchantMarkup', s.merchantMarkup).clamp(0, 100);
     s.allowPickup = allowPickup;
     s.allowStoreDelivery = allowStoreDelivery;
+    s.loyaltyOn = loyaltyOn;
+    s.scratchOn = scratchOn;
+    s.stampsNeeded = v('stampsNeeded', s.stampsNeeded).clamp(2, 20);
+    s.stampReward = v('stampReward', s.stampReward).clamp(1, 100);
+    s.stampRewardCap = v('stampRewardCap', s.stampRewardCap).clamp(250, 1000000);
+    s.stampExpiryDays = v('stampExpiryDays', s.stampExpiryDays).clamp(1, 365);
+    final pr = c['scratchPrizes']!.text.replaceAll(' ', '').replaceAll('،', ',');
+    if (RegExp(r'^\d+:\d+(,\d+:\d+)*$').hasMatch(pr)) s.scratchPrizes = pr;
+    s.scratchMinOrder = v('scratchMinOrder', s.scratchMinOrder);
+    s.couponDays = v('couponDays', s.couponDays).clamp(1, 90);
     app.saveSettings();
     toast(context, 'انحفظت الإعدادات وتسري على الطلبات الجديدة');
   }
@@ -316,6 +335,45 @@ class _SettingsTabState extends State<_SettingsTab> {
               title: const Text('التوصيل بمندوب المحل', style: TextStyle(fontWeight: FontWeight.w800)),
               subtitle: const Text('مطفي = زر «أوصله بمندوبي» ما يطلع للمحل'),
             ),
+          ]),
+        ),
+        const SectionTitle('الولاء (لعبة الأختام وكروت الخدش)'),
+        AppCard(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              value: loyaltyOn,
+              onChanged: (v) => setState(() => loyaltyOn = v),
+              title: const Text('بطاقة أختام بكل محل', style: TextStyle(fontWeight: FontWeight.w800)),
+              subtitle: const Text('كل طلب يوصل = ختم، وتكمل البطاقة = خصم'),
+            ),
+            f('stampsNeeded', 'كم ختم حتى الهدية'),
+            f('stampReward', 'خصم الهدية %'),
+            f('stampRewardCap', 'أعلى خصم للهدية (د.ع)'),
+            f('stampExpiryDays', 'الأختام تنتهي إذا ما طلب خلال (يوم)'),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              value: scratchOn,
+              onChanged: (v) => setState(() => scratchOn = v),
+              title: const Text('كرت خدش بعد كل طلب', style: TextStyle(fontWeight: FontWeight.w800)),
+              subtitle: const Text('يطلع للزبون قسيمة عشوائية'),
+            ),
+            Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: TextField(
+                controller: c['scratchPrizes'],
+                decoration: const InputDecoration(labelText: 'جوائز الخدش (مبلغ:وزن)', helperText: 'مثال 250:45,500:30,1000:17 — الوزن الأكبر يطلع أكثر. 0 = حظ أوفر'),
+              ),
+            ),
+            f('scratchMinOrder', 'أقل طلب حتى تنفع القسيمة (د.ع)'),
+            f('couponDays', 'صلاحية القسيمة (يوم)'),
+            Builder(builder: (_) {
+              final t = app.scratchTable;
+              final w = t.fold(0, (a, e) => a + e.$2);
+              final avg = w == 0 ? 0 : t.fold(0, (a, e) => a + e.$1 * e.$2) ~/ w;
+              return Text('معدّل كلفة الكرت ≈ ${iqd(avg)} (قبل ما ينحفظ التعديل). الهدايا والقسائم على ديبو، والمحل ياخذ حقه كامل.',
+                  style: const TextStyle(fontSize: 12, color: DepoColors.muted));
+            }),
           ]),
         ),
         const SectionTitle('العروض والحملات'),

@@ -19,6 +19,7 @@ import 'auth.dart';
 import 'following.dart';
 import 'join.dart';
 import 'search.dart';
+import '../widgets/loyalty_ui.dart';
 import 'store_page.dart';
 
 export '../widgets/offer_cards.dart';
@@ -196,6 +197,7 @@ class _RawajiTabState extends State<_RawajiTab> {
       physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.only(top: 12, bottom: 24),
       children: [
+        const ScratchPrompt(),
         if (app.content.show('cats')) CatStrip(cats: restaurantCats, market: false),
         // أزرار الفلترة
         if (app.content.show('filters')) SizedBox(

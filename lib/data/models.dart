@@ -86,6 +86,11 @@ class AppUser {
   double locLat, locLng; // آخر موقع (للمندوب المتاح — للمراقبة)
   int locAt;
   bool onDuty; // المندوب مفعّل «متاح للتوصيل»
+  // ---- الولاء ----
+  Map<String, int> stamps; // أختام كل محل
+  Map<String, int> stampAt; // آخر ختم لكل محل (للانتهاء)
+  List<Coupon> coupons; // قسائم الخصم (من كروت الخدش)
+  int scratchPending; // كروت خدش ما انخدشت بعد
 
   AppUser({
     required this.phone,
@@ -106,7 +111,14 @@ class AppUser {
     this.locLng = 0,
     this.locAt = 0,
     this.onDuty = false,
-  })  : places = places ?? [],
+    Map<String, int>? stamps,
+    Map<String, int>? stampAt,
+    List<Coupon>? coupons,
+    this.scratchPending = 0,
+  })  : stamps = stamps ?? {},
+        stampAt = stampAt ?? {},
+        coupons = coupons ?? [],
+        places = places ?? [],
         perms = perms ?? [],
         debtCodes = debtCodes ?? [],
         addresses = addresses ?? [],
@@ -133,6 +145,10 @@ class AppUser {
         'locLng': locLng,
         'locAt': locAt,
         'onDuty': onDuty,
+        'stamps': stamps,
+        'stampAt': stampAt,
+        'coupons': coupons.map((e) => e.toJson()).toList(),
+        'scratchPending': scratchPending,
       };
 
   factory AppUser.fromJson(Map<String, dynamic> j) => AppUser(
@@ -153,6 +169,10 @@ class AppUser {
         locLng: _d(j['locLng']),
         locAt: (j['locAt'] ?? 0) as int,
         onDuty: (j['onDuty'] ?? false) as bool,
+        stamps: {for (final e in ((j['stamps'] as Map?) ?? const {}).entries) '${e.key}': (e.value as num).toInt()},
+        stampAt: {for (final e in ((j['stampAt'] as Map?) ?? const {}).entries) '${e.key}': (e.value as num).toInt()},
+        coupons: [for (final e in (j['coupons'] as List?) ?? const []) Coupon.fromJson(Map<String, dynamic>.from(e as Map))],
+        scratchPending: (j['scratchPending'] ?? 0) as int,
         places: (j['places'] as List?) != null
             ? [for (final e in j['places'] as List) Address.fromJson(Map<String, dynamic>.from(e as Map))]
             // العناوين القديمة (نص بس) تتحول عناوين بدون خريطة
@@ -432,6 +452,9 @@ class Order {
   int courierLocAt;
   int peakBonus; // مكافأة وقت الذروة (ضمن أجرة المندوب)
   bool walletMode; // المندوب دافع رصيد مقدّماً: مبلغ الطلب ينخصم من رصيده عند التسليم
+  int loyaltyDiscount; // هدية بطاقة الولاء (ديبو تتحملها)
+  int couponDiscount; // قسيمة كرت الخدش (ديبو تتحملها)
+  String couponId;
 
   Order({
     required this.id,
@@ -476,6 +499,9 @@ class Order {
     this.courierLocAt = 0,
     this.peakBonus = 0,
     this.walletMode = false,
+    this.loyaltyDiscount = 0,
+    this.couponDiscount = 0,
+    this.couponId = '',
   })  : payRule = payRule ?? const [],
         kmFlags = kmFlags ?? [],
         createdAt = createdAt ?? _now();
@@ -487,7 +513,8 @@ class Order {
   int get itemsBase => lines.fold(0, (s, l) => s + l.storePrice * l.qty); // حق المحل (سعره هو)
   int get markup => itemsTotal - itemsBase; // زيادة ديبو
   int get originalTotal => lines.fold(0, (s, l) => s + l.originalPrice * l.qty);
-  int get total => itemsTotal + deliveryFee;
+  int get discounts => loyaltyDiscount + couponDiscount; // هدايا ديبو
+  int get total => itemsTotal + deliveryFee - discounts; // اللي يدفعه الزبون
   bool get isOpen => status != OrderStatus.delivered && status != OrderStatus.rejected && status != OrderStatus.cancelled;
 
   Map<String, dynamic> toJson() => {
@@ -533,6 +560,9 @@ class Order {
         'courierLocAt': courierLocAt,
         'peakBonus': peakBonus,
         'walletMode': walletMode,
+        'loyaltyDiscount': loyaltyDiscount,
+        'couponDiscount': couponDiscount,
+        'couponId': couponId,
       };
 
   factory Order.fromJson(Map<String, dynamic> j) => Order(
@@ -578,6 +608,9 @@ class Order {
         courierLocAt: (j['courierLocAt'] ?? 0) as int,
         peakBonus: (j['peakBonus'] ?? 0) as int,
         walletMode: (j['walletMode'] ?? false) as bool,
+        loyaltyDiscount: (j['loyaltyDiscount'] ?? 0) as int,
+        couponDiscount: (j['couponDiscount'] ?? 0) as int,
+        couponId: (j['couponId'] ?? '') as String,
       );
 
   /// المسافة تحتاج مراجعة قبل تسوية أجور المندوب
@@ -704,6 +737,19 @@ class Address {
         lng: _d(j['lng']),
       );
   Address copy() => Address.fromJson(toJson());
+}
+
+/// قسيمة خصم (من كرت الخدش)
+class Coupon {
+  final String id;
+  final int amount;
+  final int minOrder;
+  final int expiresAt;
+  const Coupon({required this.id, required this.amount, required this.minOrder, required this.expiresAt});
+  bool get valid => DateTime.now().millisecondsSinceEpoch < expiresAt;
+  Map<String, dynamic> toJson() => {'id': id, 'amount': amount, 'minOrder': minOrder, 'expiresAt': expiresAt};
+  factory Coupon.fromJson(Map<String, dynamic> j) =>
+      Coupon(id: (j['id'] ?? '') as String, amount: (j['amount'] ?? 0) as int, minOrder: (j['minOrder'] ?? 0) as int, expiresAt: (j['expiresAt'] ?? 0) as int);
 }
 
 class JoinRequest {
@@ -843,6 +889,16 @@ class AppSettings {
   int merchantMarkup; // نسبة زيادة على أسعار التجار (مخفية)
   bool allowPickup; // «استلام بنفسي»
   bool allowStoreDelivery; // التوصيل بمندوب المحل
+  // ---- الولاء (ديبو تتحمل الهدايا) ----
+  bool loyaltyOn;
+  int stampsNeeded; // كم طلب من نفس المحل حتى الهدية
+  int stampReward; // نسبة خصم الهدية %
+  int stampRewardCap; // أعلى خصم للهدية
+  int stampExpiryDays; // الأختام تنتهي إذا ما طلب خلال
+  bool scratchOn; // كرت خدش بعد كل طلب
+  String scratchPrizes; // جوائز الخدش: مبلغ:وزن
+  int scratchMinOrder; // أقل طلب حتى تنفع القسيمة
+  int couponDays; // صلاحية القسيمة
 
   AppSettings({
     this.restaurantCommission = 15,
@@ -876,6 +932,15 @@ class AppSettings {
     this.merchantMarkup = 0,
     this.allowPickup = false,
     this.allowStoreDelivery = false,
+    this.loyaltyOn = true,
+    this.stampsNeeded = 5,
+    this.stampReward = 20,
+    this.stampRewardCap = 5000,
+    this.stampExpiryDays = 30,
+    this.scratchOn = true,
+    this.scratchPrizes = '250:45,500:30,1000:17,2000:6,5000:2',
+    this.scratchMinOrder = 5000,
+    this.couponDays = 7,
   });
 
   /// هل الساعة [h] ضمن الذروة؟
@@ -926,6 +991,15 @@ class AppSettings {
         'merchantMarkup': merchantMarkup,
         'allowPickup': allowPickup,
         'allowStoreDelivery': allowStoreDelivery,
+        'loyaltyOn': loyaltyOn,
+        'stampsNeeded': stampsNeeded,
+        'stampReward': stampReward,
+        'stampRewardCap': stampRewardCap,
+        'stampExpiryDays': stampExpiryDays,
+        'scratchOn': scratchOn,
+        'scratchPrizes': scratchPrizes,
+        'scratchMinOrder': scratchMinOrder,
+        'couponDays': couponDays,
       };
 
   factory AppSettings.fromJson(Map<String, dynamic> j) {
@@ -964,6 +1038,15 @@ class AppSettings {
       merchantMarkup: g('merchantMarkup', d.merchantMarkup),
       allowPickup: (j['allowPickup'] ?? d.allowPickup) as bool,
       allowStoreDelivery: (j['allowStoreDelivery'] ?? d.allowStoreDelivery) as bool,
+      loyaltyOn: (j['loyaltyOn'] ?? d.loyaltyOn) as bool,
+      stampsNeeded: g('stampsNeeded', d.stampsNeeded),
+      stampReward: g('stampReward', d.stampReward),
+      stampRewardCap: g('stampRewardCap', d.stampRewardCap),
+      stampExpiryDays: g('stampExpiryDays', d.stampExpiryDays),
+      scratchOn: (j['scratchOn'] ?? d.scratchOn) as bool,
+      scratchPrizes: (j['scratchPrizes'] ?? d.scratchPrizes) as String,
+      scratchMinOrder: g('scratchMinOrder', d.scratchMinOrder),
+      couponDays: g('couponDays', d.couponDays),
     );
   }
 }

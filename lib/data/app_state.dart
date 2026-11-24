@@ -902,6 +902,14 @@ class AppState extends ChangeNotifier {
       custLat: pickup || location == null ? 0 : location.lat,
       custLng: pickup || location == null ? 0 : location.lng,
     );
+    // هدايا الولاء (ديبو تتحملها): هدية بطاقة المحل + أحسن قسيمة
+    final useStamps = this.rewardReady(s.id);
+    o.loyaltyDiscount = useStamps ? this.loyaltyDiscountFor(items) : 0;
+    final cp = this.bestCoupon(items - o.loyaltyDiscount);
+    if (cp != null) {
+      o.couponDiscount = min(cp.amount, items - o.loyaltyDiscount);
+      o.couponId = cp.id;
+    }
     final want = {for (final l in cart.lines) l.offer.id: l.qty};
 
     if (Cloud.enabled) {
@@ -944,6 +952,29 @@ class AppState extends ChangeNotifier {
               'orderedThisWeek': ((d['orderedThisWeek'] ?? 0) as int) + want[id]!,
             });
           }
+          // الهدايا: نتأكد من السيرفر إن الأختام والقسيمة بعدها موجودة، ونصرفها بنفس العملية
+          if (o.discounts > 0) {
+            final uref = db.collection('users').doc(u.phone);
+            final ud = (await tx.get(uref)).data() ?? const {};
+            final upd = <String, dynamic>{};
+            if (o.loyaltyDiscount > 0) {
+              final have = (((ud['stamps'] as Map?) ?? const {})[s.id] as num?)?.toInt() ?? 0;
+              if (have < settings.stampsNeeded) {
+                fail = 'هدية البطاقة انصرفت قبل. ارجع وأكّد من جديد.';
+                return;
+              }
+              upd['stamps.${s.id}'] = have - settings.stampsNeeded;
+            }
+            if (o.couponId.isNotEmpty) {
+              final list = [for (final e in (ud['coupons'] as List?) ?? const []) Map<String, dynamic>.from(e as Map)];
+              if (!list.any((e) => e['id'] == o.couponId)) {
+                fail = 'القسيمة انصرفت قبل. ارجع وأكّد من جديد.';
+                return;
+              }
+              upd['coupons'] = list.where((e) => e['id'] != o.couponId).toList();
+            }
+            tx.update(uref, upd);
+          }
           tx.set(db.collection('orders').doc(o.id), {...o.toJson(), '_ts': ts});
         }).timeout(const Duration(seconds: 20));
       } catch (e) {
@@ -963,6 +994,14 @@ class AppState extends ChangeNotifier {
       // ممكن السيرفر سبقنا ودزّ الطلب بالـ listener، فما نضيفه مرتين
       if (orderById(o.id) == null) orders.insert(0, o);
       _markSynced('orders', o.id, ts: ts);
+      if (o.loyaltyDiscount > 0) {
+        u.stamps[s.id] = (u.stamps[s.id] ?? 0) - settings.stampsNeeded;
+        _markFieldSynced('users', u.phone, 'stamps');
+      }
+      if (o.couponId.isNotEmpty) {
+        u.coupons.removeWhere((c) => c.id == o.couponId);
+        _markFieldSynced('users', u.phone, 'coupons');
+      }
     } else {
       for (final l in cart.lines) {
         final of = offerById(l.offer.id) ?? l.offer;
@@ -1038,6 +1077,8 @@ class AppState extends ChangeNotifier {
         notify(o.courierPhone!, left <= 0 ? 'رصيدك خلص (${iqd(left)}) — اشحن رصيد حتى توصلك مهام جديدة' : 'رصيدك قليل (${iqd(left)}) — اشحن قريباً حتى ما توقف المهام');
       }
     }
+    if (st == OrderStatus.delivered) this._giveLoyalty(o);
+    if ((st == OrderStatus.cancelled || st == OrderStatus.rejected) && o.discounts > 0) this._refundLoyalty(o);
     notify(o.customerPhone, 'طلبك #${o.id}: ${orderStatusNames[st]}${reason.isEmpty ? '' : ' — $reason'}');
     if (o.courierPhone != null && o.courierPhone != currentPhone && (st == OrderStatus.cancelled || st == OrderStatus.rejected)) {
       notify(o.courierPhone!, 'انلغى الطلب #${o.id}${reason.isEmpty ? '' : ' — $reason'}');
@@ -2032,7 +2073,8 @@ class StoreStatement {
   int get storeCommission => storeOrders.fold(0, (s, o) => s + o.commission); // (ب) عمولة على المحل
   /// الصافي: موجب = ديبو تدفع للمحل، سالب = المحل يدفع لديبو
   int get storeMarkup => storeOrders.fold(0, (s, o) => s + o.markup); // إذا المحل حصّل كاش فيه زيادة ديبو
-  int get net => depoGoods - commission - storeMarkup;
+  int get storeDiscounts => storeOrders.fold(0, (s, o) => s + o.discounts); // هدايا ديبو بطلبات حصّلها المحل: ديبو ترجّعها إله
+  int get net => depoGoods - commission - storeMarkup + storeDiscounts;
   int get storeEarnings => sales - commission; // اللي يطلع للمحل فعلياً من البضاعة
 }
 
@@ -2057,7 +2099,8 @@ class MonthReport {
   const MonthReport(this.month, this.orders, this.sales, this.commission, this.deliveryFees, this.storeDeliveryFees, this.courierPay, this.freeDeliveryCost,
       this.payToStores, this.collectFromStores, this.payToCouriers);
   int get markup => orders.fold(0, (s, o) => s + o.markup); // زيادة الأسعار (مخفية)
-  int get profit => commission + markup + deliveryFees - courierPay;
+  int get discounts => orders.fold(0, (s, o) => s + o.discounts); // هدايا الولاء (على ديبو)
+  int get profit => commission + markup + deliveryFees - courierPay - discounts;
   int get customersPaid => orders.fold(0, (s, o) => s + o.total);
   // حصة المحلات = بضاعة − عمولة + رسوم توصيل مندوبهم
   int get storesShare => sales - commission + storeDeliveryFees;
@@ -2744,4 +2787,196 @@ extension Wallet on AppState {
         for (final s in settlements.where((x) => x.kind.startsWith('topup'))) s.target,
         for (final o in orders.where((o) => o.walletMode && o.courierPhone != null)) o.courierPhone!,
       }.toList();
+}
+
+
+// ======================= الولاء: بطاقة أختام لكل محل + كروت خدش =======================
+extension Loyalty on AppState {
+  bool _stampExpired(AppUser u, String storeId) {
+    final at = u.stampAt[storeId] ?? 0;
+    return at > 0 && DateTime.now().millisecondsSinceEpoch - at > settings.stampExpiryDays * 86400000;
+  }
+
+  /// أختامي الفعّالة بهذا المحل (تنتهي إذا ما طلبت خلال المدة)
+  int stampsOf(String storeId) {
+    final u = me;
+    if (u == null || !settings.loyaltyOn) return 0;
+    if (_stampExpired(u, storeId)) return 0;
+    return (u.stamps[storeId] ?? 0).clamp(0, 999);
+  }
+
+  /// كم يوم باقي قبل ما تنتهي الأختام
+  int stampDaysLeft(String storeId) {
+    final at = me?.stampAt[storeId] ?? 0;
+    if (at == 0) return settings.stampExpiryDays;
+    final left = settings.stampExpiryDays - ((DateTime.now().millisecondsSinceEpoch - at) / 86400000).floor();
+    return left < 0 ? 0 : left;
+  }
+
+  bool rewardReady(String storeId) => settings.loyaltyOn && stampsOf(storeId) >= settings.stampsNeeded;
+
+  /// خصم الهدية: نسبة من الطلب وبحد أعلى (مقرّب لأقرب 250 للأسفل)
+  int loyaltyDiscountFor(int items) {
+    final raw = min((items * settings.stampReward / 100).round(), settings.stampRewardCap);
+    return (raw ~/ 250) * 250;
+  }
+
+  List<Coupon> get myCoupons => (me?.coupons ?? const []).where((c) => c.valid).toList()..sort((a, b) => b.amount.compareTo(a.amount));
+
+  /// أحسن قسيمة تنفع لهذا الطلب
+  Coupon? bestCoupon(int items) {
+    for (final c in myCoupons) {
+      if (items >= c.minOrder) return c;
+    }
+    return null;
+  }
+
+  /// بطاقات الولاء اللي عندي (محلات بيها أختام فعّالة)
+  List<Store> get myStampStores => [
+        for (final e in (me?.stamps ?? const <String, int>{}).entries)
+          if (e.value > 0 && storeById(e.key) != null && stampsOf(e.key) > 0) storeById(e.key)!,
+      ];
+
+  /// عند التسليم: ختم للزبون بهذا المحل + كرت خدش (بالسيرفر بـ transaction حتى ما يضيع)
+  void _giveLoyalty(Order o) {
+    if (!settings.loyaltyOn || o.status != OrderStatus.delivered) return;
+    final u = userByPhone(o.customerPhone);
+    if (u == null) return;
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final expired = _stampExpired(u, o.storeId);
+    final before = expired ? 0 : (u.stamps[o.storeId] ?? 0);
+    u.stamps[o.storeId] = before + 1;
+    u.stampAt[o.storeId] = now;
+    if (settings.scratchOn) u.scratchPending += 1;
+    final n = settings.stampsNeeded;
+    final left = n - ((before + 1) % n == 0 ? n : (before + 1) % n);
+    final store = storeById(o.storeId)?.name ?? 'المحل';
+    if (before + 1 >= n) {
+      notify(o.customerPhone, 'هديتك جاهزة! طلبك الجاي من $store بخصم ${settings.stampReward}%');
+    } else if (left == 1) {
+      notify(o.customerPhone, 'باقي طلب واحد بس من $store وتاخذ خصم ${settings.stampReward}%!');
+    }
+    if (Cloud.enabled) {
+      final db = Cloud.db!;
+      final ref = db.collection('users').doc(u.phone);
+      db.runTransaction((tx) async {
+        final d = (await tx.get(ref)).data();
+        if (d == null) return;
+        final at = (((d['stampAt'] as Map?) ?? const {})[o.storeId] as num?)?.toInt() ?? 0;
+        final old = (((d['stamps'] as Map?) ?? const {})[o.storeId] as num?)?.toInt() ?? 0;
+        final exp = at > 0 && now - at > settings.stampExpiryDays * 86400000;
+        tx.update(ref, {
+          'stamps.${o.storeId}': (exp ? 0 : old) + 1,
+          'stampAt.${o.storeId}': now,
+          if (settings.scratchOn) 'scratchPending': ((d['scratchPending'] ?? 0) as num).toInt() + 1,
+        });
+      }).catchError((_) {});
+      _markFieldSynced('users', u.phone, 'stamps');
+      _markFieldSynced('users', u.phone, 'stampAt');
+      _markFieldSynced('users', u.phone, 'scratchPending');
+    }
+  }
+
+  /// الطلب انلغى/انرفض: نرجّع للزبون الأختام والقسيمة اللي صرفها
+  void _refundLoyalty(Order o) {
+    final u = userByPhone(o.customerPhone);
+    if (u == null) return;
+    final cp = o.couponDiscount > 0 && o.couponId.isNotEmpty
+        ? Coupon(id: o.couponId, amount: o.couponDiscount, minOrder: 0, expiresAt: DateTime.now().add(Duration(days: settings.couponDays)).millisecondsSinceEpoch)
+        : null;
+    if (o.loyaltyDiscount > 0) {
+      u.stamps[o.storeId] = (u.stamps[o.storeId] ?? 0) + settings.stampsNeeded;
+      u.stampAt[o.storeId] = DateTime.now().millisecondsSinceEpoch;
+    }
+    if (cp != null && !u.coupons.any((c) => c.id == cp.id)) u.coupons.add(cp);
+    notify(o.customerPhone, 'رجّعنالك هديتك من الطلب #${o.id} — تكدر تستخدمها بطلب ثاني');
+    if (!Cloud.enabled) return;
+    final db = Cloud.db!;
+    final ref = db.collection('users').doc(u.phone);
+    db.runTransaction((tx) async {
+      final d = (await tx.get(ref)).data();
+      if (d == null) return;
+      final upd = <String, dynamic>{};
+      if (o.loyaltyDiscount > 0) {
+        upd['stamps.${o.storeId}'] = ((((d['stamps'] as Map?) ?? const {})[o.storeId] as num?)?.toInt() ?? 0) + settings.stampsNeeded;
+        upd['stampAt.${o.storeId}'] = DateTime.now().millisecondsSinceEpoch;
+      }
+      if (cp != null) {
+        final list = [for (final e in (d['coupons'] as List?) ?? const []) Map<String, dynamic>.from(e as Map)];
+        if (!list.any((e) => e['id'] == cp.id)) list.add(cp.toJson());
+        upd['coupons'] = list;
+      }
+      if (upd.isNotEmpty) tx.update(ref, upd);
+    }).catchError((_) {});
+    _markFieldSynced('users', u.phone, 'stamps');
+    _markFieldSynced('users', u.phone, 'stampAt');
+    _markFieldSynced('users', u.phone, 'coupons');
+  }
+
+  /// جوائز الخدش من الإعدادات: [(مبلغ، وزن)]
+  List<(int, int)> get scratchTable {
+    final out = <(int, int)>[];
+    for (final p in settings.scratchPrizes.split(',')) {
+      final x = p.trim().split(':');
+      if (x.length != 2) continue;
+      final a = int.tryParse(x[0].trim()), w = int.tryParse(x[1].trim());
+      if (a != null && w != null && a >= 0 && w > 0) out.add((a, w));
+    }
+    return out.isEmpty ? [(250, 1)] : out;
+  }
+
+  /// يخدش كرت: يختار جائزة حسب الاحتمالات ويضيفها قسيمة. يرجّع المبلغ (أو null إذا ماكو كرت)
+  Future<int?> scratchCard() async {
+    final u = me;
+    if (u == null || u.scratchPending <= 0) return null;
+    final table = scratchTable;
+    final total = table.fold(0, (a, e) => a + e.$2);
+    var r = Random().nextInt(total);
+    var prize = table.first.$1;
+    for (final e in table) {
+      if (r < e.$2) {
+        prize = e.$1;
+        break;
+      }
+      r -= e.$2;
+    }
+    final c = Coupon(
+      id: 'cp${DateTime.now().millisecondsSinceEpoch}',
+      amount: prize,
+      minOrder: settings.scratchMinOrder,
+      expiresAt: DateTime.now().add(Duration(days: settings.couponDays)).millisecondsSinceEpoch,
+    );
+    if (Cloud.enabled) {
+      final db = Cloud.db!;
+      final ref = db.collection('users').doc(u.phone);
+      var ok = false;
+      try {
+        await db.runTransaction((tx) async {
+          final d = (await tx.get(ref)).data();
+          if (d == null) return;
+          final pend = ((d['scratchPending'] ?? 0) as num).toInt();
+          if (pend <= 0) return;
+          final list = [for (final e in (d['coupons'] as List?) ?? const []) Map<String, dynamic>.from(e as Map)];
+          if (prize > 0) list.add(c.toJson());
+          tx.update(ref, {'scratchPending': pend - 1, 'coupons': list});
+          ok = true;
+        }).timeout(const Duration(seconds: 15));
+      } catch (_) {
+        return null;
+      }
+      if (!ok) {
+        u.scratchPending = 0;
+        _changed();
+        return null;
+      }
+    }
+    u.scratchPending -= 1;
+    if (prize > 0) u.coupons.add(c);
+    if (Cloud.enabled) {
+      _markFieldSynced('users', u.phone, 'scratchPending');
+      _markFieldSynced('users', u.phone, 'coupons');
+    }
+    _changed();
+    return prize;
+  }
 }

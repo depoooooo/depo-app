@@ -11,6 +11,7 @@ import '../data/models.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
 import '../widgets/depo_refresh.dart';
+import '../widgets/loyalty_ui.dart';
 import 'auth.dart';
 
 /// طلباتي
@@ -161,15 +162,29 @@ class OrderDetailScreen extends StatelessWidget {
                   for (final l in o.lines)
                     Row(children: [Expanded(child: Text('${l.title} ×${l.qty}')), Text(iqd(l.price * l.qty))]),
                   Row(children: [const Expanded(child: Text('التوصيل')), Text(o.deliveryFee == 0 ? 'مجاني' : iqd(o.deliveryFee))]),
+                  if (o.loyaltyDiscount > 0)
+                    Row(children: [
+                      const Expanded(child: Text('هدية بطاقة الولاء', style: TextStyle(color: DepoColors.success, fontWeight: FontWeight.w800))),
+                      Text('− ${iqd(o.loyaltyDiscount)}', style: const TextStyle(color: DepoColors.success, fontWeight: FontWeight.w800)),
+                    ]),
+                  if (o.couponDiscount > 0)
+                    Row(children: [
+                      const Expanded(child: Text('قسيمة كرت الخدش', style: TextStyle(color: DepoColors.success, fontWeight: FontWeight.w800))),
+                      Text('− ${iqd(o.couponDiscount)}', style: const TextStyle(color: DepoColors.success, fontWeight: FontWeight.w800)),
+                    ]),
                   const Divider(),
                   Row(children: [
                     const Expanded(child: Text('المجموع — نقداً عند الاستلام', style: TextStyle(fontWeight: FontWeight.w900))),
                     Text(iqd(o.total), style: const TextStyle(fontWeight: FontWeight.w900)),
                   ]),
-                  Text('وفّرت ${iqd(o.originalTotal - o.itemsTotal)}', style: const TextStyle(color: DepoColors.success, fontWeight: FontWeight.w700)),
+                  Text('وفّرت ${iqd(o.originalTotal - o.itemsTotal + o.discounts)}', style: const TextStyle(color: DepoColors.success, fontWeight: FontWeight.w700)),
                   if (!o.pickup && o.address.isNotEmpty) Text('العنوان: ${o.address}', style: const TextStyle(fontSize: 12, color: DepoColors.muted)),
                 ]),
               ),
+              if (o.status == OrderStatus.delivered && o.customerPhone == app.currentPhone && app.settings.loyaltyOn && app.storeById(o.storeId) != null) ...[
+                const ScratchPrompt(inset: false),
+                StampCard(store: app.storeById(o.storeId)!, compact: true),
+              ],
               if (o.status == OrderStatus.placed && o.customerPhone == app.currentPhone)
                 OutlinedButton(
                   onPressed: () async {
