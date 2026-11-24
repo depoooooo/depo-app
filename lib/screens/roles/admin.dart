@@ -364,8 +364,7 @@ class _SettingsTabState extends State<_SettingsTab> {
                 controller: c['ratingTiers'],
                 decoration: const InputDecoration(
                   labelText: 'المستويات (أقل تقييم:نسبة%)',
-                  helperText: 'مثال 4.8:15,4.5:8,4.0:0,3.5:-5,0:-10
-الموجب مكافأة والسالب خصم. الخصم ما ينزّل الكروة تحت الحد الأدنى',
+                  helperText: 'مثال 4.8:15,4.5:8,4.0:0,3.5:-5,0:-10\nالموجب مكافأة والسالب خصم. الخصم ما ينزّل الكروة تحت الحد الأدنى',
                   helperMaxLines: 3,
                 ),
               ),
