@@ -159,6 +159,7 @@ class _SettingsTabState extends State<_SettingsTab> {
   late bool allowStoreDelivery = app.settings.allowStoreDelivery;
   late bool loyaltyOn = app.settings.loyaltyOn;
   late bool scratchOn = app.settings.scratchOn;
+  late bool ratingTiersOn = app.settings.ratingTiersOn;
 
   @override
   void initState() {
@@ -197,6 +198,10 @@ class _SettingsTabState extends State<_SettingsTab> {
       'scratchPrizes': TextEditingController(text: s.scratchPrizes),
       'scratchMinOrder': TextEditingController(text: '${s.scratchMinOrder}'),
       'couponDays': TextEditingController(text: '${s.couponDays}'),
+      'ratingTiers': TextEditingController(text: s.ratingTiers),
+      'ratingWindow': TextEditingController(text: '${s.ratingWindow}'),
+      'ratingMinCount': TextEditingController(text: '${s.ratingMinCount}'),
+      'ratingPrioritySec': TextEditingController(text: '${s.ratingPrioritySec}'),
     };
     campaign = TextEditingController(text: s.campaignName);
     firstFree = s.firstOrderFree;
@@ -260,6 +265,12 @@ class _SettingsTabState extends State<_SettingsTab> {
     if (RegExp(r'^\d+:\d+(,\d+:\d+)*$').hasMatch(pr)) s.scratchPrizes = pr;
     s.scratchMinOrder = v('scratchMinOrder', s.scratchMinOrder);
     s.couponDays = v('couponDays', s.couponDays).clamp(1, 90);
+    s.ratingTiersOn = ratingTiersOn;
+    final rt = c['ratingTiers']!.text.replaceAll(' ', '').replaceAll('،', ',');
+    if (RegExp(r'^\d(\.\d+)?:-?\d+(,\d(\.\d+)?:-?\d+)*$').hasMatch(rt)) s.ratingTiers = rt;
+    s.ratingWindow = v('ratingWindow', s.ratingWindow).clamp(5, 1000);
+    s.ratingMinCount = v('ratingMinCount', s.ratingMinCount).clamp(1, 500);
+    s.ratingPrioritySec = c['ratingPrioritySec']!.text.trim().isEmpty ? 0 : v('ratingPrioritySec', s.ratingPrioritySec).clamp(0, 600);
     app.saveSettings();
     toast(context, 'انحفظت الإعدادات وتسري على الطلبات الجديدة');
   }
@@ -335,6 +346,38 @@ class _SettingsTabState extends State<_SettingsTab> {
               title: const Text('التوصيل بمندوب المحل', style: TextStyle(fontWeight: FontWeight.w800)),
               subtitle: const Text('مطفي = زر «أوصله بمندوبي» ما يطلع للمحل'),
             ),
+          ]),
+        ),
+        const SectionTitle('مستويات المندوبين حسب التقييم'),
+        AppCard(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              value: ratingTiersOn,
+              onChanged: (v) => setState(() => ratingTiersOn = v),
+              title: const Text('الكروة تتغير حسب تقييم المندوب', style: TextStyle(fontWeight: FontWeight.w800)),
+              subtitle: const Text('مكافأة للأعلى تقييماً، خصم للأقل، وأولوية بالطلبات الجديدة'),
+            ),
+            Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: TextField(
+                controller: c['ratingTiers'],
+                decoration: const InputDecoration(
+                  labelText: 'المستويات (أقل تقييم:نسبة%)',
+                  helperText: 'مثال 4.8:15,4.5:8,4.0:0,3.5:-5,0:-10
+الموجب مكافأة والسالب خصم. الخصم ما ينزّل الكروة تحت الحد الأدنى',
+                  helperMaxLines: 3,
+                ),
+              ),
+            ),
+            Row(children: [
+              Expanded(child: f('ratingWindow', 'آخر كم تقييم ينحسب')),
+              const SizedBox(width: 8),
+              Expanded(child: f('ratingMinCount', 'أقل تقييمات للدخول')),
+            ]),
+            f('ratingPrioritySec', 'تأخير الطلبات الجديدة للمستويات الأقل (ثانية، 0 = بدون)'),
+            Text('الحالي: ${app.courierTiers.map((t) => '${t.name} ${t.minStars}★ ${t.pct}%').join(' • ')}',
+                style: const TextStyle(fontSize: 12, color: DepoColors.muted)),
           ]),
         ),
         const SectionTitle('الولاء (لعبة الأختام وكروت الخدش)'),

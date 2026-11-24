@@ -571,7 +571,7 @@ class CourierStatementScreen extends StatelessWidget {
           body: ListView(padding: const EdgeInsets.all(16), children: [
             AppCard(
               child: Column(children: [
-                Note('${st.orders.length} توصيلة • ${st.km.toStringAsFixed(1)} كم${app.courierRatingOf(phone).$2 == 0 ? '' : ' • التقييم ${app.courierRatingOf(phone).$1.toStringAsFixed(1)} ★ (${app.courierRatingOf(phone).$2})'}'),
+                Note('${st.orders.length} توصيلة • ${st.km.toStringAsFixed(1)} كم${app.courierRatingOf(phone).$2 == 0 ? '' : ' • التقييم ${app.courierRatingOf(phone).$1.toStringAsFixed(1)} ★ (${app.courierRatingOf(phone).$2})'}'${app.settings.ratingTiersOn ? ' • المستوى: ${app.tierOf(phone).name}' : ''}'),
                 MoneyRow('كل الأجور', st.earned, bold: true, color: DepoColors.dark),
                 if (st.walletPaid > 0) MoneyRow('انضافت لمحفظته مباشرة', st.walletPaid, sign: '−'),
                 if (st.walletPaid > 0) MoneyRow('مستحق بالتسوية الشهرية', b.due, bold: true),
@@ -612,7 +612,8 @@ class CourierStatementScreen extends StatelessWidget {
                     ),
                   ]),
                   Note('المسافة: ${app.kmSourceText(o)}', color: o.kmNeedsReview ? const Color(0xFF8A5A00) : null),
-                  Note('الأجرة: ${CourierPay.of(o.payRule, app.settings).explain(o.distanceKm)}${o.peakBonus > 0 ? ' + مكافأة الذروة ${iqd(o.peakBonus)}' : ''}'),
+                  Note('الأجرة: ${CourierPay.of(o.payRule, app.settings).explain(o.distanceKm)}${o.peakBonus > 0 ? ' + مكافأة الذروة ${iqd(o.peakBonus)}' : ''}'
+                      '${o.ratingBonus != 0 ? ' ${o.ratingBonus > 0 ? '+' : '−'} ${o.ratingBonus > 0 ? 'مكافأة' : 'خصم'} مستوى «${o.ratingTier}» (${o.ratingPct}%) ${iqd(o.ratingBonus.abs())}' : ''}'),
                   MoneyRow('الأجرة', o.courierPay, bold: true),
                   MoneyRow(o.walletMode ? 'حصّل من الزبون (انخصم من رصيده)' : 'حصّل من الزبون (يسلّمه لديبو)', o.total),
                   Wrap(spacing: 8, children: [

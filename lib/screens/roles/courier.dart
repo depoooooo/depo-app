@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../data/app_state.dart';
 import '../../data/models.dart';
@@ -37,6 +38,7 @@ class CourierHome extends StatelessWidget {
             ),
           ),
           const _WalletCard(),
+          const _TierCard(),
           const _Earnings(),
           const SectionTitle('مهامي'),
           if (app.myTasks.isEmpty) const Text('ماكو مهام حالية', style: TextStyle(color: DepoColors.muted)),
@@ -49,6 +51,9 @@ class CourierHome extends StatelessWidget {
             const EmptyState(icon: Icons.delivery_dining, text: 'ماكو مهام هسه. أول ما محل يجهّز طلب توصيل، يطلع هنا.')
           else
             for (final o in app.availableTasks)
+              if (app.taskLockedFor(o) > 0)
+                _LockedTask(order: o)
+              else
               OrderTile(
                 order: o,
                 trailing: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
@@ -190,6 +195,147 @@ class CourierHome extends StatelessWidget {
 
 
 /// أرباح المندوب: هذا الشهر + الشهور السابقة وحالة تسويتها
+/// مستواي: تقييمي ونسبة المكافأة/الخصم وشكد باقي للمستوى الجاي
+class _TierCard extends StatelessWidget {
+  const _TierCard();
+  @override
+  Widget build(BuildContext context) {
+    final s = app.settings;
+    if (!s.ratingTiersOn || app.currentPhone == null) return const SizedBox.shrink();
+    final me = app.currentPhone!;
+    final t = app.tierOf(me);
+    final sc = app.courierScore(me);
+    final next = app.nextTierOf(me);
+    final tiers = app.courierTiers;
+    final colors = t.isNew
+        ? const [Color(0xFF4BCDDB), Color(0xFF0E7F8A)]
+        : t.pct < 0
+            ? const [Color(0xFFFF8A8E), Color(0xFFE5484D)]
+            : t.rank == 0
+                ? const [Color(0xFFFFC24B), Color(0xFFF07B24)]
+                : t.rank == 1
+                    ? const [Color(0xFFB8C6CC), Color(0xFF6B7F86)]
+                    : const [Color(0xFF0E7F8A), Color(0xFF06363C)];
+    String hint;
+    double prog;
+    if (t.isNew) {
+      hint = 'باقي ${s.ratingMinCount - sc.$2} تقييم حتى يتحدد مستواك';
+      prog = sc.$2 / s.ratingMinCount;
+    } else if (next == null) {
+      hint = 'أنت بالقمة! حافظ على ${t.minStars.toStringAsFixed(1)} ★ وفوق حتى تبقى ${t.name}';
+      prog = 1;
+    } else {
+      hint = 'وصّل لـ ${next.minStars.toStringAsFixed(1)} ★ وتصير «${next.name}» = ${tierPctText(next.pct)}';
+      final lo = t.minStars, hi = next.minStars;
+      prog = hi <= lo ? 0 : ((sc.$1 - lo) / (hi - lo)).clamp(0, 1).toDouble();
+    }
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 6),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(colors: colors, begin: AlignmentDirectional.topStart, end: AlignmentDirectional.bottomEnd),
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Icon(t.pct < 0 ? Icons.warning_amber_rounded : Icons.workspace_premium_rounded, color: Colors.white, size: 30),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('مستواك: ${t.name}', style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900)),
+              Text(t.isNew ? 'أجرتك العادية لحد ما يتحدد مستواك' : '${tierPctText(t.pct)} على كل توصيلة',
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 12.5)),
+            ]),
+          ),
+          if (sc.$2 > 0)
+            Column(children: [
+              Text(sc.$1.toStringAsFixed(2), style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w900)),
+              Text('★ (${sc.$2})', style: const TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w700)),
+            ]),
+        ]),
+        const SizedBox(height: 10),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(8),
+          child: LinearProgressIndicator(value: prog, minHeight: 7, backgroundColor: Colors.white24, color: Colors.white),
+        ),
+        const SizedBox(height: 6),
+        Text(hint, style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w800)),
+        if (app.priorityDelayOf(me) == 0 && !t.isNew)
+          const Text('تشوف الطلبات الجديدة قبل غيرك', style: TextStyle(color: Colors.white, fontSize: 11.5, fontWeight: FontWeight.w700))
+        else if (s.ratingPrioritySec > 0)
+          Text('الطلبات الجديدة توصلك بعد ${app.priorityDelayOf(me)} ثانية — «${tiers.first.name}» يشوفها أول',
+              style: const TextStyle(color: Colors.white70, fontSize: 11.5, fontWeight: FontWeight.w700)),
+        const SizedBox(height: 8),
+        Wrap(spacing: 6, runSpacing: 6, children: [
+          for (final x in tiers)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: x.name == t.name ? Colors.white : Colors.white24,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text('${x.name} ${x.minStars.toStringAsFixed(1)}★ ${x.pct > 0 ? '+' : ''}${x.pct}%',
+                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: x.name == t.name ? colors.last : Colors.white)),
+            ),
+        ]),
+        const SizedBox(height: 4),
+        Text('ينحسب من آخر ${s.ratingWindow} تقييم. سرعة وأدب ويه الزبون = نجوم أكثر = كروة أعلى',
+            style: const TextStyle(color: Colors.white70, fontSize: 10.5)),
+      ]),
+    );
+  }
+}
+
+/// طلب جديد محجوز للمستويات الأعلى — يفتح للمندوب بعد العدّاد
+class _LockedTask extends StatefulWidget {
+  final Order order;
+  const _LockedTask({required this.order});
+  @override
+  State<_LockedTask> createState() => _LockedTaskState();
+}
+
+class _LockedTaskState extends State<_LockedTask> {
+  Timer? t;
+  @override
+  void initState() {
+    super.initState();
+    t = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!mounted) return;
+      if (app.taskLockedFor(widget.order) <= 0) {
+        t?.cancel();
+        app.refreshUi();
+      } else {
+        setState(() {});
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    t?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final left = app.taskLockedFor(widget.order);
+    final top = app.courierTiers.first.name;
+    return AppCard(
+      color: const Color(0xFFFFF6E5),
+      child: Row(children: [
+        const Icon(Icons.lock_clock_rounded, color: Color(0xFF8A5A00)),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('طلب جديد من ${app.storeById(widget.order.storeId)?.name ?? ''}', style: const TextStyle(fontWeight: FontWeight.w900)),
+            Text('محجوز لمندوبين «$top» — يفتح إلك بعد $left ثانية', style: const TextStyle(fontSize: 12, color: Color(0xFF8A5A00), fontWeight: FontWeight.w700)),
+          ]),
+        ),
+      ]),
+    );
+  }
+}
+
 class _Earnings extends StatelessWidget {
   const _Earnings();
 
@@ -207,7 +353,7 @@ class _Earnings extends StatelessWidget {
           Text(iqd(now.earned), style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: DepoColors.dark)),
         ]),
         Text('${now.orders.length} توصيلة • ${now.km.toStringAsFixed(1)} كم • ${now.walletPaid == now.earned ? 'انضافت لرصيدك مباشرة' : 'التسوية آخر الشهر'}', style: const TextStyle(fontSize: 12, color: DepoColors.muted)),
-        if (app.courierRatingOf(app.currentPhone!).$2 > 0)
+        if (!s.ratingTiersOn && app.courierRatingOf(app.currentPhone!).$2 > 0)
           Text('تقييمك من الزبائن: ${app.courierRatingOf(app.currentPhone!).$1.toStringAsFixed(1)} ★ (${app.courierRatingOf(app.currentPhone!).$2} تقييم)',
               style: const TextStyle(fontSize: 12, color: DepoColors.dark, fontWeight: FontWeight.w700)),
         if (s.peakBonus > 0 && s.peakHours.isNotEmpty) Text('وقت الذروة (${s.peakHours}): + ${iqd(s.peakBonus)} لكل توصيلة', style: const TextStyle(fontSize: 11, color: Color(0xFF8A5A00), fontWeight: FontWeight.w700)),

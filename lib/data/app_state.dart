@@ -482,6 +482,7 @@ class AppState extends ChangeNotifier {
   }
 
   void _changedPublic() => _changed();
+  void refreshUi() => notifyListeners();
   void _logPublic(String t) => _log(t);
 
   /// يشيل البيانات التجريبية بس (المحلات والحسابات 0700000…) ويخلي الحقيقية — قبل الإطلاق
@@ -1048,6 +1049,7 @@ class AppState extends ChangeNotifier {
         }
       }
     }
+    if ((st == OrderStatus.preparing || st == OrderStatus.ready) && o.openAt == 0) o.openAt = DateTime.now().millisecondsSinceEpoch;
     if (st == OrderStatus.delivered) {
       o.deliveredAt = DateTime.now().millisecondsSinceEpoch;
       if (paidCourier(o)) {
@@ -1055,7 +1057,12 @@ class AppState extends ChangeNotifier {
         o.payRule = cp.rule;
         o.distanceKm = cp.kmOf(o.distanceKm);
         o.peakBonus = settings.isPeak(DateTime.now()) ? settings.peakBonus : 0;
-        o.courierPay = cp.pay(o.distanceKm) + o.peakBonus;
+        // مستوى المندوب حسب تقييمه: مكافأة أو خصم بنسبة من الأجرة (تنحفظ وقت التسليم)
+        final tier = this.tierOf(o.courierPhone!);
+        o.ratingPct = settings.ratingTiersOn ? tier.pct : 0;
+        o.ratingTier = settings.ratingTiersOn ? tier.name : '';
+        o.ratingBonus = this.ratingBonusFor(cp.pay(o.distanceKm), o.ratingPct, cp.minPay);
+        o.courierPay = cp.pay(o.distanceKm) + o.peakBonus + o.ratingBonus;
       } else {
         o.courierPay = 0;
       }
@@ -1247,6 +1254,7 @@ class AppState extends ChangeNotifier {
   /// المندوب ياخذ المهمة. بالسيرفر نتأكد ما أخذها غيره بنفس اللحظة.
   Future<bool> takeTask(Order o) async {
     if (o.courierPhone != null || currentPhone == null) return false;
+    if (this.taskLockedFor(o) > 0) return false; // الأولوية للأعلى تقييماً
     if (this.walletAvailable(currentPhone!) < o.total) return false; // رصيده ما يغطي مبلغ الطلب
     if (Cloud.enabled) {
       final db = Cloud.db!;
@@ -2199,7 +2207,8 @@ extension Finance on AppState {
     if (!o.kmFlags.contains('edited:${oldKm.toStringAsFixed(1)}')) o.kmFlags.add('edited:${oldKm.toStringAsFixed(1)}');
     if (o.status == OrderStatus.delivered && paidCourier(o)) {
       if (o.payRule.length < 4) o.payRule = cp.rule;
-      o.courierPay = cp.pay(o.distanceKm) + o.peakBonus;
+      o.ratingBonus = this.ratingBonusFor(cp.pay(o.distanceKm), o.ratingPct, cp.minPay);
+      o.courierPay = cp.pay(o.distanceKm) + o.peakBonus + o.ratingBonus;
     }
     _log('تعديل مسافة الطلب #${o.id} إلى ${o.distanceKm.toStringAsFixed(1)} كم (الأجرة ${iqd(old)} ← ${iqd(o.courierPay)})');
     _changed();
@@ -2624,7 +2633,17 @@ extension Growth on AppState {
   /// تقييم المندوب من الزبون
   void rateCourier(Order o, int stars) {
     if (o.courierRating > 0 || o.status != OrderStatus.delivered || o.customerPhone != currentPhone || o.courierPhone == null) return;
+    final before = this.tierOf(o.courierPhone!);
     o.courierRating = stars.clamp(1, 5);
+    final after = this.tierOf(o.courierPhone!);
+    final sc = this.courierScore(o.courierPhone!);
+    if (settings.ratingTiersOn && after.name != before.name && sc.$2 >= settings.ratingMinCount) {
+      notify(o.courierPhone!, after.pct > before.pct
+          ? 'مبروك! صعدت لمستوى «${after.name}» — ${tierPctText(after.pct)} على كل توصيلة'
+          : 'نزل مستواك لـ«${after.name}» (${sc.$1.toStringAsFixed(2)} ★) — ${tierPctText(after.pct)}. حسّن تقييمك وترجع تصعد');
+    } else {
+      notify(o.courierPhone!, 'زبون قيّمك $stars ★ على الطلب #${o.id} — تقييمك هسه ${sc.$1.toStringAsFixed(2)} ★');
+    }
     _changed();
   }
 
@@ -2978,5 +2997,93 @@ extension Loyalty on AppState {
     }
     _changed();
     return prize;
+  }
+}
+
+
+// ======================= مستويات المندوبين حسب التقييم =======================
+class CourierTier {
+  final String name;
+  final double minStars;
+  final int pct; // + مكافأة / − خصم من الأجرة
+  final int rank; // 0 = الأعلى
+  final bool isNew;
+  const CourierTier(this.name, this.minStars, this.pct, this.rank, {this.isNew = false});
+}
+
+String tierPctText(int pct) => pct > 0 ? 'مكافأة +$pct%' : pct < 0 ? 'خصم ${-pct}%' : 'الأجرة العادية';
+
+extension CourierTiers on AppState {
+  /// المستويات من الإعدادات (من الأعلى للأقل)
+  List<CourierTier> get courierTiers {
+    final raw = <(double, int)>[];
+    for (final p in settings.ratingTiers.replaceAll('،', ',').split(',')) {
+      final x = p.trim().split(':');
+      if (x.length != 2) continue;
+      final m = double.tryParse(x[0].trim()), v = int.tryParse(x[1].trim());
+      if (m != null && v != null) raw.add((m.clamp(0, 5).toDouble(), v.clamp(-50, 100)));
+    }
+    if (raw.isEmpty) raw.add((0, 0));
+    raw.sort((a, b) => b.$1.compareTo(a.$1));
+    if (raw.last.$1 > 0) raw.add((0, raw.last.$2)); // لازم أحد يغطي من صفر
+    const good = ['ذهبي', 'فضي', 'برونزي', 'مميز', 'نشيط'];
+    const bad = ['تحت المراقبة', 'إنذار', 'إنذار أخير'];
+    var g = 0, b = 0;
+    return [
+      for (var i = 0; i < raw.length; i++)
+        CourierTier(
+          raw[i].$2 > 0 ? good[min(g++, good.length - 1)] : raw[i].$2 == 0 ? 'أساسي' : bad[min(b++, bad.length - 1)],
+          raw[i].$1,
+          raw[i].$2,
+          i,
+        ),
+    ];
+  }
+
+  /// معدل آخر التقييمات (آخر ratingWindow تقييم)
+  (double, int) courierScore(String phone) {
+    final l = orders.where((o) => o.courierPhone == phone && o.courierRating > 0).toList()..sort((a, b) => b.deliveredAt.compareTo(a.deliveredAt));
+    final w = l.take(settings.ratingWindow.clamp(5, 1000)).toList();
+    if (w.isEmpty) return (0, 0);
+    return (w.fold(0, (a, o) => a + o.courierRating) / w.length, w.length);
+  }
+
+  CourierTier tierOf(String phone) {
+    final sc = courierScore(phone);
+    final ts = courierTiers;
+    if (sc.$2 < settings.ratingMinCount) return CourierTier('جديد', 0, 0, ts.length, isNew: true);
+    return ts.firstWhere((t) => sc.$1 + 1e-9 >= t.minStars, orElse: () => ts.last);
+  }
+
+  /// المستوى الأعلى الجاي (null إذا هو بالقمة)
+  CourierTier? nextTierOf(String phone) {
+    final cur = tierOf(phone);
+    final ts = courierTiers;
+    if (cur.isNew) return ts.firstWhere((t) => t.pct >= 0, orElse: () => ts.first);
+    return cur.rank == 0 ? null : ts[cur.rank - 1];
+  }
+
+  /// مبلغ المكافأة/الخصم مقرّب لأقرب 250، والخصم ما ينزّل الأجرة تحت الحد الأدنى
+  int ratingBonusFor(int pay, int pct, int minPay) {
+    if (pct == 0) return 0;
+    var b = ((pay * pct / 100) / 250).round() * 250;
+    if (pay + b < minPay) b = minPay - pay;
+    if (b > 0 && pct < 0) b = 0;
+    return b;
+  }
+
+  /// كم ثانية لازم ينتظر هذا المندوب قبل ما يشوف الطلب (الأعلى تقييماً أول)
+  int priorityDelayOf(String phone) {
+    if (!settings.ratingTiersOn || settings.ratingPrioritySec <= 0) return 0;
+    final t = tierOf(phone);
+    if (t.rank == 0 && !t.isNew) return 0;
+    return t.pct < 0 ? settings.ratingPrioritySec * 2 : settings.ratingPrioritySec;
+  }
+
+  /// باقي كم ثانية حتى يكدر يقبل هذا الطلب (0 = هسه)
+  int taskLockedFor(Order o) {
+    if (currentPhone == null || o.openAt == 0) return 0;
+    final left = o.openAt + priorityDelayOf(currentPhone!) * 1000 - DateTime.now().millisecondsSinceEpoch;
+    return left <= 0 ? 0 : (left / 1000).ceil();
   }
 }

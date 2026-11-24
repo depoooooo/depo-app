@@ -455,6 +455,10 @@ class Order {
   int loyaltyDiscount; // هدية بطاقة الولاء (ديبو تتحملها)
   int couponDiscount; // قسيمة كرت الخدش (ديبو تتحملها)
   String couponId;
+  int ratingPct; // نسبة مستوى المندوب وقت التسليم (+ مكافأة / − خصم)
+  int ratingBonus; // مبلغها (ضمن أجرة المندوب)
+  String ratingTier; // اسم المستوى وقت التسليم
+  int openAt; // وقت صار الطلب متاح للمندوبين (لأولوية الأعلى تقييماً)
 
   Order({
     required this.id,
@@ -502,6 +506,10 @@ class Order {
     this.loyaltyDiscount = 0,
     this.couponDiscount = 0,
     this.couponId = '',
+    this.ratingPct = 0,
+    this.ratingBonus = 0,
+    this.ratingTier = '',
+    this.openAt = 0,
   })  : payRule = payRule ?? const [],
         kmFlags = kmFlags ?? [],
         createdAt = createdAt ?? _now();
@@ -563,6 +571,10 @@ class Order {
         'loyaltyDiscount': loyaltyDiscount,
         'couponDiscount': couponDiscount,
         'couponId': couponId,
+        'ratingPct': ratingPct,
+        'ratingBonus': ratingBonus,
+        'ratingTier': ratingTier,
+        'openAt': openAt,
       };
 
   factory Order.fromJson(Map<String, dynamic> j) => Order(
@@ -611,6 +623,10 @@ class Order {
         loyaltyDiscount: (j['loyaltyDiscount'] ?? 0) as int,
         couponDiscount: (j['couponDiscount'] ?? 0) as int,
         couponId: (j['couponId'] ?? '') as String,
+        ratingPct: (j['ratingPct'] ?? 0) as int,
+        ratingBonus: (j['ratingBonus'] ?? 0) as int,
+        ratingTier: (j['ratingTier'] ?? '') as String,
+        openAt: (j['openAt'] ?? 0) as int,
       );
 
   /// المسافة تحتاج مراجعة قبل تسوية أجور المندوب
@@ -899,6 +915,12 @@ class AppSettings {
   String scratchPrizes; // جوائز الخدش: مبلغ:وزن
   int scratchMinOrder; // أقل طلب حتى تنفع القسيمة
   int couponDays; // صلاحية القسيمة
+  // ---- مستويات المندوبين حسب التقييم ----
+  bool ratingTiersOn;
+  String ratingTiers; // أقل تقييم:نسبة%، مثل 4.8:15,4.5:8,4.0:0,3.5:-5,0:-10
+  int ratingWindow; // آخر كم تقييم ينحسب
+  int ratingMinCount; // أقل عدد تقييمات حتى يدخل بالمستويات
+  int ratingPrioritySec; // المستويات الأقل تشوف الطلب الجديد بعد هالثواني
 
   AppSettings({
     this.restaurantCommission = 15,
@@ -941,6 +963,11 @@ class AppSettings {
     this.scratchPrizes = '250:45,500:30,1000:17,2000:6,5000:2',
     this.scratchMinOrder = 5000,
     this.couponDays = 7,
+    this.ratingTiersOn = true,
+    this.ratingTiers = '4.8:15,4.5:8,4.0:0,3.5:-5,0:-10',
+    this.ratingWindow = 50,
+    this.ratingMinCount = 10,
+    this.ratingPrioritySec = 30,
   });
 
   /// هل الساعة [h] ضمن الذروة؟
@@ -1000,6 +1027,11 @@ class AppSettings {
         'scratchPrizes': scratchPrizes,
         'scratchMinOrder': scratchMinOrder,
         'couponDays': couponDays,
+        'ratingTiersOn': ratingTiersOn,
+        'ratingTiers': ratingTiers,
+        'ratingWindow': ratingWindow,
+        'ratingMinCount': ratingMinCount,
+        'ratingPrioritySec': ratingPrioritySec,
       };
 
   factory AppSettings.fromJson(Map<String, dynamic> j) {
@@ -1047,6 +1079,11 @@ class AppSettings {
       scratchPrizes: (j['scratchPrizes'] ?? d.scratchPrizes) as String,
       scratchMinOrder: g('scratchMinOrder', d.scratchMinOrder),
       couponDays: g('couponDays', d.couponDays),
+      ratingTiersOn: (j['ratingTiersOn'] ?? d.ratingTiersOn) as bool,
+      ratingTiers: (j['ratingTiers'] ?? d.ratingTiers) as String,
+      ratingWindow: g('ratingWindow', d.ratingWindow),
+      ratingMinCount: g('ratingMinCount', d.ratingMinCount),
+      ratingPrioritySec: g('ratingPrioritySec', d.ratingPrioritySec),
     );
   }
 }
