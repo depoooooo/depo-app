@@ -64,7 +64,8 @@ async def main():
     print('########## guest')
     await run('', [])
     print('########## owner: markets')
-    await run('07704720344', ['حسابي', 'الأسواق', 'dump:MARKETS', 'ديوني عند المحلات', 'dump:MY DEBTS', 'رجوع',
-                              'محلي', 'dump:MY SHOP', 'رجوع', 'dump:BACK TO MARKETS'])
+    await run('07704720344', ['حسابي', 'الأسواق', 'dump:MARKETS', 'مخلي', 'dump:SHOP PAGE', 'رجوع', 'ديوني عند المحلات', 'dump:MY DEBTS', 'رجوع',
+                              'محلي', 'dump:MY SHOP', 'المنتجات', 'dump:PRODUCTS', 'الطلبات', 'dump:ORDERS', 'بيانات المحل', 'dump:SHOP FORM', 'رجوع',
+                              'الزبائن والديون', 'طلب جديد', 'dump:NEW DEBT', 'رجوع', 'تسجيل دفعة', 'dump:PAYMENT'])
 
 asyncio.run(main())
