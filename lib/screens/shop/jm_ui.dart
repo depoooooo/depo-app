@@ -35,12 +35,12 @@ ThemeData jmTheme(BuildContext context) {
   );
 }
 
-/// شاشة بنفس شكل شاشات ديبو: شريط علوي + عنوان بالوسط
+/// تخطيط جمّارة: زر رجوع دائري فوق + عنوان كبير + أزرار دائرية — بألوان ديبو
 class JmScaffold extends StatelessWidget {
   final String title;
   final String? subtitle;
-  final Widget? leading; // صورة المحل جنب العنوان
-  final List<Widget> actions;
+  final Widget? leading; // يمين العنوان (صورة المحل مثلاً)
+  final List<Widget> actions; // يسار (أزرار دائرية)
   final Widget body;
   final Widget? bottom;
   final Color? titleColor;
@@ -53,21 +53,31 @@ class JmScaffold extends StatelessWidget {
       child: Scaffold(
         backgroundColor: DepoColors.bg,
         bottomNavigationBar: bottom,
-        appBar: AppBar(
-          titleSpacing: 0,
-          title: Row(mainAxisSize: MainAxisSize.min, children: [
-            if (leading != null) ...[SizedBox(width: 34, height: 34, child: FittedBox(child: leading!)), const SizedBox(width: 8)],
-            Flexible(
-              child: Column(mainAxisSize: MainAxisSize.min, children: [
-                Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: titleColor ?? DepoColors.ink)),
-                if (subtitle != null && subtitle!.isNotEmpty)
-                  Text(subtitle!, style: const TextStyle(fontSize: 11.5, color: DepoColors.muted, fontWeight: FontWeight.w600)),
+        body: SafeArea(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+              child: Align(
+                alignment: AlignmentDirectional.centerEnd,
+                child: JmCircleBtn(icon: Icons.arrow_forward, onTap: () => Navigator.maybePop(context), tooltip: 'رجوع'),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 6, 16, 10),
+              child: Row(children: [
+                if (leading != null) ...[leading!, const SizedBox(width: 12)],
+                Expanded(
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 26, fontWeight: FontWeight.w900, color: titleColor ?? Jm.text)),
+                    if (subtitle != null) Text(subtitle!, style: const TextStyle(fontSize: 12, color: DepoColors.brand, fontWeight: FontWeight.w700)),
+                  ]),
+                ),
+                for (final a in actions) Padding(padding: const EdgeInsetsDirectional.only(start: 8), child: a),
               ]),
             ),
+            Expanded(child: body),
           ]),
-          actions: [for (final a in actions) Padding(padding: const EdgeInsetsDirectional.only(end: 6), child: a), const SizedBox(width: 6)],
         ),
-        body: body,
       ),
     );
   }
@@ -82,12 +92,12 @@ class JmCircleBtn extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final b = Material(
-      color: DepoColors.soft,
-      shape: const CircleBorder(),
+      color: Colors.white,
+      shape: const CircleBorder(side: BorderSide(color: Jm.line)),
       child: InkWell(
         customBorder: const CircleBorder(),
         onTap: onTap,
-        child: Padding(padding: const EdgeInsets.all(8), child: Icon(icon, size: 20, color: DepoColors.dark)),
+        child: Padding(padding: const EdgeInsets.all(9), child: Icon(icon, size: 20, color: DepoColors.ink)),
       ),
     );
     return tooltip == null ? b : Tooltip(message: tooltip!, child: b);
