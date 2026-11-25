@@ -34,7 +34,7 @@ class _MarketsScreenState extends State<MarketsScreen> {
           title: 'الأسواق',
           actions: [
             JmCircleBtn(icon: Icons.storefront_outlined, tooltip: 'محلي', onTap: () => _push(context, const MyShopScreen())),
-            JmCircleBtn(icon: Icons.add, tooltip: 'إنشاء محل', onTap: () => _push(context, const MyShopScreen())),
+            if (app.myShop == null) JmCircleBtn(icon: Icons.add, tooltip: 'إنشاء محل', onTap: () => _push(context, const MyShopScreen())),
           ],
           body: ListView(padding: const EdgeInsets.fromLTRB(16, 4, 16, 24), children: [
             JmButton(label: 'ديوني عند المحلات', icon: Icons.person_outline, onTap: () => _push(context, const MyDebtsScreen())),
