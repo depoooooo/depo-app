@@ -15,9 +15,16 @@ async def texts(page):
     }""")
 
 async def main():
+    for phone in ('', '07704720344'):
+        print(f'########## SCENARIO phone={phone or "guest"}')
+        await run(phone)
+
+async def run(phone):
     async with async_playwright() as p:
         b = await p.chromium.launch()
         page = await b.new_page(viewport={'width': 400, 'height': 860})
+        if phone:
+            await page.add_init_script(f"localStorage.setItem('flutter.depo_phone', JSON.stringify('{phone}'));")
         page.on('console', lambda m: print(f'[console.{m.type}] {m.text}'[:2000]))
         page.on('pageerror', lambda e: print(f'[PAGEERROR] {e}'[:2000]))
         page.on('requestfailed', lambda r: print(f'[REQFAIL] {r.url[:150]} {r.failure}'))
