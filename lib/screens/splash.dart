@@ -31,8 +31,16 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
   @override
   void initState() {
     super.initState();
-    app.load().then((_) {
-      Notifier.start();
+    // مهما صار (خطأ أو نت بطيء) ما نعلق بشاشة البداية
+    app.load().timeout(const Duration(seconds: 12)).catchError((e) {
+      // ignore: avoid_print
+      print('DEPO load failed: $e');
+      app.loaded = true;
+      app.offline = true;
+    }).whenComplete(() {
+      try {
+        Notifier.start();
+      } catch (_) {}
       _maybeGo();
     });
     c.forward().then((_) {

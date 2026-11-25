@@ -26,11 +26,15 @@ void main() {
   };
   FlutterError.onError = (d) {
     FlutterError.presentError(d);
+    // ignore: avoid_print
+    print('DEPO flutter error: ${d.exceptionAsString()}\n${d.stack}');
     errorLog.add('${DateTime.now()} ${d.exceptionAsString()}');
     if (errorLog.length > 100) errorLog.removeAt(0);
   };
   PlatformDispatcher.instance.onError = (e, st) {
     errorLog.add('${DateTime.now()} $e');
+    // ignore: avoid_print
+    print('DEPO uncaught: $e\n$st');
     return true; // ما نطيّح التطبيق
   };
   runApp(const DepoApp());

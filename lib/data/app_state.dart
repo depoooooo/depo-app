@@ -12,6 +12,9 @@ import 'models.dart';
 
 /// حالة التطبيق: البيانات تنحفظ بـ Firebase (Firestore) وتتزامن بين كل الأجهزة.
 /// إذا ماكو اتصال بالسيرفر، تشتغل محلياً على الجهاز.
+/// أخطاء البيانات (تنعرض بسجل الأخطاء)
+final appErrors = <String>[];
+
 class AppState extends ChangeNotifier {
   AppState() {
     // زيادة الأسعار المخفية: حسب نوع المحل ومن الإعدادات (المحل نفسه يشوف سعره هو)
@@ -272,9 +275,18 @@ class AppState extends ChangeNotifier {
         final ta = (a.data()['_ts'] ?? 0) as num, tb = (b.data()['_ts'] ?? 0) as num;
         return _newestFirst.contains(c) ? tb.compareTo(ta) : ta.compareTo(tb);
       });
-    T keep<T>(String id, Map<String, dynamic> d, T Function(Map<String, dynamic>) from, T? old) {
+    T? keep<T>(String id, Map<String, dynamic> d, T Function(Map<String, dynamic>) from, T? old) {
       if (changed != null && old != null && !changed.contains(id)) return old;
-      final fresh = from(_clean(d));
+      final T fresh;
+      try {
+        fresh = from(_clean(d));
+      } catch (e) {
+        // مستند خربان ما يطيّح القسم كله: نتجاوزه ونسجّل السبب
+        appErrors.add('${DateTime.now()} [$c/$id] $e');
+        // ignore: avoid_print
+        print('DEPO bad doc $c/$id: $e');
+        return old;
+      }
       // إذا ما تغيّر نخلي نفس الكائن (حتى الشاشات المفتوحة ما تضيع)
       if (old != null && jsonEncode((old as dynamic).toJson()) == jsonEncode((fresh as dynamic).toJson())) return old;
       return fresh;
@@ -288,37 +300,45 @@ class AppState extends ChangeNotifier {
     switch (c) {
       case 'users':
         final old = {for (final x in users) x.phone: x};
-        users = [for (final d in list) keep(d.id, d.data(), AppUser.fromJson, old[d.id])];
+        users = [for (final d in list) keep(d.id, d.data(), AppUser.fromJson, old[d.id])].whereType<AppUser>().toList();
       case 'stores':
         final old = {for (final x in stores) x.id: x};
-        stores = [for (final d in list) keep(d.id, d.data(), Store.fromJson, old[d.id])];
+        stores = [for (final d in list) keep(d.id, d.data(), Store.fromJson, old[d.id])].whereType<Store>().toList();
       case 'offers':
         final old = {for (final x in offers) x.id: x};
-        offers = [for (final d in list) keep(d.id, d.data(), Offer.fromJson, old[d.id])];
+        offers = [for (final d in list) keep(d.id, d.data(), Offer.fromJson, old[d.id])].whereType<Offer>().toList();
       case 'orders':
         final old = {for (final x in orders) x.id: x};
-        orders = [for (final d in list) keep(d.id, d.data(), Order.fromJson, old[d.id])];
+        orders = [for (final d in list) keep(d.id, d.data(), Order.fromJson, old[d.id])].whereType<Order>().toList();
       case 'joinRequests':
         final old = {for (final x in joinRequests) x.id: x};
-        joinRequests = [for (final d in list) keep(d.id, d.data(), JoinRequest.fromJson, old[d.id])];
+        joinRequests = [for (final d in list) keep(d.id, d.data(), JoinRequest.fromJson, old[d.id])].whereType<JoinRequest>().toList();
       case 'debtors':
         final old = {for (final x in debtors) x.id: x};
-        debtors = [for (final d in list) keep(d.id, d.data(), Debtor.fromJson, old[d.id])];
+        debtors = [for (final d in list) keep(d.id, d.data(), Debtor.fromJson, old[d.id])].whereType<Debtor>().toList();
       case 'debts':
         final old = {for (final x in debts) x.id: x};
-        debts = [for (final d in list) keep(d.id, d.data(), DebtEntry.fromJson, old[d.id])];
+        debts = [for (final d in list) keep(d.id, d.data(), DebtEntry.fromJson, old[d.id])].whereType<DebtEntry>().toList();
       case 'chats':
         final old = {for (final x in chats) x.id: x};
-        chats = [for (final d in list) keep(d.id, d.data(), Chat.fromJson, old[d.id])];
+        chats = [for (final d in list) keep(d.id, d.data(), Chat.fromJson, old[d.id])].whereType<Chat>().toList();
       case 'settlements':
         final old = {for (final x in settlements) x.id: x};
-        settlements = [for (final d in list) keep(d.id, d.data(), Settlement.fromJson, old[d.id])]..sort((a, b) => b.at.compareTo(a.at));
+        settlements = [for (final d in list) keep(d.id, d.data(), Settlement.fromJson, old[d.id])].whereType<Settlement>().toList()..sort((a, b) => b.at.compareTo(a.at));
       case 'complaints':
         final old = {for (final x in complaints) x.id: x};
-        complaints = [for (final d in list) keep(d.id, d.data(), Complaint.fromJson, old[d.id])];
+        complaints = [for (final d in list) keep(d.id, d.data(), Complaint.fromJson, old[d.id])].whereType<Complaint>().toList();
       case 'meta':
         for (final d in list) {
-          if (d.id == 'settings') settings = AppSettings.fromJson(_clean(d.data()));
+          if (d.id == 'settings') {
+            try {
+              settings = AppSettings.fromJson(_clean(d.data()));
+            } catch (e) {
+              appErrors.add('${DateTime.now()} [settings] $e');
+              // ignore: avoid_print
+              print('DEPO bad settings: $e');
+            }
+          }
           if (d.id == 'audit') audit = List<String>.from(d.data()['items'] ?? const []);
           if (d.id == 'content') {
             content = ContentConfig.fromJson(_clean(d.data()));

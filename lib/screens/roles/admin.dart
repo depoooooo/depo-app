@@ -471,24 +471,27 @@ class _SettingsTabState extends State<_SettingsTab> {
           ),
           const SizedBox(height: 8),
           OutlinedButton.icon(
-            onPressed: () => showDialog<void>(
+            onPressed: () {
+              final logs = [...appErrors, ...errorLog];
+              showDialog<void>(
               context: context,
               builder: (c) => AlertDialog(
-                title: Text('سجل الأخطاء (${errorLog.length})'),
+                title: Text('سجل الأخطاء (${logs.length})'),
                 content: SizedBox(
                   width: double.maxFinite,
-                  child: errorLog.isEmpty
+                  child: logs.isEmpty
                       ? const Text('ماكو أخطاء بهذي الجلسة ✓')
                       : ListView(shrinkWrap: true, children: [
-                          for (final e in errorLog.reversed) Padding(padding: const EdgeInsets.only(bottom: 8), child: Text(e, textDirection: TextDirection.ltr, style: const TextStyle(fontSize: 11))),
+                          for (final e in logs.reversed) Padding(padding: const EdgeInsets.only(bottom: 8), child: Text(e, textDirection: TextDirection.ltr, style: const TextStyle(fontSize: 11))),
                         ]),
                 ),
                 actions: [
-                  if (errorLog.isNotEmpty) TextButton(onPressed: () => copyText(c, errorLog.reversed.join('\n\n'), done: 'انسخ السجل'), child: const Text('نسخ')),
+                  if (logs.isNotEmpty) TextButton(onPressed: () => copyText(c, logs.reversed.join('\n\n'), done: 'انسخ السجل'), child: const Text('نسخ')),
                   TextButton(onPressed: () => Navigator.pop(c), child: const Text('سد')),
                 ],
               ),
-            ),
+            );
+            },
             icon: const Icon(Icons.bug_report_outlined),
             label: const Text('سجل الأخطاء (للدعم الفني)'),
           ),
