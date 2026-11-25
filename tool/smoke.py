@@ -1,45 +1,70 @@
-"""فحص تشغيل: يفتح نسخة الويب بمتصفح حقيقي ويطبع الأخطاء والنصوص اللي على الشاشة."""
+"""فحص تشغيل: يفتح نسخة الويب بمتصفح حقيقي، يتنقّل بالشاشات، ويطبع الأخطاء والنصوص اللي على الشاشة."""
 import asyncio, sys
 from playwright.async_api import async_playwright
 
-URL = sys.argv[1] if len(sys.argv) > 1 else 'https://depoooooo.github.io/depo-app/'
+URL = 'https://depoooooo.github.io/depo-app/'
 
-async def texts(page):
-    return await page.evaluate("""() => {
-      const out = [];
-      document.querySelectorAll('flt-semantics, [role], flt-semantics-container *').forEach(e => {
-        const t = (e.getAttribute('aria-label') || e.innerText || '').trim();
-        if (t && !out.includes(t)) out.push(t);
-      });
-      return out.slice(0, 80);
-    }""")
+JS_TEXTS = """() => {
+  const out = [];
+  document.querySelectorAll('flt-semantics').forEach(e => {
+    if (e.children.length && e.querySelector('flt-semantics')) return;
+    const t = (e.getAttribute('aria-label') || e.innerText || '').trim();
+    if (t && !out.includes(t)) out.push(t);
+  });
+  return out.slice(0, 90);
+}"""
 
-async def main():
-    for phone in ('', '07704720344'):
-        print(f'########## SCENARIO phone={phone or "guest"}')
-        await run(phone)
+JS_CLICK = """(txt) => {
+  const all = [...document.querySelectorAll('flt-semantics')];
+  const exact = all.filter(e => (e.getAttribute('aria-label') || e.innerText || '').trim() === txt);
+  const part = all.filter(e => (e.getAttribute('aria-label') || e.innerText || '').includes(txt));
+  const el = (exact.length ? exact : part).pop();
+  if (!el) return false;
+  el.click();
+  return true;
+}"""
 
-async def run(phone):
+async def semantics(page):
+    await page.evaluate("() => { const b = document.querySelector('flt-semantics-placeholder'); if (b) b.click(); }")
+    await page.wait_for_timeout(700)
+
+async def dump(page, label):
+    await semantics(page)
+    t = await page.evaluate(JS_TEXTS)
+    print(f'===== {label}: {len(t)} items')
+    for x in t:
+        print('   |', x.replace('\n', ' / ')[:150])
+
+async def tap(page, txt, wait=1800):
+    await semantics(page)
+    ok = await page.evaluate(JS_CLICK, txt)
+    print(f'>>> tap «{txt}»: {"ok" if ok else "NOT FOUND"}')
+    await page.wait_for_timeout(wait)
+    return ok
+
+async def run(phone, steps):
     async with async_playwright() as p:
         b = await p.chromium.launch()
         page = await b.new_page(viewport={'width': 400, 'height': 860})
         if phone:
             await page.add_init_script(f"localStorage.setItem('flutter.depo_phone', JSON.stringify('{phone}'));")
-        page.on('console', lambda m: print(f'[console.{m.type}] {m.text}'[:2000]))
-        page.on('pageerror', lambda e: print(f'[PAGEERROR] {e}'[:2000]))
-        page.on('requestfailed', lambda r: print(f'[REQFAIL] {r.url[:150]} {r.failure}'))
-        await page.goto(URL + '?v=' + str(asyncio.get_event_loop().time()), wait_until='load')
-        for sec in (6, 14, 25):
-            await page.wait_for_timeout((sec - (0 if sec == 6 else {14: 6, 25: 14}[sec])) * 1000)
-            try:
-                await page.evaluate("() => { const b = document.querySelector('flt-semantics-placeholder'); if (b) b.click(); }")
-            except Exception as e:
-                print('semantics click failed', e)
-            await page.wait_for_timeout(800)
-            t = await texts(page)
-            print(f'===== SCREEN after {sec}s: {len(t)} items')
-            for x in t:
-                print('   |', x.replace('\n', ' / ')[:160])
+        page.on('console', lambda m: None if 'GL Driver' in m.text or m.type == 'debug' else print(f'[console.{m.type}] {m.text}'[:3000]))
+        page.on('pageerror', lambda e: print(f'[PAGEERROR] {e}'[:3000]))
+        await page.goto(URL + '?v=' + str(id(page)), wait_until='load')
+        await page.wait_for_timeout(9000)
+        await dump(page, 'HOME')
+        for s in steps:
+            if s.startswith('dump:'):
+                await dump(page, s[5:])
+            else:
+                await tap(page, s)
         await b.close()
+
+async def main():
+    print('########## guest')
+    await run('', [])
+    print('########## owner: markets')
+    await run('07704720344', ['حسابي', 'الأسواق', 'dump:MARKETS', 'ديوني عند المحلات', 'dump:MY DEBTS', 'رجوع',
+                              'محلي', 'dump:MY SHOP', 'رجوع', 'dump:BACK TO MARKETS'])
 
 asyncio.run(main())

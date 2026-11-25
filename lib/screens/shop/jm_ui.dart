@@ -22,7 +22,12 @@ class Jm {
 /// نفس ثيم التطبيق، بس حقول الإدخال بيضاء وناعمة
 ThemeData jmTheme(BuildContext context) {
   final base = Theme.of(context);
+  // أزرار التطبيق العامة عرضها «كامل الشاشة» — داخل صف (Row) تخرب التخطيط وتختفي. هنا عرضها حسب محتواها
+  const size = WidgetStatePropertyAll(Size(0, 48));
   return base.copyWith(
+    filledButtonTheme: FilledButtonThemeData(style: (base.filledButtonTheme.style ?? const ButtonStyle()).copyWith(minimumSize: size)),
+    outlinedButtonTheme: OutlinedButtonThemeData(style: (base.outlinedButtonTheme.style ?? const ButtonStyle()).copyWith(minimumSize: size)),
+    elevatedButtonTheme: ElevatedButtonThemeData(style: (base.elevatedButtonTheme.style ?? const ButtonStyle()).copyWith(minimumSize: size)),
     inputDecorationTheme: base.inputDecorationTheme.copyWith(
       filled: true,
       fillColor: Colors.white,
