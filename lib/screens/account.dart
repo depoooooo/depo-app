@@ -400,9 +400,9 @@ class MarketsTile extends StatelessWidget {
           onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const MarketsScreen())),
           child: Ink(
             padding: const EdgeInsets.all(16),
-            decoration: const BoxDecoration(gradient: LinearGradient(colors: [Color(0xFF0E4A44), Color(0xFF061F1C)])),
+            decoration: const BoxDecoration(gradient: LinearGradient(colors: [DepoColors.brand, DepoColors.dark])),
             child: Row(children: [
-              const CircleAvatar(radius: 22, backgroundColor: Color(0x332EE6E0), child: Icon(Icons.storefront_rounded, color: Color(0xFF2EE6E0))),
+              const CircleAvatar(radius: 22, backgroundColor: Colors.white24, child: Icon(Icons.storefront_rounded, color: Colors.white)),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [

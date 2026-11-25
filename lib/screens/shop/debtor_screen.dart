@@ -4,6 +4,7 @@ import '../../data/models.dart';
 import '../../widgets/common.dart';
 import '../../widgets/debt_ui.dart';
 import '../chat_screen.dart';
+import '../../theme.dart';
 import 'jm_ui.dart';
 
 /// صفحة زبون بالدفتر. readOnly = الزبون نفسه يشوف ديونه
@@ -39,7 +40,7 @@ class DebtorScreen extends StatelessWidget {
           actions: [if (owner) JmCircleBtn(icon: Icons.settings_outlined, tooltip: 'معلومات الزبون', onTap: () => _edit(context, d))],
           body: ListView(padding: const EdgeInsets.fromLTRB(16, 4, 16, 32), children: [
             JmCard(
-              color: const Color(0x26000000),
+              color: Colors.white,
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text(readOnly ? 'المتبقي عليك' : 'المتبقي على الزبون', style: const TextStyle(fontSize: 13, color: Jm.sub)),
                 const SizedBox(height: 4),
@@ -47,23 +48,23 @@ class DebtorScreen extends StatelessWidget {
                 const SizedBox(height: 10),
                 ClipRRect(
                   borderRadius: BorderRadius.circular(6),
-                  child: LinearProgressIndicator(value: pct, minHeight: 8, backgroundColor: const Color(0xFFD9534F), color: const Color(0xFF4ADE80)),
+                  child: LinearProgressIndicator(value: pct, minHeight: 8, backgroundColor: const Color(0xFFFDECED), color: DepoColors.success),
                 ),
                 const SizedBox(height: 6),
                 Row(children: [
-                  Text('سدّد ${iqd(sum.paid)}', style: const TextStyle(fontSize: 12, color: Color(0xFF4ADE80), fontWeight: FontWeight.w700)),
+                  Text('سدّد ${iqd(sum.paid)}', style: const TextStyle(fontSize: 12, color: DepoColors.success, fontWeight: FontWeight.w700)),
                   const Spacer(),
-                  Text('من ${iqd(sum.ordered)}', style: const TextStyle(fontSize: 12, color: Color(0xFFFF8A8E))),
+                  Text('من ${iqd(sum.ordered)}', style: const TextStyle(fontSize: 12, color: DepoColors.danger)),
                 ]),
                 if (sum.overdue > 0 || sum.nextDue > 0) ...[
                   const SizedBox(height: 10),
                   Center(
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                      decoration: BoxDecoration(color: const Color(0x1AFFFFFF), borderRadius: BorderRadius.circular(20), border: Border.all(color: Jm.line)),
+                      decoration: BoxDecoration(color: DepoColors.soft, borderRadius: BorderRadius.circular(20), border: Border.all(color: Jm.line)),
                       child: Text(
                         sum.overdue > 0 ? 'متأخر ${iqd(sum.overdue)} من ${dateLabel(sum.oldestOverdue)}' : 'أقرب موعد استحقاق ${dateLabel(sum.nextDue)}',
-                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: sum.overdue > 0 ? const Color(0xFFFF8A8E) : Jm.text),
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: sum.overdue > 0 ? DepoColors.danger : Jm.text),
                       ),
                     ),
                   ),
@@ -103,7 +104,7 @@ class DebtorScreen extends StatelessWidget {
                       ),
                     ]),
                   ),
-                  CircleAvatar(radius: 18, backgroundColor: const Color(0x14FFFFFF), child: Icon(Icons.inbox_outlined, size: 20, color: linked ? Jm.cyan : Jm.sub)),
+                  CircleAvatar(radius: 18, backgroundColor: DepoColors.soft, child: Icon(Icons.inbox_outlined, size: 20, color: linked ? Jm.cyan : Jm.sub)),
                 ]),
               ),
               _CodeCard(d: d),
@@ -116,7 +117,7 @@ class DebtorScreen extends StatelessWidget {
               const Expanded(child: Text('الطلبات الحالية', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900))),
               if (owner && entries.any((e) => !e.voided))
                 TextButton(
-                  style: TextButton.styleFrom(foregroundColor: const Color(0xFFFF8A8E), backgroundColor: const Color(0x26E5484D), shape: const StadiumBorder()),
+                  style: TextButton.styleFrom(foregroundColor: DepoColors.danger, backgroundColor: const Color(0xFFFDECED), shape: const StadiumBorder()),
                   onPressed: () => _voidAll(context, d),
                   child: const Text('حذف الكل', style: TextStyle(fontWeight: FontWeight.w900)),
                 ),
@@ -291,7 +292,7 @@ Future<void> pickDebtorThen(BuildContext context, Store store, void Function(Deb
           for (final x in list)
             ListTile(
               title: Text(x.name, style: const TextStyle(fontWeight: FontWeight.w800, color: Jm.text)),
-              trailing: Text(iqd(app.summaryOf(x.id).remaining), style: const TextStyle(color: Color(0xFFFF8A8E), fontWeight: FontWeight.w900)),
+              trailing: Text(iqd(app.summaryOf(x.id).remaining), style: const TextStyle(color: DepoColors.danger, fontWeight: FontWeight.w900)),
               onTap: () => Navigator.pop(c, x),
             ),
         ]),
@@ -317,14 +318,14 @@ Future<void> recordPayment(BuildContext context, Debtor d) async {
         Container(
           height: 52,
           alignment: Alignment.center,
-          decoration: BoxDecoration(color: const Color(0x331FA85A), borderRadius: BorderRadius.circular(16)),
-          child: Text('تسجيل دفعة · ${d.name}', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Color(0xFF4ADE80))),
+          decoration: BoxDecoration(color: DepoColors.successBg, borderRadius: BorderRadius.circular(16)),
+          child: Text('تسجيل دفعة · ${d.name}', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: DepoColors.success)),
         ),
         const SizedBox(height: 12),
         OutlinedButton(
           style: OutlinedButton.styleFrom(
-            foregroundColor: const Color(0xFF4ADE80),
-            side: const BorderSide(color: Color(0xFF4ADE80)),
+            foregroundColor: DepoColors.success,
+            side: const BorderSide(color: DepoColors.success),
             minimumSize: const Size.fromHeight(46),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
           ),
@@ -421,11 +422,11 @@ class _DebtOrderScreenState extends State<DebtOrderScreen> {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
           decoration: BoxDecoration(
-            color: on ? const Color(0xFFFF6B6B) : const Color(0x0DFFFFFF),
+            color: on ? DepoColors.dark : Colors.white,
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: on ? const Color(0xFFFF6B6B) : Jm.line),
+            border: Border.all(color: on ? DepoColors.dark : Jm.line),
           ),
-          child: Text(t, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: Jm.text)),
+          child: Text(t, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: on ? Colors.white : Jm.text)),
         ),
       );
 
@@ -453,10 +454,10 @@ class _DebtOrderScreenState extends State<DebtOrderScreen> {
         Container(
           height: 54,
           padding: const EdgeInsets.symmetric(horizontal: 16),
-          decoration: BoxDecoration(color: const Color(0x33E5484D), borderRadius: BorderRadius.circular(18), border: Border.all(color: const Color(0x44E5484D))),
+          decoration: BoxDecoration(color: const Color(0xFFFDECED), borderRadius: BorderRadius.circular(18), border: Border.all(color: const Color(0xFFF7C7C9))),
           child: const Row(children: [
-            Expanded(child: Text('طلب جديد', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Color(0xFFFF6B6B)))),
-            CircleAvatar(radius: 14, backgroundColor: Color(0x44E5484D), child: Icon(Icons.arrow_downward, size: 16, color: Color(0xFFFF6B6B))),
+            Expanded(child: Text('طلب جديد', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Jm.red))),
+            CircleAvatar(radius: 14, backgroundColor: Color(0xFFF7C7C9), child: Icon(Icons.arrow_downward, size: 16, color: Jm.red)),
           ]),
         ),
         _label('اسم الزبون'),
@@ -469,7 +470,7 @@ class _DebtOrderScreenState extends State<DebtOrderScreen> {
               for (final s in suggestions.where((x) => x.name.contains(name.text.trim()) && x.name != name.text.trim()).take(4))
                 ActionChip(
                   label: Text(s.name),
-                  backgroundColor: const Color(0x14FFFFFF),
+                  backgroundColor: DepoColors.soft,
                   side: const BorderSide(color: Jm.line),
                   onPressed: () => setState(() {
                     name.text = s.name;
@@ -502,7 +503,7 @@ class _DebtOrderScreenState extends State<DebtOrderScreen> {
                   lines.remove(l);
                   l.dispose();
                 }),
-                icon: const CircleAvatar(radius: 14, backgroundColor: Color(0x14FFFFFF), child: Icon(Icons.close, size: 16, color: Jm.sub)),
+                icon: const CircleAvatar(radius: 14, backgroundColor: DepoColors.soft, child: Icon(Icons.close, size: 16, color: Jm.sub)),
               ),
             ]),
           ),
@@ -512,11 +513,11 @@ class _DebtOrderScreenState extends State<DebtOrderScreen> {
           child: Container(
             height: 50,
             alignment: Alignment.center,
-            decoration: BoxDecoration(borderRadius: BorderRadius.circular(16), border: Border.all(color: const Color(0xFFFF6B6B))),
-            child: const Text('+ إضافة صنف آخر', style: TextStyle(fontWeight: FontWeight.w800, color: Color(0xFFFF6B6B))),
+            decoration: BoxDecoration(borderRadius: BorderRadius.circular(16), border: Border.all(color: Jm.red)),
+            child: const Text('+ إضافة صنف آخر', style: TextStyle(fontWeight: FontWeight.w800, color: Jm.red)),
           ),
         ),
-        if (total > 0) Padding(padding: const EdgeInsets.only(top: 14), child: Text('المجموع: ${iqd(total)}', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Color(0xFFFF6B6B)))),
+        if (total > 0) Padding(padding: const EdgeInsets.only(top: 14), child: Text('المجموع: ${iqd(total)}', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Jm.red))),
         _label('شهر الدين'),
         Wrap(spacing: 8, runSpacing: 8, children: [
           for (final m in months)
@@ -526,12 +527,12 @@ class _DebtOrderScreenState extends State<DebtOrderScreen> {
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                 decoration: BoxDecoration(
-                  color: month == m ? const Color(0xFFFF6B6B) : const Color(0x0DFFFFFF),
+                  color: month == m ? DepoColors.dark : Colors.white,
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(color: month == m ? Colors.white : monthColor(m), width: month == m ? 1.5 : 1.2),
                 ),
                 child: Row(mainAxisSize: MainAxisSize.min, children: [
-                  Text(m, textDirection: TextDirection.ltr, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: Jm.text)),
+                  Text(m, textDirection: TextDirection.ltr, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: month == m ? Colors.white : Jm.text)),
                   const SizedBox(width: 6),
                   Container(width: 9, height: 9, decoration: BoxDecoration(color: monthColor(m), shape: BoxShape.circle, border: Border.all(color: Colors.white, width: month == m ? 1.5 : 0))),
                 ]),

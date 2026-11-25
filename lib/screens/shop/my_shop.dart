@@ -170,7 +170,7 @@ class _ShopFormScreenState extends State<ShopFormScreen> {
         JmCard(
           dashed: mapLink.isEmpty,
           child: Column(children: [
-            CircleAvatar(radius: 22, backgroundColor: const Color(0x2619C9B7), child: Icon(mapLink.isEmpty ? Icons.location_on_outlined : Icons.check, color: Jm.cyan)),
+            CircleAvatar(radius: 22, backgroundColor: DepoColors.soft, child: Icon(mapLink.isEmpty ? Icons.location_on_outlined : Icons.check, color: Jm.cyan)),
             const SizedBox(height: 8),
             Text(mapLink.isEmpty ? 'لم تحدد موقع المحل بعد' : 'تم تحديد موقع المحل', style: const TextStyle(fontWeight: FontWeight.w900)),
             const SizedBox(height: 4),
@@ -356,7 +356,7 @@ class _DebtsTabState extends State<_DebtsTab> {
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
         onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => OverdueReport(store: s))),
         child: Row(children: [
-          CircleAvatar(radius: 16, backgroundColor: Jm.red.withValues(alpha: 0.2), child: const Icon(Icons.picture_as_pdf_outlined, size: 18, color: Color(0xFFFF8A8E))),
+          CircleAvatar(radius: 16, backgroundColor: Jm.red.withValues(alpha: 0.2), child: const Icon(Icons.picture_as_pdf_outlined, size: 18, color: DepoColors.danger)),
           const SizedBox(width: 10),
           const Expanded(child: Text('تقرير الديون المتأخرة', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900))),
           if (overdueCount > 0) Badge2('$overdueCount', bg: Jm.red, fg: Colors.white),
@@ -394,7 +394,7 @@ class _DebtorTile extends StatelessWidget {
       border: late ? Jm.red.withValues(alpha: 0.6) : null,
       onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => DebtorScreen(debtorId: d.id))),
       child: Row(children: [
-        JmAvatar(letter: d.name.characters.first, size: 44, color: late ? const Color(0xFFFF8A8E) : Jm.yellow),
+        JmAvatar(letter: d.name.characters.first, size: 44, color: late ? DepoColors.danger : Jm.yellow),
         const SizedBox(width: 12),
         Expanded(
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -402,18 +402,18 @@ class _DebtorTile extends StatelessWidget {
             const SizedBox(height: 5),
             ClipRRect(
               borderRadius: BorderRadius.circular(4),
-              child: LinearProgressIndicator(value: sum.ordered == 0 ? 0 : sum.paid / sum.ordered, minHeight: 5, backgroundColor: Jm.red.withValues(alpha: 0.5), color: const Color(0xFF4ADE80)),
+              child: LinearProgressIndicator(value: sum.ordered == 0 ? 0 : sum.paid / sum.ordered, minHeight: 5, backgroundColor: Jm.red.withValues(alpha: 0.5), color: DepoColors.success),
             ),
             const SizedBox(height: 3),
             Text(
               late ? 'متأخر ${iqd(sum.overdue)}' : (sum.nextDue > 0 ? 'يستحق ${dateLabel(sum.nextDue)}' : 'مسدّد ${sum.paidPercent}%'),
-              style: TextStyle(fontSize: 11, color: late ? const Color(0xFFFF8A8E) : Jm.sub, fontWeight: FontWeight.w700),
+              style: TextStyle(fontSize: 11, color: late ? DepoColors.danger : Jm.sub, fontWeight: FontWeight.w700),
             ),
           ]),
         ),
         const SizedBox(width: 12),
         Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-          Text(iqd(sum.remaining), style: TextStyle(fontWeight: FontWeight.w900, color: sum.remaining > 0 ? const Color(0xFFFF8A8E) : const Color(0xFF4ADE80))),
+          Text(iqd(sum.remaining), style: TextStyle(fontWeight: FontWeight.w900, color: sum.remaining > 0 ? DepoColors.danger : DepoColors.success)),
           const Text('المتبقي', style: TextStyle(fontSize: 11, color: Jm.sub)),
         ]),
       ]),
@@ -457,7 +457,7 @@ class OverdueReport extends StatelessWidget {
                       Text('متأخر من ${dateLabel(app.summaryOf(d.id).oldestOverdue)} • الباقي ${iqd(app.summaryOf(d.id).remaining)}', style: const TextStyle(fontSize: 12, color: Jm.sub)),
                     ]),
                   ),
-                  Text(iqd(app.summaryOf(d.id).overdue), style: const TextStyle(fontWeight: FontWeight.w900, color: Color(0xFFFF8A8E))),
+                  Text(iqd(app.summaryOf(d.id).overdue), style: const TextStyle(fontWeight: FontWeight.w900, color: DepoColors.danger)),
                   IconButton(tooltip: 'إرسال تذكير', onPressed: () => sendDebtReminder(context, d), icon: const Icon(Icons.notifications_active_outlined, color: Jm.cyan)),
                 ]),
               ),
@@ -485,7 +485,7 @@ class _ProductsTab extends StatelessWidget {
       Row(children: [
         const Expanded(child: Text('العروض الخاصة', style: TextStyle(fontWeight: FontWeight.w900))),
         TextButton(
-          style: TextButton.styleFrom(foregroundColor: const Color(0xFF4ADE80), backgroundColor: const Color(0x1A1FA85A), shape: const StadiumBorder()),
+          style: TextButton.styleFrom(foregroundColor: DepoColors.success, backgroundColor: DepoColors.successBg, shape: const StadiumBorder()),
           onPressed: () => promoSheet(context, store),
           child: Text(hasPromo ? 'تعديل البنر' : '+ بنر عرض', style: const TextStyle(fontWeight: FontWeight.w900)),
         ),
@@ -616,7 +616,7 @@ Future<void> promoSheet(BuildContext context, Store store) async {
                   app.setShopPromo(store, imageId: '', text: '');
                   Navigator.pop(c);
                 },
-                child: const Text('حذف البنر', style: TextStyle(color: Color(0xFFFF8A8E), fontWeight: FontWeight.w800)),
+                child: const Text('حذف البنر', style: TextStyle(color: DepoColors.danger, fontWeight: FontWeight.w800)),
               ),
             ],
           ]),
@@ -653,7 +653,7 @@ class _CategoryProducts extends StatelessWidget {
                     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                       Text(o.title, style: TextStyle(fontWeight: FontWeight.w900, color: o.active ? Jm.text : Jm.faint)),
                       Text(iqd(o.price), style: const TextStyle(fontWeight: FontWeight.w900, color: Jm.cyan)),
-                      Text(o.active ? 'متوفر للطلب' : 'غير متوفر', style: TextStyle(fontSize: 11, color: o.active ? const Color(0xFF4ADE80) : const Color(0xFFFF8A8E))),
+                      Text(o.active ? 'متوفر للطلب' : 'غير متوفر', style: TextStyle(fontSize: 11, color: o.active ? DepoColors.success : DepoColors.danger)),
                     ]),
                   ),
                   const Icon(Icons.chevron_left, color: Jm.sub),
@@ -749,7 +749,7 @@ class _ProductEditorState extends State<ProductEditor> {
             child: Container(
               width: 88,
               height: 88,
-              decoration: BoxDecoration(borderRadius: BorderRadius.circular(18), border: Border.all(color: const Color(0x55FFFFFF)), color: const Color(0x0DFFFFFF)),
+              decoration: BoxDecoration(borderRadius: BorderRadius.circular(18), border: Border.all(color: Jm.line), color: Colors.white),
               clipBehavior: Clip.antiAlias,
               child: imageId.isNotEmpty
                   ? AppImage(imageId: imageId, height: 88, width: 88, fallback: const SizedBox())
@@ -793,14 +793,14 @@ class _ProductEditorState extends State<ProductEditor> {
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
                 decoration: BoxDecoration(
-                  color: cat == c.name && customCat.text.isEmpty ? const Color(0xFFFF6B6B) : const Color(0x0DFFFFFF),
+                  color: cat == c.name && customCat.text.isEmpty ? DepoColors.dark : Colors.white,
                   borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: cat == c.name && customCat.text.isEmpty ? const Color(0xFFFF6B6B) : Jm.line),
+                  border: Border.all(color: cat == c.name && customCat.text.isEmpty ? DepoColors.dark : Jm.line),
                 ),
                 child: Row(mainAxisSize: MainAxisSize.min, children: [
-                  Text(c.name, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: Jm.text)),
+                  Text(c.name, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: cat == c.name && customCat.text.isEmpty ? Colors.white : Jm.text)),
                   const SizedBox(width: 4),
-                  Icon(c.icon, size: 15, color: Jm.text),
+                  Icon(c.icon, size: 15, color: cat == c.name && customCat.text.isEmpty ? Colors.white : Jm.text),
                 ]),
               ),
             ),

@@ -5,6 +5,7 @@ import '../../widgets/common.dart';
 import '../../widgets/debt_ui.dart';
 import '../auth.dart';
 import 'debtor_screen.dart';
+import '../../theme.dart';
 import 'jm_ui.dart';
 
 /// «ديوني عند المحلات»: الزبون يكتب الرمز اللي انطاه صاحب المحل ويشوف ديونه
@@ -46,7 +47,7 @@ class _MyDebtsScreenState extends State<MyDebtsScreen> {
             JmCard(
               padding: const EdgeInsets.fromLTRB(16, 20, 16, 16),
               child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                const Center(child: CircleAvatar(radius: 24, backgroundColor: Color(0x2619C9B7), child: Icon(Icons.lock_outline_rounded, color: Jm.cyan))),
+                const Center(child: CircleAvatar(radius: 24, backgroundColor: DepoColors.soft, child: Icon(Icons.lock_outline_rounded, color: Jm.cyan))),
                 const SizedBox(height: 10),
                 const Text('أدخل رمز المحل', textAlign: TextAlign.center, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
                 const SizedBox(height: 4),
@@ -73,7 +74,7 @@ class _MyDebtsScreenState extends State<MyDebtsScreen> {
                       style: OutlinedButton.styleFrom(
                         foregroundColor: Jm.cyan,
                         side: const BorderSide(color: Jm.line),
-                        backgroundColor: const Color(0x14FFFFFF),
+                        backgroundColor: DepoColors.soft,
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                       ),
                       onPressed: () async {
@@ -131,11 +132,11 @@ class _Account extends StatelessWidget {
             Text(st?.name ?? 'محل', style: const TextStyle(fontWeight: FontWeight.w900)),
             Text(
               late ? 'متأخر ${iqd(sum.overdue)}' : (sum.nextDue > 0 ? 'أقرب موعد ${dateLabel(sum.nextDue)}' : 'مسدّد ${sum.paidPercent}%'),
-              style: TextStyle(fontSize: 12, color: late ? const Color(0xFFFF8A8E) : Jm.sub, fontWeight: FontWeight.w700),
+              style: TextStyle(fontSize: 12, color: late ? DepoColors.danger : Jm.sub, fontWeight: FontWeight.w700),
             ),
           ]),
         ),
-        Text(iqd(sum.remaining), style: TextStyle(fontWeight: FontWeight.w900, color: sum.remaining > 0 ? const Color(0xFFFF8A8E) : const Color(0xFF4ADE80))),
+        Text(iqd(sum.remaining), style: TextStyle(fontWeight: FontWeight.w900, color: sum.remaining > 0 ? DepoColors.danger : DepoColors.success)),
         PopupMenuButton<String>(
           iconColor: Jm.sub,
           onSelected: (_) => app.unlinkDebtCode(d.code),
