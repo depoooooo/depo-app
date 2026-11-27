@@ -22,3 +22,5 @@ ios/.symlinks/
 google-services.json
 GoogleService-Info.plist
 .env
+android/app/upload.jks
+android/key.properties

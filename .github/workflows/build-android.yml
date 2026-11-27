@@ -39,7 +39,14 @@ jobs:
           if [ ! -d web ]; then
             flutter create --platforms=web --org com.depo --project-name depo .
           fi
+          # مفتاح التوقيع الرسمي: مشفّر بالمستودع، ويفتحه السر DEPO_KEY_PASS (إذا مو مضاف، يبني بتوقيع تجريبي)
+          if [ -n "$DEPO_KEY_PASS" ]; then
+            openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -in branding/upload.jks.enc -out android/app/upload.jks -pass env:DEPO_KEY_PASS
+            printf 'storePassword=%s\nkeyPassword=%s\nkeyAlias=upload\nstoreFile=upload.jks\n' "$DEPO_KEY_PASS" "$DEPO_KEY_PASS" > android/key.properties
+          fi
           python3 branding/apply_branding.py
+        env:
+          DEPO_KEY_PASS: ${{ secrets.DEPO_KEY_PASS }}
 
       - run: flutter pub get
 
@@ -47,7 +54,12 @@ jobs:
         run: flutter analyze --no-fatal-infos --no-fatal-warnings
 
       - name: بناء APK
-        run: flutter build apk --release
+        run: flutter build apk --release --build-number=${{ github.run_number }}
+
+      # نسخة متجر Google Play (.aab) — بس إذا التوقيع الرسمي مفعّل
+      - name: بناء نسخة المتجر AAB
+        if: ${{ hashFiles('android/key.properties') != '' }}
+        run: flutter build appbundle --release --build-number=${{ github.run_number }}
 
       - name: رفع الـ APK
         uses: actions/upload-artifact@v4
@@ -69,7 +81,10 @@ jobs:
           tag_name: build-${{ github.run_number }}
           name: Depo تجريبي ${{ github.run_number }}
           prerelease: true
-          files: build/app/outputs/flutter-apk/app-release.apk
+          files: |
+            build/app/outputs/flutter-apk/app-release.apk
+            build/app/outputs/bundle/release/app-release.aab
+          fail_on_unmatched_files: false
 
   deploy-web:
     needs: build

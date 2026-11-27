@@ -70,6 +70,27 @@ elif os.path.exists(gg):
         s += "\ndependencies {\n    coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.4'\n}\n"
         open(gg, "w", encoding="utf-8").write(s)
 
+# توقيع النسخة الرسمية (لمتجر Google Play): يشتغل بس إذا ملف key.properties موجود (ينكتب بالبناء من السر DEPO_KEY_PASS)
+if os.path.exists(gk) and os.path.exists(os.path.join(ROOT, "android/key.properties")):
+    s = open(gk, encoding="utf-8").read()
+    if 'create("release")' not in s:
+        cfg = (
+            "android {\n"
+            "    signingConfigs {\n"
+            "        create(\"release\") {\n"
+            "            val p = java.util.Properties().apply { load(java.io.FileInputStream(rootProject.file(\"key.properties\"))) }\n"
+            "            keyAlias = p.getProperty(\"keyAlias\")\n"
+            "            keyPassword = p.getProperty(\"keyPassword\")\n"
+            "            storeFile = file(p.getProperty(\"storeFile\"))\n"
+            "            storePassword = p.getProperty(\"storePassword\")\n"
+            "        }\n"
+            "    }\n"
+        )
+        s = s.replace("android {\n", cfg, 1)
+        s = s.replace('signingConfig = signingConfigs.getByName("debug")', 'signingConfig = signingConfigs.getByName("release")')
+        open(gk, "w", encoding="utf-8").write(s)
+        print("release signing: ON")
+
 # فحص lint بأندرويد يتعطل ويه إضافات Firebase، نطفيه وقت البناء (ما يأثر على التطبيق)
 LINT_OFF = 'subprojects { tasks.matching { it.name.contains("lintVital") }.configureEach { enabled = false } }'
 for g in ("android/build.gradle.kts", "android/build.gradle"):
