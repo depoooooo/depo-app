@@ -11,6 +11,8 @@
     out.push({ name: f.split('/').pop(), type: r.headers.get('content-type') || 'application/octet-stream', blob: await r.blob() });
   }
   document.getElementById('s').textContent = 'sent ' + out.length;
-  if (window.opener) window.opener.postMessage({ depoFiles: out }, 'https://play.google.com');
+  const msg = { depoFiles: out };
+  if (window.opener) window.opener.postMessage(msg, 'https://play.google.com');
+  if (window.parent && window.parent !== window) window.parent.postMessage(msg, 'https://play.google.com');
 })();
 </script></body></html>
