@@ -922,6 +922,7 @@ class AppSettings {
   int ratingMinCount; // أقل عدد تقييمات حتى يدخل بالمستويات
   int ratingPrioritySec; // المستويات الأقل تشوف الطلب الجديد بعد هالثواني
   bool otpLive; // رمز التحقق الحقيقي (OTPIQ عن طريق السيرفر) بدل التجريبي
+  String otpServer; // رابط سيرفر Cloudflare
 
   AppSettings({
     this.restaurantCommission = 15,
@@ -970,6 +971,7 @@ class AppSettings {
     this.ratingMinCount = 10,
     this.ratingPrioritySec = 30,
     this.otpLive = false,
+    this.otpServer = '',
   });
 
   /// هل الساعة [h] ضمن الذروة؟
@@ -1035,6 +1037,7 @@ class AppSettings {
         'ratingMinCount': ratingMinCount,
         'ratingPrioritySec': ratingPrioritySec,
         'otpLive': otpLive,
+        'otpServer': otpServer,
       };
 
   factory AppSettings.fromJson(Map<String, dynamic> j) {
@@ -1088,6 +1091,7 @@ class AppSettings {
       ratingMinCount: g('ratingMinCount', d.ratingMinCount),
       ratingPrioritySec: g('ratingPrioritySec', d.ratingPrioritySec),
       otpLive: (j['otpLive'] ?? d.otpLive) as bool,
+      otpServer: (j['otpServer'] ?? d.otpServer) as String,
     );
   }
 }

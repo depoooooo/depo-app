@@ -75,7 +75,8 @@ class _LoginScreenState extends State<LoginScreen> {
     if (via != null) channel = via;
     if (Otp.waitBeforeResend > Duration.zero && step == _Step.code && via == null) return;
     setState(() => sending = true);
-    Otp.live = app.settings.otpLive;
+    Otp.live = app.settings.otpLive && app.settings.otpServer.startsWith('https://');
+    Otp.server = app.settings.otpServer;
     final shown = await Otp.send(phoneNorm, channel);
     if (!mounted) return;
     if (shown == null) {

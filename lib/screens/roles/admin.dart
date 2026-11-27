@@ -203,6 +203,7 @@ class _SettingsTabState extends State<_SettingsTab> {
       'ratingWindow': TextEditingController(text: '${s.ratingWindow}'),
       'ratingMinCount': TextEditingController(text: '${s.ratingMinCount}'),
       'ratingPrioritySec': TextEditingController(text: '${s.ratingPrioritySec}'),
+      'otpServer': TextEditingController(text: s.otpServer),
     };
     campaign = TextEditingController(text: s.campaignName);
     firstFree = s.firstOrderFree;
@@ -268,6 +269,7 @@ class _SettingsTabState extends State<_SettingsTab> {
     s.couponDays = v('couponDays', s.couponDays).clamp(1, 90);
     s.ratingTiersOn = ratingTiersOn;
     s.otpLive = otpLive;
+    s.otpServer = c['otpServer']!.text.trim();
     final rt = c['ratingTiers']!.text.replaceAll(' ', '').replaceAll('،', ',');
     if (RegExp(r'^\d(\.\d+)?:-?\d+(,\d(\.\d+)?:-?\d+)*$').hasMatch(rt)) s.ratingTiers = rt;
     s.ratingWindow = v('ratingWindow', s.ratingWindow).clamp(5, 1000);
@@ -352,13 +354,20 @@ class _SettingsTabState extends State<_SettingsTab> {
         ),
         const SectionTitle('رمز التحقق'),
         AppCard(
-          child: SwitchListTile(
+          child: Column(children: [
+            TextField(
+              controller: c['otpServer'],
+              textDirection: TextDirection.ltr,
+              decoration: const InputDecoration(labelText: 'رابط سيرفر الرمز (Cloudflare)', hintText: 'https://depo-otp.xxx.workers.dev'),
+            ),
+            SwitchListTile(
             contentPadding: EdgeInsets.zero,
             value: otpLive,
             onChanged: (v) => setState(() => otpLive = v),
             title: const Text('رمز تحقق حقيقي (واتساب ثم SMS)', style: TextStyle(fontWeight: FontWeight.w800)),
             subtitle: const Text('عن طريق OTPIQ من السيرفر (25 د.ع للرمز). إذا مطفي، الرمز يطلع على الشاشة (تجريبي)'),
           ),
+          ]),
         ),
         const SectionTitle('مستويات المندوبين حسب التقييم'),
         AppCard(
