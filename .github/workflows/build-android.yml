@@ -68,7 +68,9 @@ jobs:
           path: build/app/outputs/flutter-apk/app-release.apk
 
       - name: بناء نسخة الويب
-        run: flutter build web --release --base-href /depo-app/
+        run: |
+          flutter build web --release --base-href /depo-app/
+          cp branding/privacy.html build/web/privacy.html
 
       - name: تجهيز رابط الويب
         uses: actions/upload-pages-artifact@v3
