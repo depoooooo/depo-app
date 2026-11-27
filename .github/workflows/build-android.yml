@@ -72,6 +72,21 @@ jobs:
           flutter build web --release --base-href /depo-app/
           cp branding/privacy.html build/web/privacy.html
           cp branding/delete-account.html build/web/delete-account.html
+          mkdir -p build/web/store
+          cp branding/relay.html build/web/relay.html
+          cp branding/Icon-512.png branding/feature-graphic.png build/web/store/
+          if [ -f build/app/outputs/bundle/release/app-release.aab ]; then cp build/app/outputs/bundle/release/app-release.aab build/web/store/depo.aab; fi
+
+      # صور شاشة للمتجر من نسخة الويب (ما توقف البناء إذا فشلت)
+      - name: صور شاشة المتجر
+        continue-on-error: true
+        run: |
+          pip install playwright >/dev/null && python -m playwright install --with-deps chromium >/dev/null
+          mkdir -p /tmp/site && cp -r build/web /tmp/site/depo-app
+          (cd /tmp/site && python3 -m http.server 8099 >/dev/null 2>&1 &)
+          sleep 2
+          python3 tool/store_shots.py build/web/store
+          ls -la build/web/store
 
       - name: تجهيز رابط الويب
         uses: actions/upload-pages-artifact@v3

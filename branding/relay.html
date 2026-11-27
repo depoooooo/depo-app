@@ -1,0 +1,16 @@
+<!DOCTYPE html><html><head><meta charset="utf-8"><title>Depo relay</title></head><body>
+<p id="s">...</p>
+<script>
+// يفتحه Play Console ويطلب ملف من هذا الموقع، وهذا يرجّعه إله بـ postMessage
+(async () => {
+  const q = new URLSearchParams(location.search);
+  const files = (q.get('f') || '').split(',').filter(Boolean);
+  const out = [];
+  for (const f of files) {
+    const r = await fetch(f + '?v=' + Date.now());
+    out.push({ name: f.split('/').pop(), type: r.headers.get('content-type') || 'application/octet-stream', blob: await r.blob() });
+  }
+  document.getElementById('s').textContent = 'sent ' + out.length;
+  if (window.opener) window.opener.postMessage({ depoFiles: out }, 'https://play.google.com');
+})();
+</script></body></html>
