@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../data/app_state.dart';
 import '../data/models.dart';
 import '../theme.dart';
+import '../widgets/common.dart';
 import '../widgets/nav_icons.dart';
 import 'account.dart';
 import 'cart_screen.dart';
@@ -24,6 +25,17 @@ class Shell extends StatefulWidget {
 class _ShellState extends State<Shell> {
   int index = 0;
   void setIndex(int i) => setState(() => index = i);
+
+  @override
+  void initState() {
+    super.initState();
+    if (app.reloginNeeded) {
+      app.reloginNeeded = false;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) toast(context, 'فعّلنا رمز التحقق الحقيقي لحماية حسابك — سجّل دخول مرة ثانية من «حسابي»');
+      });
+    }
+  }
 
   // الصفحات تنبني مرة وحدة، وكل صفحة تتحدث لحالها (مو كل التطبيق ويه كل تغيير)
   late final List<Widget> pages = [

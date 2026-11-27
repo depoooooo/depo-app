@@ -1,13 +1,56 @@
 rules_version = '2';
 
-// قواعد المرحلة الأولى (تجريبية):
-// أي جهاز فاتح التطبيق (دخول مجهول Anonymous) يكدر يقرا ويكتب بالأقسام المسموحة بس.
-// قبل الإطلاق نبدلها بقواعد كاملة تعتمد على رقم الهاتف المؤكَّد والدور (زبون/مطعم/تاجر/مندوب/مشرف/مدير).
+// قواعد الحماية — المرحلة الأولى (بعد تفعيل رمز التحقق الحقيقي)
+// الهوية: الدخول برمز حقيقي يعطي المستخدم هوية بيها رقمه (request.auth.token.phone)
+// - الأدوار والصلاحيات والإيقاف: المدير بس (والمشرف لحسابات الزبائن/المندوبين/المحلات)
+// - الرمز السري: صاحب الحساب بس (أو أول مرة)
+// - الإعدادات: المدير بس. المحتوى: المدير والمشرفين
+// المرحلة الثانية: كل مستخدم يقرا بياناته بس (تحتاج إعادة بناء طريقة المزامنة بالتطبيق)
 service cloud.firestore {
   match /databases/{database}/documents {
+    function signed() { return request.auth != null; }
+    function myPhone() { return signed() ? request.auth.token.get('phone', '') : ''; }
+    function myDoc() { return /databases/$(database)/documents/users/$(myPhone()); }
+    function hasMe() { return myPhone() != '' && exists(myDoc()); }
+    function isOwner() { return myPhone() == '07704720344'; }
+    function active() { return get(myDoc()).data.get('suspended', false) == false; }
+    function isAdmin() { return isOwner() || (hasMe() && get(myDoc()).data.role == 'admin' && active()); }
+    function isSupervisor() { return hasMe() && get(myDoc()).data.role == 'supervisor' && active(); }
+    function changed() { return request.resource.data.diff(resource.data).affectedKeys(); }
+
+    match /users/{p} {
+      allow read: if signed();
+      allow create: if signed() && (isAdmin() || (
+        request.resource.data.phone == p
+        && request.resource.data.get('perms', []).size() == 0
+        && request.resource.data.get('suspended', false) == false
+        && request.resource.data.get('storeId', null) == null
+        && (request.resource.data.role == 'customer' || (request.resource.data.role == 'admin' && p == '07704720344' && isOwner()))
+      ));
+      allow update: if signed() && (
+        isAdmin()
+        || (!changed().hasAny(['role', 'perms', 'suspended', 'storeId', 'phone'])
+            && (!changed().hasAny(['pinHash']) || myPhone() == p || resource.data.get('pinHash', '') == ''))
+        || (isSupervisor()
+            && !changed().hasAny(['perms', 'phone'])
+            && !(resource.data.role in ['admin', 'supervisor'])
+            && request.resource.data.role in ['customer', 'courier', 'restaurant', 'merchant'])
+      );
+      allow delete: if signed() && (myPhone() == p || isAdmin());
+    }
+
+    match /meta/{id} {
+      allow read: if signed();
+      allow write: if signed() && (
+        id == 'settings' ? isAdmin()
+        : id == 'content' ? (isAdmin() || isSupervisor())
+        : true
+      );
+    }
+
     match /{col}/{docId} {
-      allow read, write: if request.auth != null
-        && col in ['users', 'stores', 'offers', 'orders', 'joinRequests', 'complaints', 'meta', 'images', 'debtors', 'debts', 'chats', 'settlements'];
+      allow read, write: if signed()
+        && col in ['stores', 'offers', 'orders', 'joinRequests', 'complaints', 'images', 'debtors', 'debts', 'chats', 'settlements'];
     }
   }
 }

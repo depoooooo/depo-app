@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart' as fs;
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:crypto/crypto.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'cloud.dart';
@@ -94,6 +95,7 @@ class AppState extends ChangeNotifier {
     _selectedPlace = prefs.getString('depo_place');
     courierAvailable = prefs.getBool('depo_courier_available') ?? true;
     if (await _tryConnect()) {
+      await _checkIdentity();
       await loadSeen();
       loaded = true;
       notifyListeners();
@@ -115,6 +117,24 @@ class AppState extends ChangeNotifier {
       }
     });
   }
+
+  /// مع الرمز الحقيقي: الهوية بالسيرفر لازم تطابق الرقم المسجّل بالجهاز.
+  /// الأجهزة اللي دخلت قبل الرمز الحقيقي (أو هوية رقم ثاني) نطلّعها حتى تدخل من جديد برمز —
+  /// وإلا قواعد الحماية بالسيرفر ترفض تعديلاتها.
+  Future<void> _checkIdentity() async {
+    if (currentPhone == null || !settings.otpLive) return;
+    try {
+      final u = FirebaseAuth.instance.currentUser;
+      final claims = u == null ? null : (await u.getIdTokenResult().timeout(const Duration(seconds: 8))).claims;
+      if (claims?['phone'] != currentPhone) {
+        reloginNeeded = true;
+        logout();
+      }
+    } catch (_) {}
+  }
+
+  /// انطلب من المستخدم يدخل من جديد (بسبب تفعيل الرمز الحقيقي)
+  bool reloginNeeded = false;
 
   /// ماكو اتصال بالسيرفر هسه (نحاول بالخلفية)
   bool offline = false;

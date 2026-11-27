@@ -1,6 +1,6 @@
 // سيرفر ديبو على Cloudflare Workers:
 // رمز التحقق عن طريق OTPIQ (واتساب ثم SMS) + هوية رسمية من Firebase (custom token)
-// الأسرار (تنحط من لوحة Cloudflare، مو بالكود): OTPIQ_KEY, FB_CLIENT_EMAIL, FB_PRIVATE_KEY
+// الأسرار (تنحط من لوحة Cloudflare، مو بالكود): OTPIQ_KEY, FB_CLIENT_EMAIL, FB_PRIVATE_KEY, REVIEW_CODE (اختياري)
 // التخزين: KV باسم OTP_KV
 
 const CODE_TTL = 5 * 60; // ثانية
@@ -65,6 +65,12 @@ async function send(env, body) {
   const channel = body.channel === 'sms' ? 'sms' : 'whatsapp-sms';
   const now = Math.floor(Date.now() / 1000);
   const d = (await env.OTP_KV.get('otp:' + phone, 'json')) || {};
+  // حساب مراجعة Google Play: رمز ثابت من الأسرار (REVIEW_CODE)، بدون رسالة وبدون حدود
+  if (env.REVIEW_CODE && phone === (env.REVIEW_PHONE || '07500000001')) {
+    const rc = String(env.REVIEW_CODE).trim();
+    await env.OTP_KV.put('otp:' + phone, JSON.stringify({ codeHash: await sha256(`${phone}:${rc}:${env.FB_CLIENT_EMAIL}`), expiresAt: now + CODE_TTL, tries: 0, sentAt: 0 }), { expirationTtl: 3600 });
+    return json({ ok: true, resendAfter: RESEND });
+  }
   if (d.sentAt && now - d.sentAt < RESEND) return fail(`انتظر ${RESEND - (now - d.sentAt)} ثانية وجرّب`, 429);
   const hourStart = d.hourStart && now - d.hourStart < 3600 ? d.hourStart : now;
   const hourCount = hourStart === d.hourStart ? (d.hourCount || 0) : 0;
@@ -73,7 +79,7 @@ async function send(env, body) {
   const code = code6();
   const r = await fetch('https://api.otpiq.com/api/sms', {
     method: 'POST',
-    headers: { Authorization: `Bearer ${env.OTPIQ_KEY}`, 'Content-Type': 'application/json', Accept: 'application/json' },
+    headers: { Authorization: `Bearer ${String(env.OTPIQ_KEY || '').trim()}`, 'Content-Type': 'application/json', Accept: 'application/json' },
     body: JSON.stringify({ phoneNumber: '964' + phone.slice(1), smsType: 'verification', verificationCode: code, provider: channel }),
   });
   if (!r.ok) {
