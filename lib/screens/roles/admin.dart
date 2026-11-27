@@ -160,6 +160,7 @@ class _SettingsTabState extends State<_SettingsTab> {
   late bool loyaltyOn = app.settings.loyaltyOn;
   late bool scratchOn = app.settings.scratchOn;
   late bool ratingTiersOn = app.settings.ratingTiersOn;
+  late bool otpLive = app.settings.otpLive;
 
   @override
   void initState() {
@@ -266,6 +267,7 @@ class _SettingsTabState extends State<_SettingsTab> {
     s.scratchMinOrder = v('scratchMinOrder', s.scratchMinOrder);
     s.couponDays = v('couponDays', s.couponDays).clamp(1, 90);
     s.ratingTiersOn = ratingTiersOn;
+    s.otpLive = otpLive;
     final rt = c['ratingTiers']!.text.replaceAll(' ', '').replaceAll('،', ',');
     if (RegExp(r'^\d(\.\d+)?:-?\d+(,\d(\.\d+)?:-?\d+)*$').hasMatch(rt)) s.ratingTiers = rt;
     s.ratingWindow = v('ratingWindow', s.ratingWindow).clamp(5, 1000);
@@ -347,6 +349,16 @@ class _SettingsTabState extends State<_SettingsTab> {
               subtitle: const Text('مطفي = زر «أوصله بمندوبي» ما يطلع للمحل'),
             ),
           ]),
+        ),
+        const SectionTitle('رمز التحقق'),
+        AppCard(
+          child: SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            value: otpLive,
+            onChanged: (v) => setState(() => otpLive = v),
+            title: const Text('رمز تحقق حقيقي (واتساب ثم SMS)', style: TextStyle(fontWeight: FontWeight.w800)),
+            subtitle: const Text('عن طريق OTPIQ من السيرفر (25 د.ع للرمز). إذا مطفي، الرمز يطلع على الشاشة (تجريبي)'),
+          ),
         ),
         const SectionTitle('مستويات المندوبين حسب التقييم'),
         AppCard(

@@ -921,6 +921,7 @@ class AppSettings {
   int ratingWindow; // آخر كم تقييم ينحسب
   int ratingMinCount; // أقل عدد تقييمات حتى يدخل بالمستويات
   int ratingPrioritySec; // المستويات الأقل تشوف الطلب الجديد بعد هالثواني
+  bool otpLive; // رمز التحقق الحقيقي (OTPIQ عن طريق السيرفر) بدل التجريبي
 
   AppSettings({
     this.restaurantCommission = 15,
@@ -968,6 +969,7 @@ class AppSettings {
     this.ratingWindow = 50,
     this.ratingMinCount = 10,
     this.ratingPrioritySec = 30,
+    this.otpLive = false,
   });
 
   /// هل الساعة [h] ضمن الذروة؟
@@ -1032,6 +1034,7 @@ class AppSettings {
         'ratingWindow': ratingWindow,
         'ratingMinCount': ratingMinCount,
         'ratingPrioritySec': ratingPrioritySec,
+        'otpLive': otpLive,
       };
 
   factory AppSettings.fromJson(Map<String, dynamic> j) {
@@ -1084,6 +1087,7 @@ class AppSettings {
       ratingWindow: g('ratingWindow', d.ratingWindow),
       ratingMinCount: g('ratingMinCount', d.ratingMinCount),
       ratingPrioritySec: g('ratingPrioritySec', d.ratingPrioritySec),
+      otpLive: (j['otpLive'] ?? d.otpLive) as bool,
     );
   }
 }

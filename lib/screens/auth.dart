@@ -75,12 +75,18 @@ class _LoginScreenState extends State<LoginScreen> {
     if (via != null) channel = via;
     if (Otp.waitBeforeResend > Duration.zero && step == _Step.code && via == null) return;
     setState(() => sending = true);
+    Otp.live = app.settings.otpLive;
     final shown = await Otp.send(phoneNorm, channel);
     if (!mounted) return;
+    if (shown == null) {
+      setState(() => sending = false);
+      toast(context, Otp.lastError ?? 'ما كدرنا نرسل الرمز');
+      return;
+    }
     code.clear();
     setState(() {
       sending = false;
-      demoCode = shown ?? '';
+      demoCode = shown;
       step = _Step.code;
       attempts = 0;
       resendLeft = Otp.resendAfter.inSeconds;
@@ -94,14 +100,14 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _verify() async {
-    if (!await Otp.verify(code.text)) {
+    if (!await Otp.verify(phoneNorm, code.text)) {
       if (!mounted) return;
       attempts++;
       if (attempts >= 5) {
         toast(context, 'محاولات كثيرة، أعد إرسال الرمز');
         setState(() => step = _Step.phone);
       } else {
-        toast(context, 'الرمز غلط، جرب مرة ثانية');
+        toast(context, Otp.lastError ?? 'الرمز غلط، جرب مرة ثانية');
       }
       return;
     }
@@ -263,7 +269,7 @@ class _LoginScreenState extends State<LoginScreen> {
             const SizedBox(height: 4),
             Text('دزّينا رمز من 6 أرقام على ${otpChannelNames[channel]} للرقم $phoneNorm', style: const TextStyle(color: DepoColors.muted)),
             const SizedBox(height: 12),
-            Container(
+            if (demoCode.isNotEmpty) Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(color: const Color(0xFFFFF6E5), borderRadius: BorderRadius.circular(12)),
               child: Text('نسخة تجريبية: الرمز هو $demoCode\n(بعد التفعيل يوصلك على ${otpChannelNames[channel]})',
