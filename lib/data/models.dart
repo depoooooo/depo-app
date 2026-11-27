@@ -971,7 +971,7 @@ class AppSettings {
     this.ratingMinCount = 10,
     this.ratingPrioritySec = 30,
     this.otpLive = false,
-    this.otpServer = '',
+    this.otpServer = 'https://depo-otp.deposupport.workers.dev',
   });
 
   /// هل الساعة [h] ضمن الذروة؟
@@ -1091,7 +1091,7 @@ class AppSettings {
       ratingMinCount: g('ratingMinCount', d.ratingMinCount),
       ratingPrioritySec: g('ratingPrioritySec', d.ratingPrioritySec),
       otpLive: (j['otpLive'] ?? d.otpLive) as bool,
-      otpServer: (j['otpServer'] ?? d.otpServer) as String,
+      otpServer: ((j['otpServer'] as String?)?.trim().isNotEmpty ?? false) ? j['otpServer'] as String : d.otpServer,
     );
   }
 }
