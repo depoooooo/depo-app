@@ -43,8 +43,7 @@ service cloud.firestore {
       allow read: if signed();
       allow write: if signed() && (
         id == 'settings' ? isAdmin()
-        : id == 'content' ? (isAdmin() || isSupervisor())
-        : true
+        : (id == 'content' ? (isAdmin() || isSupervisor()) : true)
       );
     }
 
