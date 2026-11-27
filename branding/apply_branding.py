@@ -74,15 +74,15 @@ elif os.path.exists(gg):
 if os.path.exists(gk) and os.path.exists(os.path.join(ROOT, "android/key.properties")):
     s = open(gk, encoding="utf-8").read()
     if 'create("release")' not in s:
+        kp = dict(l.split("=", 1) for l in open(os.path.join(ROOT, "android/key.properties"), encoding="utf-8").read().splitlines() if "=" in l)
         cfg = (
             "android {\n"
             "    signingConfigs {\n"
             "        create(\"release\") {\n"
-            "            val p = java.util.Properties().apply { load(java.io.FileInputStream(rootProject.file(\"key.properties\"))) }\n"
-            "            keyAlias = p.getProperty(\"keyAlias\")\n"
-            "            keyPassword = p.getProperty(\"keyPassword\")\n"
-            "            storeFile = file(p.getProperty(\"storeFile\"))\n"
-            "            storePassword = p.getProperty(\"storePassword\")\n"
+            f"            keyAlias = \"{kp['keyAlias']}\"\n"
+            f"            keyPassword = \"{kp['keyPassword']}\"\n"
+            f"            storeFile = file(\"{kp['storeFile']}\")\n"
+            f"            storePassword = \"{kp['storePassword']}\"\n"
             "        }\n"
             "    }\n"
         )
