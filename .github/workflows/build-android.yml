@@ -71,6 +71,7 @@ jobs:
         run: |
           flutter build web --release --base-href /depo-app/
           cp branding/privacy.html build/web/privacy.html
+          cp branding/delete-account.html build/web/delete-account.html
 
       - name: تجهيز رابط الويب
         uses: actions/upload-pages-artifact@v3
